@@ -1,0 +1,86 @@
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.78'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = neo_version
+
+    parchment {
+        mappingsVersion = '2024.11.17'
+        minecraftVersion = '1.21.1'
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    // Create, Ponder, Flywheel
+    maven { url = 'https://maven.createmod.net' }
+    // Registrate (Create dependency)
+    maven { url = 'https://mvn.devos.one/snapshots' }
+}
+
+dependencies {
+    // ------------------------------------------------------------------
+    // IMPORTANT: match these versions to the Create version in YOUR pack.
+    // Check the versions Create itself uses at:
+    //   https://github.com/Creators-of-Create/Create/blob/mc1.21.1/dev/gradle.properties
+    // The versions below correspond to Create 6.0.10 for MC 1.21.1.
+    // ------------------------------------------------------------------
+    implementation("com.simibubi.create:create-1.21.1:6.0.10-281:slim") { transitive = false }
+    implementation("net.createmod.ponder:ponder-neoforge:1.0.82+mc1.21.1")
+    implementation("dev.engine-room.flywheel:flywheel-neoforge-1.21.1:1.0.6")
+    implementation("com.tterrag.registrate:Registrate:MC1.21-1.3.0+67")
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources', ProcessResources) {
+    var replaceProperties = [
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version            : neo_version,
+        neo_version_range      : neo_version_range,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_license            : mod_license,
+        mod_version            : mod_version,
+        mod_authors            : mod_authors,
+        mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties + [project: project]
+    }
+}

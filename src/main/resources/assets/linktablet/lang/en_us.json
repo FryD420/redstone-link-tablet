@@ -1,0 +1,28 @@
+{
+  "item.linktablet.tablet": "Link Tablet",
+  "item.linktablet.tablet.tooltip": "Toggle Create Redstone Links remotely",
+  "itemGroup.linktablet": "Link Tablet",
+
+  "gui.linktablet.tablet.title": "Link Tablet",
+  "gui.linktablet.add_app": "+",
+  "gui.linktablet.add_app_row": "+ Add App",
+  "gui.linktablet.view.grid": "Grid view",
+  "gui.linktablet.view.list": "List view",
+  "gui.linktablet.no_apps": "No apps yet. Tap + to add one.",
+  "gui.linktablet.edit_app.title.new": "New App",
+  "gui.linktablet.edit_app.title.edit": "Edit App",
+  "gui.linktablet.edit_app.name": "App name",
+  "gui.linktablet.edit_app.frequency": "Frequency",
+  "gui.linktablet.edit_app.frequencies": "Frequencies",
+  "gui.linktablet.edit_app.add_frequency": "Add",
+  "gui.linktablet.edit_app.no_frequencies": "Pick two items, then hit Add.",
+  "gui.linktablet.edit_app.chip_remove": "Click to remove this frequency",
+  "gui.linktablet.edit_app.icon": "Icon",
+  "gui.linktablet.edit_app.icon.default": "Default (frequency items)",
+  "gui.linktablet.edit_app.color": "Color",
+  "gui.linktablet.edit_app.save": "Save",
+  "gui.linktablet.edit_app.cancel": "Cancel",
+  "gui.linktablet.edit_app.remove": "Remove App",
+  "gui.linktablet.picker.search": "Search items...",
+  "gui.linktablet.picker.clear_icon": "Use frequency as icon"
+}

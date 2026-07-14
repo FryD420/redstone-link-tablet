@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+
+# Dev runs (worlds, logs, server files)
+run/
+runs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Claude Code local session config
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

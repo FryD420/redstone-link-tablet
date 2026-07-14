@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "LSL",
+    "SCS",
+    "LSL"
+  ],
+  "key": {
+    "L": {
+      "item": "create:redstone_link"
+    },
+    "S": {
+      "item": "minecraft:nether_star"
+    },
+    "C": {
+      "item": "create:linked_controller"
+    }
+  },
+  "result": {
+    "id": "linktablet:tablet",
+    "count": 1
+  }
+}
