@@ -1,6 +1,7 @@
 modLoader = "javafml"
 loaderVersion = "${loader_version_range}"
 license = "${mod_license}"
+issueTrackerURL = "https://github.com/FryD420/redstone-link-tablet/issues"
 
 [[mods]]
 modId = "${mod_id}"
