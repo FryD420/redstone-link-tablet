@@ -1,6 +1,7 @@
 {
   "item.linktablet.tablet": "Link Tablet",
   "item.linktablet.tablet.tooltip": "Toggle Create Redstone Links remotely",
+  "item.linktablet.tablet.case": "Case: %s",
   "itemGroup.linktablet": "Link Tablet",
 
   "gui.linktablet.tablet.title": "Link Tablet",

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dyed cases: craft the tablet with any dye (shapeless) to color its case — back,
+  edges, and front bezel ring. Apps are preserved; re-dye anytime. All 16 colors.
 - Momentary apps: a per-app "Momentary" setting makes the app transmit only while the
   button is held down (doorbells, dispensers). Held state is transient and server-side,
   so a disconnect can never leave a signal stuck on. Momentary apps show a hollow ring

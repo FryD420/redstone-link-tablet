@@ -1,7 +1,9 @@
 package com.modpack.linktablet.item;
 
 import com.modpack.linktablet.client.ClientHooks;
+import com.modpack.linktablet.registry.ModDataComponents;
 import net.minecraft.ChatFormatting;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -33,5 +35,11 @@ public class TabletItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.linktablet.tablet.tooltip").withStyle(ChatFormatting.GRAY));
+        DyeColor caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
+        if (caseColor != null) {
+            tooltip.add(Component.translatable("item.linktablet.tablet.case",
+                            Component.translatable("color.minecraft." + caseColor.getName()))
+                    .withStyle(ChatFormatting.GRAY));
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.modpack.linktablet.frequency.SignalApp;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.world.item.DyeColor;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -21,6 +22,13 @@ public class ModDataComponents {
             DATA_COMPONENTS.register("tablet_apps", () -> DataComponentType.<List<SignalApp>>builder()
                     .persistent(SignalApp.CODEC.listOf())
                     .networkSynchronized(SignalApp.STREAM_CODEC.apply(ByteBufCodecs.list()))
+                    .build());
+
+    /** Dyed case color; absent = the default dark case. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<DyeColor>> CASE_COLOR =
+            DATA_COMPONENTS.register("case_color", () -> DataComponentType.<DyeColor>builder()
+                    .persistent(DyeColor.CODEC)
+                    .networkSynchronized(DyeColor.STREAM_CODEC)
                     .build());
 
     public static void register(IEventBus bus) {

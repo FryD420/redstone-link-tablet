@@ -4,6 +4,7 @@ import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModCreativeTabs;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
+import com.modpack.linktablet.registry.ModRecipeSerializers;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -26,6 +27,7 @@ public class LinkTabletMod {
         ModDataComponents.register(modEventBus);
         ModItems.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
+        ModRecipeSerializers.register(modEventBus);
         modEventBus.addListener(this::registerPayloads);
     }
 
