@@ -13,7 +13,7 @@ The **Link Tablet** is a handheld device with an app-style touchscreen that togg
 trains, farms, the entire factory — name them, give them an icon, and flick them
 on and off from one screen, anywhere in link range.
 
-![The Link Tablet GUI open in a shader-lit world, with app toggles](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero.png)
+![Two wall-mounted tablets with live screens — switch list and icon grid — glowing at night](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero2.png)
 
 ## Apps, not levers
 
