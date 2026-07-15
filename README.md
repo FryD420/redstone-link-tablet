@@ -17,19 +17,29 @@ For **Minecraft 1.21.1** on **NeoForge**, requires **Create 6.x**.
   using the same two-item frequency system, chosen from a searchable in-GUI picker
   (no physical items needed). Anything a Redstone Link or Linked Controller can
   trigger, the tablet can too.
+- **Momentary apps** — a per-app setting for hold-to-transmit (doorbells, dispensers);
+  the held state is server-side and transient, so it can never get stuck on.
+- **Per-app signal strength (1–15)** — strongest signal wins on shared frequencies,
+  like stacked Redstone Links.
+- **Placeable** — sneak + right-click to mount the tablet on any wall, floor, or
+  ceiling; it transmits from the block and its screen glows while any app is on.
+  Sneak + right-click with an empty hand picks it back up, apps intact.
+- **Dyed cases** — craft with any dye to recolor the case (all 16 colors),
+  apps preserved.
 - **Two layouts** — an icon grid or a list with toggle switches; pick whichever you
   like with one click, per player.
 - **It feels like a tablet** — the screen is dark until you open it, then lights up
-  (fully emissive, glows in the dark), with a solid back, camera, and status LED.
+  (fully emissive, glows in the dark), with a solid back, camera, and status LED —
+  plus UI sounds throughout.
 
 ## How to use
 
-1. Craft the tablet (endgame-tier shaped recipe):
+1. Craft the tablet (brass-age shaped recipe):
 
    ```
-   Redstone Link   Nether Star    Redstone Link
-   Nether Star     Linked Ctrl.   Nether Star
-   Redstone Link   Nether Star    Redstone Link
+   Brass Sheet     Tinted Glass   Brass Sheet
+   Redstone Link   Linked Ctrl.   Redstone Link
+   Brass Sheet     Electron Tube  Brass Sheet
    ```
 
 2. Right-click to open it. Tap **+** to create an app.
