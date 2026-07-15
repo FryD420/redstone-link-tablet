@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- App reordering: a new rearrange button in the tablet's title bar enters a
+  drag-to-rearrange mode (in both grid and list view) — taps stop toggling,
+  apps reflow live as you drag, and the order syncs and persists. Works on
+  held and placed tablets.
+- Fixed: releasing a momentary app could leave its signal stuck on if the
+  app list changed (app removed/reordered) while the button was held.
+
 ## 1.1.1 — 2026-07-15
 
 - Recipe rework: the tablet is now crafted from 4 brass sheets, 2 redstone links,

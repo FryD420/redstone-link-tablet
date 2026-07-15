@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -72,6 +73,21 @@ public class TabletScreen extends Screen {
     /** Index of the momentary app currently held down, or -1. */
     private int heldMomentary = -1;
 
+    // Rearrange mode: while active, clicks grab-and-drag apps instead of
+    // toggling them. The screen works on an optimistic local copy of the
+    // list ({@code workingApps}) so drags reflow instantly; each drop
+    // sends one ReorderAppPayload and the copy is retired once the
+    // server-synced list matches it (no snap-back flicker).
+    private boolean reorderMode = false;
+    private List<SignalApp> workingApps = null;
+    /** Frames the retired overlay has waited for server sync. */
+    private int overlayFrames = 0;
+    /** Current slot of the grabbed app while dragging, or -1. */
+    private int dragIndex = -1;
+    /** Slot the grabbed app was in at press time (the packet's "from"). */
+    private int dragFromIndex = -1;
+    private double dragOffsetX, dragOffsetY;
+
     public TabletScreen(AppView view) {
         super(Component.translatable("gui.linktablet.tablet.title"));
         this.view = view;
@@ -86,7 +102,7 @@ public class TabletScreen extends Screen {
     }
 
     private List<SignalApp> apps() {
-        return view.apps();
+        return workingApps != null ? workingApps : view.apps();
     }
 
     private boolean listView() {
@@ -168,9 +184,79 @@ public class TabletScreen extends Screen {
         return bodyTop() + 8;
     }
 
+    /** Rearrange-mode toggle button, top-left of the body. */
+    private int reorderBtnX() {
+        return panelLeft() + 4;
+    }
+
     private boolean overModeBtn(double mouseX, double mouseY, int btnX) {
         return mouseX >= btnX && mouseX < btnX + MODE_BTN_SIZE
                 && mouseY >= modeBtnY() && mouseY < modeBtnY() + MODE_BTN_SIZE;
+    }
+
+    /** Left edge of the entry (tile or row) at an index, layout-aware. */
+    private int entryX(int i) {
+        return listView()
+                ? rowX()
+                : gridLeft() + TILE_GAP + (i % columns()) * (TILE_SIZE + TILE_GAP);
+    }
+
+    /** Top edge of the entry at an index, layout- and scroll-aware. */
+    private int entryY(int i) {
+        return listView()
+                ? gridTop() + i * LIST_STRIDE - (int) scroll
+                : gridTop() + (i / columns()) * ROW_STRIDE - (int) scroll;
+    }
+
+    // ------------------------------------------------------------------
+    // Rearrange mode
+    // ------------------------------------------------------------------
+
+    private boolean dragging() {
+        return dragIndex != -1;
+    }
+
+    private void enterReorderMode() {
+        releaseMomentary(); // never carry a held signal into the mode
+        if (workingApps == null) {
+            workingApps = new ArrayList<>(view.apps());
+        }
+        reorderMode = true;
+        overlayFrames = 0;
+        UISounds.tick(1.5F);
+    }
+
+    private void exitReorderMode() {
+        // workingApps stays until the server-synced order matches it,
+        // so the exit never shows a one-frame snap-back.
+        reorderMode = false;
+        dragIndex = dragFromIndex = -1;
+        overlayFrames = 0;
+        UISounds.tick(1.0F);
+    }
+
+    /** Slot the dragged app would land in at the mouse position, or -1. */
+    private int dragSlotAt(double mouseX, double mouseY) {
+        int idx = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
+        if (idx == -1 || apps().isEmpty()) return -1;
+        return Math.min(idx, apps().size() - 1); // add tile = move to end
+    }
+
+    private void updateDragHover(double mouseX, double mouseY) {
+        int hover = dragSlotAt(mouseX, mouseY);
+        if (hover != -1 && hover != dragIndex) {
+            workingApps.add(hover, workingApps.remove(dragIndex)); // live reflow
+            dragIndex = hover;
+            UISounds.tick(1.3F);
+        }
+    }
+
+    private void commitDrag() {
+        if (dragging() && dragIndex != dragFromIndex) {
+            PacketDistributor.sendToServer(
+                    new ModNetworking.ReorderAppPayload(target(), dragFromIndex, dragIndex));
+        }
+        dragIndex = dragFromIndex = -1;
     }
 
     // ------------------------------------------------------------------
@@ -183,6 +269,30 @@ public class TabletScreen extends Screen {
 
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
+        if (reorderMode) {
+            // External add/remove synced in: refresh the copy, drop the drag
+            if (view.apps().size() != workingApps.size()) {
+                workingApps = new ArrayList<>(view.apps());
+                dragIndex = dragFromIndex = -1;
+            }
+            if (dragging()) {
+                // Auto-scroll while holding a tile near the top/bottom edge
+                if (mouseY < gridTop() + 10) {
+                    scroll = Mth.clamp(scroll - 3, 0, maxScroll());
+                } else if (mouseY > gridBottom() - 10) {
+                    scroll = Mth.clamp(scroll + 3, 0, maxScroll());
+                }
+                updateDragHover(mouseX, mouseY);
+            }
+        } else if (workingApps != null) {
+            // Retired overlay: hold the optimistic order until the server
+            // echoes it back (or something else changed the list).
+            if (view.apps().equals(workingApps) || view.apps().size() != workingApps.size()
+                    || ++overlayFrames > 40) {
+                workingApps = null;
+            }
+        }
+
         int left = panelLeft();
         int pw = panelWidth();
         int top = bodyTop();
@@ -192,7 +302,10 @@ public class TabletScreen extends Screen {
         graphics.fill(left - 6, top - 2, left + pw + 6, bottom + 2, 0xFF16181D);
         graphics.fill(left - 4, top, left + pw + 4, bottom, 0xFF23262E);
 
-        graphics.drawCenteredString(font, title, width / 2, top + 12, 0xFFFFFF);
+        Component titleText = reorderMode
+                ? Component.translatable("gui.linktablet.reorder.title")
+                : title;
+        graphics.drawCenteredString(font, titleText, width / 2, top + 12, 0xFFFFFF);
         renderModeButtons(graphics, mouseX, mouseY);
 
         List<SignalApp> apps = apps();
@@ -205,6 +318,19 @@ public class TabletScreen extends Screen {
         }
         graphics.disableScissor();
 
+        // Grabbed entry floats at the cursor, above everything
+        if (dragging()) {
+            int fx = (int) (mouseX - dragOffsetX);
+            int fy = (int) (mouseY - dragOffsetY);
+            if (listView()) {
+                renderAppRow(graphics, apps.get(dragIndex), fx, fy, rowWidth(), false, false);
+                graphics.fill(fx, fy, fx + rowWidth(), fy + ROW_HEIGHT, 0x28FFFFFF);
+            } else {
+                renderAppTile(graphics, apps.get(dragIndex), fx, fy, false, false);
+                graphics.fill(fx, fy, fx + TILE_SIZE, fy + TILE_SIZE, 0x28FFFFFF);
+            }
+        }
+
         if (apps.isEmpty()) {
             graphics.drawCenteredString(font,
                     Component.translatable("gui.linktablet.no_apps"),
@@ -216,6 +342,8 @@ public class TabletScreen extends Screen {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
         } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
+        } else if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
+            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.reorder"), mouseX, mouseY);
         }
     }
 
@@ -237,6 +365,16 @@ public class TabletScreen extends Screen {
         graphics.fill(lx + 1, y + 2, lx + 11, y + 4, listColor);
         graphics.fill(lx + 1, y + 5, lx + 11, y + 7, listColor);
         graphics.fill(lx + 1, y + 8, lx + 11, y + 10, listColor);
+
+        // Rearrange glyph: up/down arrow pair (top-left)
+        int rx = reorderBtnX();
+        int reorderColor = glyphColor(reorderMode, overModeBtn(mouseX, mouseY, rx));
+        graphics.fill(rx + 2, y + 2, rx + 4, y + 3, reorderColor);
+        graphics.fill(rx + 1, y + 3, rx + 5, y + 4, reorderColor);
+        graphics.fill(rx + 2, y + 4, rx + 4, y + 10, reorderColor);
+        graphics.fill(rx + 8, y + 2, rx + 10, y + 8, reorderColor);
+        graphics.fill(rx + 7, y + 8, rx + 11, y + 9, reorderColor);
+        graphics.fill(rx + 8, y + 9, rx + 10, y + 10, reorderColor);
     }
 
     private static int glyphColor(boolean active, boolean hovered) {
@@ -248,12 +386,9 @@ public class TabletScreen extends Screen {
 
     private void renderGridContent(GuiGraphics graphics, List<SignalApp> apps, int mouseX, int mouseY) {
         int total = totalTiles();
-        int base = gridLeft();
         for (int i = 0; i < total; i++) {
-            int col = i % columns();
-            int row = i / columns();
-            int x = base + TILE_GAP + col * (TILE_SIZE + TILE_GAP);
-            int y = gridTop() + row * ROW_STRIDE - (int) scroll;
+            int x = entryX(i);
+            int y = entryY(i);
             if (y + TILE_SIZE < gridTop() - 2 || y > gridBottom()) continue;
 
             boolean hovered = mouseX >= x && mouseX < x + TILE_SIZE
@@ -261,11 +396,27 @@ public class TabletScreen extends Screen {
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
             if (i < apps.size()) {
-                renderAppTile(graphics, apps.get(i), x, y, hovered, i == heldMomentary);
+                if (reorderMode && i == dragIndex) {
+                    renderPlaceholderTile(graphics, x, y);
+                } else {
+                    if (reorderMode) {
+                        graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF8A93A6);
+                    }
+                    renderAppTile(graphics, apps.get(i), x, y, hovered, i == heldMomentary);
+                }
             } else {
-                renderAddTile(graphics, x, y, hovered);
+                renderAddTile(graphics, x, y, hovered && !reorderMode);
+                if (reorderMode) {
+                    graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, 0x8016181D);
+                }
             }
         }
+    }
+
+    /** Empty slot the dragged app was lifted out of. */
+    private void renderPlaceholderTile(GuiGraphics graphics, int x, int y) {
+        graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
+        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, 0xFF262A33);
     }
 
     private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered, boolean held) {
@@ -340,7 +491,7 @@ public class TabletScreen extends Screen {
         int x = rowX();
         int w = rowWidth();
         for (int i = 0; i < total; i++) {
-            int y = gridTop() + i * LIST_STRIDE - (int) scroll;
+            int y = entryY(i);
             if (y + ROW_HEIGHT < gridTop() - 2 || y > gridBottom()) continue;
 
             boolean hovered = mouseX >= x && mouseX < x + w
@@ -348,11 +499,27 @@ public class TabletScreen extends Screen {
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
             if (i < apps.size()) {
-                renderAppRow(graphics, apps.get(i), x, y, w, hovered, i == heldMomentary);
+                if (reorderMode && i == dragIndex) {
+                    renderPlaceholderRow(graphics, x, y, w);
+                } else {
+                    if (reorderMode) {
+                        graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF8A93A6);
+                    }
+                    renderAppRow(graphics, apps.get(i), x, y, w, hovered, i == heldMomentary);
+                }
             } else {
-                renderAddRow(graphics, x, y, w, hovered);
+                renderAddRow(graphics, x, y, w, hovered && !reorderMode);
+                if (reorderMode) {
+                    graphics.fill(x, y, x + w, y + ROW_HEIGHT, 0x8016181D);
+                }
             }
         }
+    }
+
+    /** Empty slot the dragged app was lifted out of. */
+    private void renderPlaceholderRow(GuiGraphics graphics, int x, int y, int w) {
+        graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF5A6070);
+        graphics.fill(x, y, x + w, y + ROW_HEIGHT, 0xFF262A33);
     }
 
     private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
@@ -407,6 +574,14 @@ public class TabletScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
+            if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
+                if (reorderMode) {
+                    exitReorderMode();
+                } else {
+                    enterReorderMode();
+                }
+                return true;
+            }
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {
                 if (listView()) UISounds.tick(1.8F);
                 ClientPrefs.setListView(false);
@@ -421,12 +596,35 @@ public class TabletScreen extends Screen {
             }
         }
 
+        if (reorderMode) {
+            // Grab-and-drag only; toggling/editing is suspended in the mode
+            if (button == 0) {
+                int idx = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
+                if (idx >= 0 && idx < apps().size()) { // add tile inert
+                    dragIndex = dragFromIndex = idx;
+                    dragOffsetX = mouseX - entryX(idx);
+                    dragOffsetY = mouseY - entryY(idx);
+                    UISounds.tick(0.9F);
+                }
+            }
+            return true;
+        }
+
         int index = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
         if (index != -1) {
             handleEntryClick(index, button);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (button == 0 && dragging()) {
+            updateDragHover(mouseX, mouseY);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     /** Tile index under the mouse in grid mode, or -1. */
@@ -490,6 +688,11 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && dragging()) {
+            commitDrag();
+            UISounds.tick(1.6F);
+            return true;
+        }
         if (button == 0 && heldMomentary != -1) {
             UISounds.toggle(false);
             releaseMomentary();
@@ -507,6 +710,8 @@ public class TabletScreen extends Screen {
 
     @Override
     public void removed() {
+        // Screen closed mid-drag: commit the move at its previewed slot
+        commitDrag();
         // Screen closed or replaced mid-press: never leave a held signal on
         releaseMomentary();
         super.removed();

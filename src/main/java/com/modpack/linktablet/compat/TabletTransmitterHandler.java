@@ -73,6 +73,24 @@ public class TabletTransmitterHandler {
         if (holds.isEmpty()) HELD.remove(player.getUUID());
     }
 
+    /**
+     * Clears every momentary hold aimed at one tablet. Holds are keyed by
+     * app index, so a reorder invalidates them: for a placed tablet any
+     * player may be holding one of its apps; for a held tablet only the
+     * reordering player's own hand can be.
+     */
+    public static void clearHeldForTarget(Player player, boolean mainHand, @Nullable BlockPos pos) {
+        if (pos != null) {
+            HELD.values().forEach(holds -> holds.keySet().removeIf(key -> pos.equals(key.pos())));
+            HELD.values().removeIf(Map::isEmpty);
+        } else {
+            Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
+            if (holds == null) return;
+            holds.keySet().removeIf(key -> key.pos() == null && key.mainHand() == mainHand);
+            if (holds.isEmpty()) HELD.remove(player.getUUID());
+        }
+    }
+
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;

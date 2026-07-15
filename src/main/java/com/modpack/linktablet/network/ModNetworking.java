@@ -159,6 +159,24 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: move an app from one position to another
+    // ------------------------------------------------------------------
+    public record ReorderAppPayload(AppTarget target, int from, int to) implements CustomPacketPayload {
+        public static final Type<ReorderAppPayload> TYPE = new Type<>(id("reorder_app"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ReorderAppPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, ReorderAppPayload::target,
+                        ByteBufCodecs.VAR_INT, ReorderAppPayload::from,
+                        ByteBufCodecs.VAR_INT, ReorderAppPayload::to,
+                        ReorderAppPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: remove an app
     // ------------------------------------------------------------------
     public record RemoveAppPayload(AppTarget target, int index) implements CustomPacketPayload {
@@ -178,10 +196,11 @@ public class ModNetworking {
     // ------------------------------------------------------------------
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("2");
+        PayloadRegistrar registrar = event.registrar("3");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
+        registrar.playToServer(ReorderAppPayload.TYPE, ReorderAppPayload.STREAM_CODEC, ModNetworking::handleReorder);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
     }
 
@@ -213,16 +232,18 @@ public class ModNetworking {
         Player player = context.player();
         AppHost host = resolve(player, payload.target());
         if (host == null) return;
-        List<SignalApp> apps = host.apps();
-        if (payload.index() < 0 || payload.index() >= apps.size()) return;
-        SignalApp app = apps.get(payload.index());
-        if (!app.momentary()) return;
-
         BlockPos holdPos = payload.target().pos().orElse(null);
         if (payload.held()) {
+            List<SignalApp> apps = host.apps();
+            if (payload.index() < 0 || payload.index() >= apps.size()) return;
+            SignalApp app = apps.get(payload.index());
+            if (!app.momentary()) return;
             TabletTransmitterHandler.setHeld(player, payload.target().mainHand(), holdPos,
                     payload.index(), app.frequencies(), app.strength());
         } else {
+            // Releases always clear, even if the list changed under the
+            // press (a remove/reorder mid-hold must never leave the
+            // transmitter stuck on).
             TabletTransmitterHandler.clearHeld(player, payload.target().mainHand(), holdPos, payload.index());
         }
         playClick(player, payload.target(), payload.held());
@@ -242,6 +263,23 @@ public class ModNetworking {
             apps.set(payload.index(), app);
         }
         host.save(apps);
+    }
+
+    private static void handleReorder(ReorderAppPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        AppHost host = resolve(player, payload.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        int from = payload.from();
+        int to = payload.to();
+        if (from < 0 || from >= apps.size() || to < 0 || to >= apps.size() || from == to) return;
+        apps.add(to, apps.remove(from));
+        host.save(apps);
+
+        // Index-keyed momentary holds on this tablet may now point at the
+        // wrong app; drop them (release packets are self-healing).
+        TabletTransmitterHandler.clearHeldForTarget(player,
+                payload.target().mainHand(), payload.target().pos().orElse(null));
     }
 
     private static void handleRemove(RemoveAppPayload payload, IPayloadContext context) {

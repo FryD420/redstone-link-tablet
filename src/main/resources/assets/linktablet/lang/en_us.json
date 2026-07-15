@@ -11,6 +11,8 @@
   "gui.linktablet.add_app_row": "+ Add App",
   "gui.linktablet.view.grid": "Grid view",
   "gui.linktablet.view.list": "List view",
+  "gui.linktablet.view.reorder": "Rearrange apps",
+  "gui.linktablet.reorder.title": "Drag to rearrange",
   "gui.linktablet.no_apps": "No apps yet. Tap + to add one.",
   "gui.linktablet.edit_app.title.new": "New App",
   "gui.linktablet.edit_app.title.edit": "Edit App",
