@@ -51,10 +51,19 @@ public class AppEditScreen extends Screen {
     private static final int CHIPS_PER_ROW = 4;
     private static final int CHIPS_Y = 118;
 
-    // Color swatches (right column, 4 per row)
-    private static final int SWATCH_SIZE = 20;
-    private static final int SWATCH_STRIDE = 24;
-    private static final int SWATCHES_Y = 88;
+    // Right column: color button opens a 4x4 swatch popup ("dropdown")
+    private static final int COLOR_BTN_Y = 86;
+    private static final int POPUP_Y = COLOR_BTN_Y + 24;
+    private static final int POPUP_SWATCH = 16;
+    private static final int POPUP_STRIDE = 18;
+    private static final int POPUP_SIZE = 3 * POPUP_STRIDE + POPUP_SWATCH; // 4x4 grid
+
+    // Right column: momentary checkbox + strength slider
+    private static final int MOMENTARY_Y = 118;
+    private static final int STRENGTH_LABEL_Y = 142;
+    private static final int TRACK_Y = 154;
+    private static final int TRACK_W = 72;
+    private static final int CHECKBOX_SIZE = 12;
 
     private final TabletScreen parent;
     private final int index; // -1 = new app
@@ -66,6 +75,10 @@ public class AppEditScreen extends Screen {
     private Optional<Item> iconItem = Optional.empty();
     private int color = SignalApp.DEFAULT_COLOR;
     private boolean wasActive = false;
+    private boolean momentary = false;
+    private int strength = SignalApp.MAX_STRENGTH;
+    private boolean draggingStrength = false;
+    private boolean colorPopupOpen = false;
 
     private Button saveButton;
     private Button addFreqButton;
@@ -81,6 +94,8 @@ public class AppEditScreen extends Screen {
             this.iconItem = existing.icon().map(BuiltInRegistries.ITEM::get);
             this.color = existing.color();
             this.wasActive = existing.active();
+            this.momentary = existing.momentary();
+            this.strength = existing.strength();
         }
     }
 
@@ -175,7 +190,7 @@ public class AppEditScreen extends Screen {
         if (frequencies.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
-        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, color, icon);
+        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon);
         UISounds.confirm();
         PacketDistributor.sendToServer(new ModNetworking.UpsertAppPayload(
                 parent.hand() == InteractionHand.MAIN_HAND, index, app));
@@ -200,6 +215,22 @@ public class AppEditScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int left = panelLeft();
+        int rightX = left + RIGHT_COL;
+
+        // Open color popup swallows every click until it closes
+        if (colorPopupOpen) {
+            for (int i = 0; i < COLORS.length; i++) {
+                int x = rightX + (i % 4) * POPUP_STRIDE;
+                int y = POPUP_Y + (i / 4) * POPUP_STRIDE;
+                if (mouseX >= x && mouseX < x + POPUP_SWATCH && mouseY >= y && mouseY < y + POPUP_SWATCH) {
+                    color = COLORS[i];
+                    UISounds.tick(1.4F);
+                    break;
+                }
+            }
+            colorPopupOpen = false;
+            return true;
+        }
 
         // Frequency chips: click to remove
         for (int i = 0; i < frequencies.size(); i++) {
@@ -212,16 +243,55 @@ public class AppEditScreen extends Screen {
             }
         }
 
-        // Color swatches (right column)
-        for (int i = 0; i < COLORS.length; i++) {
-            int x = left + RIGHT_COL + (i % 4) * SWATCH_STRIDE;
-            int y = SWATCHES_Y + (i / 4) * SWATCH_STRIDE;
-            if (mouseX >= x && mouseX < x + SWATCH_SIZE && mouseY >= y && mouseY < y + SWATCH_SIZE) {
-                color = COLORS[i];
-                return true;
-            }
+        // Color button: opens the swatch popup
+        if (mouseX >= rightX && mouseX < rightX + 34
+                && mouseY >= COLOR_BTN_Y && mouseY < COLOR_BTN_Y + 20) {
+            colorPopupOpen = true;
+            UISounds.tick(1.3F);
+            return true;
+        }
+
+        // Momentary checkbox (box + label)
+        if (mouseX >= rightX && mouseX < rightX + 90
+                && mouseY >= MOMENTARY_Y - 2 && mouseY < MOMENTARY_Y + CHECKBOX_SIZE + 2) {
+            momentary = !momentary;
+            UISounds.tick(momentary ? 1.6F : 1.1F);
+            return true;
+        }
+
+        // Strength slider
+        if (mouseX >= rightX - 2 && mouseX < rightX + TRACK_W + 4
+                && mouseY >= TRACK_Y - 6 && mouseY < TRACK_Y + 12) {
+            draggingStrength = true;
+            setStrengthFromMouse(mouseX);
+            return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (draggingStrength) {
+            setStrengthFromMouse(mouseX);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (draggingStrength) {
+            draggingStrength = false;
+            UISounds.tick(1.0F + strength / 15.0F);
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    private void setStrengthFromMouse(double mouseX) {
+        double rel = (mouseX - (panelLeft() + RIGHT_COL)) / TRACK_W;
+        strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
+                1, SignalApp.MAX_STRENGTH);
     }
 
     @Override
@@ -280,19 +350,59 @@ public class AppEditScreen extends Screen {
             graphics.fill(left + RIGHT_COL + 2, 48, left + RIGHT_COL + 22, 68, 0x88000000);
         }
 
-        // Color swatches
-        for (int i = 0; i < COLORS.length; i++) {
-            int x = left + RIGHT_COL + (i % 4) * SWATCH_STRIDE;
-            int y = SWATCHES_Y + (i / 4) * SWATCH_STRIDE;
-            if (COLORS[i] == color) {
-                graphics.fill(x - 2, y - 2, x + SWATCH_SIZE + 2, y + SWATCH_SIZE + 2, 0xFFFFFFFF);
+        int rightX = left + RIGHT_COL;
+
+        // Color button (opens the swatch popup) with a small dropdown arrow
+        graphics.fill(rightX - 1, COLOR_BTN_Y - 1, rightX + 21, COLOR_BTN_Y + 21, 0xFF444955);
+        graphics.fill(rightX, COLOR_BTN_Y, rightX + 20, COLOR_BTN_Y + 20, color | 0xFF000000);
+        int ax = rightX + 26;
+        int ay = COLOR_BTN_Y + 8;
+        graphics.fill(ax, ay, ax + 6, ay + 2, 0xFF9AA0AC);
+        graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, 0xFF9AA0AC);
+        graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, 0xFF9AA0AC);
+
+        // Momentary checkbox
+        graphics.fill(rightX, MOMENTARY_Y, rightX + CHECKBOX_SIZE, MOMENTARY_Y + CHECKBOX_SIZE, 0xFF444955);
+        graphics.fill(rightX + 1, MOMENTARY_Y + 1, rightX + CHECKBOX_SIZE - 1, MOMENTARY_Y + CHECKBOX_SIZE - 1, 0xFF23262E);
+        if (momentary) {
+            graphics.fill(rightX + 3, MOMENTARY_Y + 3, rightX + CHECKBOX_SIZE - 3, MOMENTARY_Y + CHECKBOX_SIZE - 3, 0xFF4ADE80);
+        }
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.momentary"),
+                rightX + CHECKBOX_SIZE + 4, MOMENTARY_Y + 2, 0x9AA0AC);
+
+        // Strength slider
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
+                rightX, STRENGTH_LABEL_Y, 0x9AA0AC);
+        graphics.fill(rightX, TRACK_Y, rightX + TRACK_W, TRACK_Y + 4, 0xFF444955);
+        int handleX = rightX + (int) ((strength - 1) / (float) (SignalApp.MAX_STRENGTH - 1) * (TRACK_W - 4));
+        graphics.fill(rightX, TRACK_Y, handleX + 2, TRACK_Y + 4, 0xFF2F855A);
+        graphics.fill(handleX, TRACK_Y - 4, handleX + 4, TRACK_Y + 8, 0xFFE2E5EB);
+        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, TRACK_Y - 2, 0xFFE2E5EB);
+
+        // Color popup, z-lifted above the batched text/items so nothing
+        // bleeds through it
+        if (colorPopupOpen) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 300);
+            graphics.fill(rightX - 4, POPUP_Y - 4, rightX + POPUP_SIZE + 4, POPUP_Y + POPUP_SIZE + 4, 0xFF16181D);
+            for (int i = 0; i < COLORS.length; i++) {
+                int x = rightX + (i % 4) * POPUP_STRIDE;
+                int y = POPUP_Y + (i / 4) * POPUP_STRIDE;
+                if (COLORS[i] == color) {
+                    graphics.fill(x - 1, y - 1, x + POPUP_SWATCH + 1, y + POPUP_SWATCH + 1, 0xFFFFFFFF);
+                }
+                graphics.fill(x, y, x + POPUP_SWATCH, y + POPUP_SWATCH, COLORS[i]);
             }
-            graphics.fill(x, y, x + SWATCH_SIZE, y + SWATCH_SIZE, COLORS[i]);
+            graphics.pose().popPose();
         }
 
         if (hoveredChip) {
             graphics.renderTooltip(font,
                     Component.translatable("gui.linktablet.edit_app.chip_remove"), mouseX, mouseY);
+        } else if (!colorPopupOpen && mouseX >= rightX && mouseX < rightX + 90
+                && mouseY >= MOMENTARY_Y - 2 && mouseY < MOMENTARY_Y + CHECKBOX_SIZE + 2) {
+            graphics.renderTooltip(font,
+                    Component.translatable("gui.linktablet.edit_app.momentary.tooltip"), mouseX, mouseY);
         }
     }
 

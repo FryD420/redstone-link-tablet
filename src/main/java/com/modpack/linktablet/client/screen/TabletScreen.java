@@ -71,6 +71,9 @@ public class TabletScreen extends Screen {
     private final InteractionHand hand;
     private double scroll = 0;
 
+    /** Index of the momentary app currently held down, or -1. */
+    private int heldMomentary = -1;
+
     public TabletScreen(InteractionHand hand) {
         super(Component.translatable("gui.linktablet.tablet.title"));
         this.hand = hand;
@@ -258,16 +261,16 @@ public class TabletScreen extends Screen {
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
             if (i < apps.size()) {
-                renderAppTile(graphics, apps.get(i), x, y, hovered);
+                renderAppTile(graphics, apps.get(i), x, y, hovered, i == heldMomentary);
             } else {
                 renderAddTile(graphics, x, y, hovered);
             }
         }
     }
 
-    private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered) {
-        // Active glow border
-        if (app.active()) {
+    private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered, boolean held) {
+        // Active glow border (momentary apps glow while held)
+        if (app.active() || held) {
             graphics.fill(x - 2, y - 2, x + TILE_SIZE + 2, y + TILE_SIZE + 2, 0xFF4ADE80);
         } else if (hovered) {
             graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
@@ -290,9 +293,12 @@ public class TabletScreen extends Screen {
             drawFreqPairMarkers(graphics, cx, iy);
         }
 
-        // ON/OFF pip
-        int pipColor = app.active() ? 0xFF4ADE80 : 0xFF444955;
+        // ON/OFF pip; momentary apps get a hollow ring (solid while held)
+        int pipColor = (app.active() || held) ? 0xFF4ADE80 : 0xFF444955;
         graphics.fill(x + TILE_SIZE - 8, y + 4, x + TILE_SIZE - 4, y + 8, pipColor);
+        if (app.momentary() && !held) {
+            graphics.fill(x + TILE_SIZE - 7, y + 5, x + TILE_SIZE - 5, y + 7, app.color() | 0xFF000000);
+        }
 
         // Frequency count badge for scene apps
         if (app.frequencies().size() > 1) {
@@ -342,14 +348,16 @@ public class TabletScreen extends Screen {
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
             if (i < apps.size()) {
-                renderAppRow(graphics, apps.get(i), x, y, w, hovered);
+                renderAppRow(graphics, apps.get(i), x, y, w, hovered, i == heldMomentary);
             } else {
                 renderAddRow(graphics, x, y, w, hovered);
             }
         }
     }
 
-    private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w, boolean hovered) {
+    private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
+                              boolean hovered, boolean held) {
+        boolean lit = app.active() || held;
         graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? 0xFF353A46 : 0xFF2C303A);
 
         // Colored icon chip
@@ -362,19 +370,27 @@ public class TabletScreen extends Screen {
         String name = font.plainSubstrByWidth(app.name(), w - 24 - SWITCH_W - 12 - tagWidth);
         int nameY = y + (ROW_HEIGHT - 8) / 2;
         graphics.drawString(font, name, x + 26, nameY,
-                app.active() ? 0xFFE2E5EB : 0xFF9AA0AC);
+                lit ? 0xFFE2E5EB : 0xFF9AA0AC);
         if (!countTag.isEmpty()) {
             graphics.drawString(font, countTag, x + 26 + font.width(name), nameY, 0xFF6A7284);
         }
 
-        // Toggle switch
         int sx = x + w - SWITCH_W - 4;
         int sy = y + (ROW_HEIGHT - SWITCH_H) / 2;
-        int track = app.active() ? 0xFF2F855A : 0xFF444955;
-        graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, track);
-        int knobX = app.active() ? sx + SWITCH_W - 10 : sx + 2;
-        graphics.fill(knobX, sy + 2, knobX + 8, sy + SWITCH_H - 2,
-                app.active() ? 0xFF4ADE80 : 0xFF9AA0AC);
+        if (app.momentary()) {
+            // Push button: center dot lights while held
+            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? 0xFF2F855A : 0xFF444955);
+            int cx = sx + SWITCH_W / 2;
+            int cy = sy + SWITCH_H / 2;
+            graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, held ? 0xFF4ADE80 : 0xFF9AA0AC);
+        } else {
+            // Toggle switch
+            int track = app.active() ? 0xFF2F855A : 0xFF444955;
+            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, track);
+            int knobX = app.active() ? sx + SWITCH_W - 10 : sx + 2;
+            graphics.fill(knobX, sy + 2, knobX + 8, sy + SWITCH_H - 2,
+                    app.active() ? 0xFF4ADE80 : 0xFF9AA0AC);
+        }
     }
 
     private void renderAddRow(GuiGraphics graphics, int x, int y, int w, boolean hovered) {
@@ -450,10 +466,19 @@ public class TabletScreen extends Screen {
                 UISounds.page();
                 minecraft.setScreen(new AppEditScreen(this, index, apps.get(index)));
             } else if (button == 0) {
-                // Left-click: toggle
-                UISounds.toggle(!apps.get(index).active());
-                PacketDistributor.sendToServer(
-                        new ModNetworking.ToggleAppPayload(hand == InteractionHand.MAIN_HAND, index));
+                SignalApp app = apps.get(index);
+                if (app.momentary()) {
+                    // Press-and-hold: transmits until mouse release
+                    UISounds.toggle(true);
+                    heldMomentary = index;
+                    PacketDistributor.sendToServer(new ModNetworking.MomentaryAppPayload(
+                            hand == InteractionHand.MAIN_HAND, index, true));
+                } else {
+                    // Left-click: toggle
+                    UISounds.toggle(!app.active());
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.ToggleAppPayload(hand == InteractionHand.MAIN_HAND, index));
+                }
             }
         } else if (button == 0) {
             if (apps.size() < ModNetworking.MAX_APPS) {
@@ -461,6 +486,30 @@ public class TabletScreen extends Screen {
                 minecraft.setScreen(new AppEditScreen(this, -1, null));
             }
         }
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && heldMomentary != -1) {
+            UISounds.toggle(false);
+            releaseMomentary();
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    private void releaseMomentary() {
+        if (heldMomentary == -1) return;
+        PacketDistributor.sendToServer(new ModNetworking.MomentaryAppPayload(
+                hand == InteractionHand.MAIN_HAND, heldMomentary, false));
+        heldMomentary = -1;
+    }
+
+    @Override
+    public void removed() {
+        // Screen closed or replaced mid-press: never leave a held signal on
+        releaseMomentary();
+        super.removed();
     }
 
     @Override

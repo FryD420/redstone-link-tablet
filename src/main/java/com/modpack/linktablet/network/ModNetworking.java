@@ -1,6 +1,7 @@
 package com.modpack.linktablet.network;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.item.TabletItem;
 import com.modpack.linktablet.registry.ModDataComponents;
@@ -71,6 +72,24 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: press (held=true) or release (held=false) a momentary app
+    // ------------------------------------------------------------------
+    public record MomentaryAppPayload(boolean mainHand, int index, boolean held) implements CustomPacketPayload {
+        public static final Type<MomentaryAppPayload> TYPE = new Type<>(id("momentary_app"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MomentaryAppPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.BOOL, MomentaryAppPayload::mainHand,
+                        ByteBufCodecs.VAR_INT, MomentaryAppPayload::index,
+                        ByteBufCodecs.BOOL, MomentaryAppPayload::held,
+                        MomentaryAppPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: remove an app
     // ------------------------------------------------------------------
     public record RemoveAppPayload(boolean mainHand, int index) implements CustomPacketPayload {
@@ -92,6 +111,7 @@ public class ModNetworking {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
+        registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
     }
@@ -116,6 +136,7 @@ public class ModNetworking {
         List<SignalApp> apps = apps(stack);
         if (payload.index() < 0 || payload.index() >= apps.size()) return;
         SignalApp app = apps.get(payload.index());
+        if (app.momentary()) return; // momentary apps use MomentaryAppPayload
         boolean nowActive = !app.active();
         apps.set(payload.index(), app.withActive(nowActive));
         save(stack, apps);
@@ -125,6 +146,28 @@ public class ModNetworking {
         player.level().playSound(player, player.blockPosition(),
                 nowActive ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                 SoundSource.PLAYERS, 0.3F, nowActive ? 1.6F : 1.3F);
+    }
+
+    private static void handleMomentary(MomentaryAppPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        ItemStack stack = tablet(player, payload.mainHand());
+        if (stack.isEmpty()) return;
+        List<SignalApp> apps = apps(stack);
+        if (payload.index() < 0 || payload.index() >= apps.size()) return;
+        SignalApp app = apps.get(payload.index());
+        if (!app.momentary()) return;
+
+        if (payload.held()) {
+            TabletTransmitterHandler.setHeld(player, payload.mainHand(), payload.index(),
+                    app.frequencies(), app.strength());
+        } else {
+            TabletTransmitterHandler.clearHeld(player, payload.mainHand(), payload.index());
+        }
+
+        // Same faint world-side click other players hear on toggles
+        player.level().playSound(player, player.blockPosition(),
+                payload.held() ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
+                SoundSource.PLAYERS, 0.3F, payload.held() ? 1.6F : 1.3F);
     }
 
     private static void handleUpsert(UpsertAppPayload payload, IPayloadContext context) {

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Momentary apps: a per-app "Momentary" setting makes the app transmit only while the
+  button is held down (doorbells, dispensers). Held state is transient and server-side,
+  so a disconnect can never leave a signal stuck on. Momentary apps show a hollow ring
+  pip in grid view and a push button in list view.
+- Per-app signal strength (1-15) via a slider in the edit screen; when multiple apps
+  drive the same frequency, the strongest signal wins, like stacked Redstone Links.
+- Edit screen layout rework: two columns, and the color picker is now a compact
+  dropdown swatch button instead of an always-visible grid.
 - UI sounds throughout the tablet: open/close, toggle clicks (distinct on/off pitch),
   save chime, remove sound, frequency chip ticks, view-mode switch. Nearby players
   hear a faint click when someone toggles an app.

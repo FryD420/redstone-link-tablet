@@ -24,19 +24,27 @@ public class VirtualTransmitter implements IRedstoneLinkable {
 
     private ServerLevel level;
     private BlockPos position;
+    private int strength;
     private boolean alive = true;
 
-    public VirtualTransmitter(Frequency frequency, ServerLevel level, BlockPos position) {
+    public VirtualTransmitter(Frequency frequency, ServerLevel level, BlockPos position, int strength) {
         this.frequency = frequency;
         this.level = level;
         this.position = position;
+        this.strength = strength;
         this.networkKey = Couple.create(
                 RedstoneLinkNetworkHandler.Frequency.of(frequency.icon1()),
                 RedstoneLinkNetworkHandler.Frequency.of(frequency.icon2()));
     }
 
-    /** Follows the player around; re-registers on dimension change. */
-    public void updatePosition(ServerLevel newLevel, BlockPos newPosition) {
+    /**
+     * Follows the player around and tracks the desired strength;
+     * re-registers on dimension change, re-evaluates the network when
+     * the position or strength changes.
+     */
+    public void update(ServerLevel newLevel, BlockPos newPosition, int newStrength) {
+        boolean strengthChanged = newStrength != this.strength;
+        this.strength = newStrength;
         if (newLevel != this.level) {
             Create.REDSTONE_LINK_NETWORK_HANDLER.removeFromNetwork(this.level, this);
             this.level = newLevel;
@@ -44,7 +52,7 @@ public class VirtualTransmitter implements IRedstoneLinkable {
             Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(newLevel, this);
             return;
         }
-        if (!newPosition.equals(this.position)) {
+        if (!newPosition.equals(this.position) || strengthChanged) {
             this.position = newPosition;
             Create.REDSTONE_LINK_NETWORK_HANDLER.updateNetworkOf(this.level, this);
         }
@@ -65,7 +73,7 @@ public class VirtualTransmitter implements IRedstoneLinkable {
 
     @Override
     public int getTransmittedStrength() {
-        return 15;
+        return strength;
     }
 
     @Override
