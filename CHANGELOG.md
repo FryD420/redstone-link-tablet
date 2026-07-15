@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 — 2026-07-15
+
+- Recipe rework: the tablet is now crafted from 4 brass sheets, 2 redstone links,
+  tinted glass (screen), an electron tube, and a linked controller at the core —
+  no more nether stars. Fits Create's brass-age progression.
+
 ## 1.1.0 — 2026-07-15
 
 - Placeable tablet: sneak + right-click any surface to mount the tablet on walls,

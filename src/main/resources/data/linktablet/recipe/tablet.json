@@ -2,19 +2,25 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "pattern": [
-    "LSL",
-    "SCS",
-    "LSL"
+    "PGP",
+    "LCL",
+    "PEP"
   ],
   "key": {
+    "P": {
+      "item": "create:brass_sheet"
+    },
+    "G": {
+      "item": "minecraft:tinted_glass"
+    },
     "L": {
       "item": "create:redstone_link"
     },
-    "S": {
-      "item": "minecraft:nether_star"
-    },
     "C": {
       "item": "create:linked_controller"
+    },
+    "E": {
+      "item": "create:electron_tube"
     }
   },
   "result": {
