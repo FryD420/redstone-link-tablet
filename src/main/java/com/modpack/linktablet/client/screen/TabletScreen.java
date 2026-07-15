@@ -1,6 +1,7 @@
 package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.client.ClientPrefs;
+import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModDataComponents;
@@ -391,11 +392,13 @@ public class TabletScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {
+                if (listView()) UISounds.tick(1.8F);
                 ClientPrefs.setListView(false);
                 scroll = 0;
                 return true;
             }
             if (overModeBtn(mouseX, mouseY, listBtnX())) {
+                if (!listView()) UISounds.tick(1.8F);
                 ClientPrefs.setListView(true);
                 scroll = 0;
                 return true;
@@ -444,14 +447,17 @@ public class TabletScreen extends Screen {
         if (index < apps.size()) {
             if (button == 1) {
                 // Right-click: edit
+                UISounds.page();
                 minecraft.setScreen(new AppEditScreen(this, index, apps.get(index)));
             } else if (button == 0) {
                 // Left-click: toggle
+                UISounds.toggle(!apps.get(index).active());
                 PacketDistributor.sendToServer(
                         new ModNetworking.ToggleAppPayload(hand == InteractionHand.MAIN_HAND, index));
             }
         } else if (button == 0) {
             if (apps.size() < ModNetworking.MAX_APPS) {
+                UISounds.page();
                 minecraft.setScreen(new AppEditScreen(this, -1, null));
             }
         }
@@ -461,6 +467,12 @@ public class TabletScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         scroll = Mth.clamp(scroll - scrollY * 16, 0, maxScroll());
         return true;
+    }
+
+    @Override
+    public void onClose() {
+        UISounds.close();
+        super.onClose();
     }
 
     @Override

@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionHand;
 public class ClientHooks {
 
     public static void openTabletScreen(InteractionHand hand) {
+        UISounds.open();
         Minecraft.getInstance().setScreen(new TabletScreen(hand));
     }
 }

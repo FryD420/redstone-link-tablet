@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.Frequency;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
@@ -137,6 +138,7 @@ public class AppEditScreen extends Screen {
 
         if (index != -1) {
             addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.remove"), b -> {
+                        UISounds.delete();
                         PacketDistributor.sendToServer(new ModNetworking.RemoveAppPayload(
                                 parent.hand() == InteractionHand.MAIN_HAND, index));
                         minecraft.setScreen(parent);
@@ -161,6 +163,7 @@ public class AppEditScreen extends Screen {
         Frequency freq = Frequency.of(stagedItem1, stagedItem2);
         if (!frequencies.contains(freq)) {
             frequencies.add(freq);
+            UISounds.tick(1.6F);
         }
         stagedItem1 = Items.AIR;
         stagedItem2 = Items.AIR;
@@ -173,6 +176,7 @@ public class AppEditScreen extends Screen {
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
         SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, color, icon);
+        UISounds.confirm();
         PacketDistributor.sendToServer(new ModNetworking.UpsertAppPayload(
                 parent.hand() == InteractionHand.MAIN_HAND, index, app));
         minecraft.setScreen(parent);
@@ -203,6 +207,7 @@ public class AppEditScreen extends Screen {
             int y = chipY(i);
             if (mouseX >= x && mouseX < x + CHIP_W && mouseY >= y && mouseY < y + CHIP_H) {
                 frequencies.remove(i);
+                UISounds.tick(1.1F);
                 return true;
             }
         }

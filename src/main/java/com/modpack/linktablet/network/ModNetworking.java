@@ -9,6 +9,8 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -108,13 +110,21 @@ public class ModNetworking {
     }
 
     private static void handleToggle(ToggleAppPayload payload, IPayloadContext context) {
-        ItemStack stack = tablet(context.player(), payload.mainHand());
+        Player player = context.player();
+        ItemStack stack = tablet(player, payload.mainHand());
         if (stack.isEmpty()) return;
         List<SignalApp> apps = apps(stack);
         if (payload.index() < 0 || payload.index() >= apps.size()) return;
         SignalApp app = apps.get(payload.index());
-        apps.set(payload.index(), app.withActive(!app.active()));
+        boolean nowActive = !app.active();
+        apps.set(payload.index(), app.withActive(nowActive));
         save(stack, apps);
+
+        // Faint click other nearby players can hear (the toggling player
+        // is excluded — they already got the UI sound client-side).
+        player.level().playSound(player, player.blockPosition(),
+                nowActive ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
+                SoundSource.PLAYERS, 0.3F, nowActive ? 1.6F : 1.3F);
     }
 
     private static void handleUpsert(UpsertAppPayload payload, IPayloadContext context) {

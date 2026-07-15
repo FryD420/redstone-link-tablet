@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- UI sounds throughout the tablet: open/close, toggle clicks (distinct on/off pitch),
+  save chime, remove sound, frequency chip ticks, view-mode switch. Nearby players
+  hear a faint click when someone toggles an app.
+
 ## 1.0.0 — 2026-07-14
 
 Initial release.
