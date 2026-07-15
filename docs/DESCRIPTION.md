@@ -27,6 +27,8 @@ on and off from one screen, anywhere in link range.
 - **Per-app signal strength (1–15)** — when several apps drive the same frequency,
   the strongest wins, exactly like stacked Redstone Links.
 - **Two layouts** — icon grid or list with toggle switches, switchable per player.
+- **Drag to rearrange** — a rearrange mode in the tablet GUI lets you drag apps
+  into any order, with live reflow, in both layouts.
 - **Real Create frequencies** — apps use Create's two-item frequency system with a
   searchable in-GUI picker (no physical items consumed). Anything a Redstone Link
   or Linked Controller can trigger, the tablet can too.
@@ -39,6 +41,16 @@ and its screen glows (light level 7) whenever an app is running. Sneak + right-c
 with an empty hand to pick it back up; apps and case color survive the trip.
 
 ![A wall-mounted tablet with its screen lit, overseeing a Create factory floor](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mounted-factory.png)
+
+## The screen is real
+
+The tablet's physical screen isn't a texture — it renders your actual apps, live,
+on both the held tablet and the placed one. An icon grid of up to 20 apps (their
+real item icons, glowing when active), or mini toggle-switch rows if you last used
+that tablet in list view — each tablet remembers its own layout.
+
+And on a placed tablet, **the screen is touchable**: click an app right on the
+glass to toggle it, no GUI needed. Tap the bezel for the full interface.
 
 ## Make it yours
 
