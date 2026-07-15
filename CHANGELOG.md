@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-07-15
 
 - Placeable tablet: sneak + right-click any surface to mount the tablet on walls,
   floors, or ceilings. Right-click to use the same GUI; the mounted tablet transmits
