@@ -2,19 +2,22 @@ package com.modpack.linktablet.client;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletBlockEntity;
-import com.modpack.linktablet.client.screen.TabletScreen;
+import com.modpack.linktablet.client.render.TabletBlockEntityRenderer;
+import com.modpack.linktablet.client.render.TabletItemRenderer;
+import com.modpack.linktablet.registry.ModBlockEntities;
 import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.item.ItemProperties;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.DyeColor;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 
 @EventBusSubscriber(modid = LinkTabletMod.MOD_ID, value = Dist.CLIENT)
 public class ClientSetup {
@@ -49,20 +52,25 @@ public class ClientSetup {
     }
 
     @SubscribeEvent
-    public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            // "lit" = 1 while this player has the tablet GUI open on this
-            // stack; the item model override swaps to the glowing-screen
-            // variant. Purely cosmetic, so client-side only.
-            ItemProperties.register(ModItems.TABLET.get(),
-                    ResourceLocation.fromNamespaceAndPath(LinkTabletMod.MOD_ID, "lit"),
-                    (stack, level, entity, seed) -> {
-                        Minecraft mc = Minecraft.getInstance();
-                        if (!(mc.screen instanceof TabletScreen tablet)) return 0.0F;
-                        if (!(tablet.view() instanceof AppView.Hand handView)) return 0.0F;
-                        if (entity == null || entity != mc.player) return 0.0F;
-                        return entity.getItemInHand(handView.hand()) == stack ? 1.0F : 0.0F;
-                    });
-        });
+    public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(ModBlockEntities.TABLET.get(), TabletBlockEntityRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterAdditionalModels(ModelEvent.RegisterAdditional event) {
+        // Standalone-baked geometry the tablet's custom item renderer
+        // draws (the item model JSON itself is a builtin/entity stub).
+        event.register(TabletItemRenderer.MODEL_BASE);
+        event.register(TabletItemRenderer.MODEL_LIT);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
+        event.registerItem(new IClientItemExtensions() {
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                return TabletItemRenderer.instance();
+            }
+        }, ModItems.TABLET.get());
     }
 }

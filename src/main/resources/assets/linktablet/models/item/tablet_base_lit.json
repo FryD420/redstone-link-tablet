@@ -1,7 +1,7 @@
 {
-  "parent": "linktablet:item/tablet",
+  "parent": "linktablet:item/tablet_base",
   "textures": {
-    "front": "linktablet:item/tablet"
+    "front": "linktablet:item/tablet_screen_on"
   },
   "elements": [
     {

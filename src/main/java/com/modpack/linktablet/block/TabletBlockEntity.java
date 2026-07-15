@@ -12,6 +12,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.DyeColor;
@@ -37,6 +38,8 @@ public class TabletBlockEntity extends BlockEntity {
     private List<SignalApp> apps = List.of();
     @Nullable
     private DyeColor caseColor;
+    /** Physical mini-screen layout: true = switch list, false = pip grid. */
+    private boolean screenList;
 
     /** Server-side transmitters keyed by frequency (max strength wins). */
     private final Map<Frequency, VirtualTransmitter> transmitters = new HashMap<>();
@@ -54,6 +57,19 @@ public class TabletBlockEntity extends BlockEntity {
         return caseColor;
     }
 
+    public boolean isScreenList() {
+        return screenList;
+    }
+
+    public void setScreenList(boolean screenList) {
+        if (this.screenList == screenList) return;
+        this.screenList = screenList;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void setApps(List<SignalApp> newApps) {
         this.apps = List.copyOf(newApps);
         setChanged();
@@ -64,9 +80,10 @@ public class TabletBlockEntity extends BlockEntity {
         refreshTransmitters();
     }
 
-    /** Copies apps + case color from the tablet item being placed. */
+    /** Copies apps, case color, and screen layout from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
+        this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         setApps(stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of()));
     }
 
@@ -78,6 +95,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (caseColor != null) {
             stack.set(ModDataComponents.CASE_COLOR.get(), caseColor);
+        }
+        if (screenList) {
+            stack.set(ModDataComponents.SCREEN_LIST.get(), true);
         }
         return stack;
     }
@@ -166,6 +186,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (caseColor != null) {
             tag.putString("case_color", caseColor.getName());
         }
+        if (screenList) {
+            tag.putBoolean("screen_list", true);
+        }
     }
 
     @Override
@@ -175,6 +198,7 @@ public class TabletBlockEntity extends BlockEntity {
         this.apps = appsTag == null ? List.of()
                 : SignalApp.CODEC.listOf().parse(NbtOps.INSTANCE, appsTag).result().orElse(List.of());
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
+        this.screenList = tag.getBoolean("screen_list");
     }
 
     @Override
@@ -185,5 +209,17 @@ public class TabletBlockEntity extends BlockEntity {
     @Override
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void onDataPacket(Connection net, ClientboundBlockEntityDataPacket pkt,
+                             HolderLookup.Provider registries) {
+        super.onDataPacket(net, pkt, registries);
+        // The chunk mesh bakes the case tint, but on placement it is
+        // built before this data arrives — request a re-render so the
+        // dyed bezel shows immediately instead of on the next update.
+        if (level != null && level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 8);
+        }
     }
 }

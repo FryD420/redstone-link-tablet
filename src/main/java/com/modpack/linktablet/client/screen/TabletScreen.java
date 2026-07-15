@@ -585,12 +585,18 @@ public class TabletScreen extends Screen {
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {
                 if (listView()) UISounds.tick(1.8F);
                 ClientPrefs.setListView(false);
+                // The tablet's physical mini-screen remembers the last
+                // view used on it (per-tablet, unlike the client pref)
+                PacketDistributor.sendToServer(
+                        new ModNetworking.ScreenLayoutPayload(target(), false));
                 scroll = 0;
                 return true;
             }
             if (overModeBtn(mouseX, mouseY, listBtnX())) {
                 if (!listView()) UISounds.tick(1.8F);
                 ClientPrefs.setListView(true);
+                PacketDistributor.sendToServer(
+                        new ModNetworking.ScreenLayoutPayload(target(), true));
                 scroll = 0;
                 return true;
             }

@@ -1,6 +1,8 @@
 package com.modpack.linktablet.block;
 
 import com.modpack.linktablet.client.ClientHooks;
+import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModItems;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
@@ -28,6 +30,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -98,6 +101,26 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.BLOCKS, 0.8F, 1.1F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        // Tap directly on an app's pip on the screen: toggle it without
+        // opening the GUI. Runs identically on both sides (apps are
+        // synced and the server receives the client's exact hit vec),
+        // so client and server always agree on pip-vs-GUI.
+        if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+            List<SignalApp> apps = be.getApps();
+            int index = TabletScreenMath.hitPip(state, pos, hitResult, apps.size(), be.isScreenList());
+            if (index >= 0 && !apps.get(index).momentary()) {
+                if (!level.isClientSide) {
+                    List<SignalApp> updated = new ArrayList<>(apps);
+                    SignalApp app = updated.get(index);
+                    updated.set(index, app.withActive(!app.active()));
+                    be.setApps(updated);
+                    // Unlike the GUI path, the clicker has no UI sound
+                    // here, so nobody is excluded.
+                    ModNetworking.playToggleClick(level, null, pos, !app.active());
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
         }
         if (level.isClientSide) {
             ClientHooks.openTabletBlockScreen(pos);

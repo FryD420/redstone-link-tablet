@@ -17,6 +17,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -177,6 +178,23 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: set the physical mini-screen layout (grid or switch list)
+    // ------------------------------------------------------------------
+    public record ScreenLayoutPayload(AppTarget target, boolean list) implements CustomPacketPayload {
+        public static final Type<ScreenLayoutPayload> TYPE = new Type<>(id("screen_layout"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ScreenLayoutPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, ScreenLayoutPayload::target,
+                        ByteBufCodecs.BOOL, ScreenLayoutPayload::list,
+                        ScreenLayoutPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: remove an app
     // ------------------------------------------------------------------
     public record RemoveAppPayload(AppTarget target, int index) implements CustomPacketPayload {
@@ -196,17 +214,26 @@ public class ModNetworking {
     // ------------------------------------------------------------------
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("3");
+        PayloadRegistrar registrar = event.registrar("4");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
         registrar.playToServer(ReorderAppPayload.TYPE, ReorderAppPayload.STREAM_CODEC, ModNetworking::handleReorder);
+        registrar.playToServer(ScreenLayoutPayload.TYPE, ScreenLayoutPayload.STREAM_CODEC, ModNetworking::handleScreenLayout);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
     }
 
     private static void playClick(Player player, AppTarget target, boolean on) {
-        BlockPos at = target.pos().orElse(player.blockPosition());
-        player.level().playSound(player, at,
+        playToggleClick(player.level(), player, target.pos().orElse(player.blockPosition()), on);
+    }
+
+    /**
+     * The faint toggle click. {@code excluded} skips a player who already
+     * heard a client-side UI sound; pass null to include everyone (e.g.
+     * tapping an app pip directly on a placed tablet's screen).
+     */
+    public static void playToggleClick(Level level, @Nullable Player excluded, BlockPos pos, boolean on) {
+        level.playSound(excluded, pos,
                 on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                 SoundSource.PLAYERS, 0.3F, on ? 1.6F : 1.3F);
     }
@@ -280,6 +307,29 @@ public class ModNetworking {
         // wrong app; drop them (release packets are self-healing).
         TabletTransmitterHandler.clearHeldForTarget(player,
                 payload.target().mainHand(), payload.target().pos().orElse(null));
+    }
+
+    private static void handleScreenLayout(ScreenLayoutPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+                    > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                be.setScreenList(payload.list());
+            }
+            return;
+        }
+        ItemStack stack = player.getItemInHand(
+                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        if (stack.getItem() instanceof TabletItem) {
+            if (payload.list()) {
+                stack.set(ModDataComponents.SCREEN_LIST.get(), true);
+            } else {
+                stack.remove(ModDataComponents.SCREEN_LIST.get());
+            }
+        }
     }
 
     private static void handleRemove(RemoveAppPayload payload, IPayloadContext context) {

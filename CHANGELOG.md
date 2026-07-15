@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Live tablet screens: both the held tablet and the placed tablet now render
+  a real mini app grid on their physical screens — one colored pip per app
+  (4x5, first 20), glowing when active, hollow for momentary apps. Each
+  tablet remembers the layout you last used in its GUI: in list mode the
+  physical screen shows mini toggle-switch rows (first 5 apps) instead.
+- Tap-to-toggle: clicking an app's pip directly on a placed tablet's screen
+  toggles that app on the spot — no GUI needed. Clicking anywhere else on
+  the tablet still opens the full GUI.
+- The held tablet's lit screen now uses the same bright screen texture as
+  the placed tablet.
 - App reordering: a new rearrange button in the tablet's title bar enters a
   drag-to-rearrange mode (in both grid and list view) — taps stop toggling,
   apps reflow live as you drag, and the order syncs and persists. Works on

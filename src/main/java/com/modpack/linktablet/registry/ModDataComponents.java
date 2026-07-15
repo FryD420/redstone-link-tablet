@@ -2,6 +2,7 @@ package com.modpack.linktablet.registry;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.frequency.SignalApp;
+import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -29,6 +30,13 @@ public class ModDataComponents {
             DATA_COMPONENTS.register("case_color", () -> DataComponentType.<DyeColor>builder()
                     .persistent(DyeColor.CODEC)
                     .networkSynchronized(DyeColor.STREAM_CODEC)
+                    .build());
+
+    /** Physical mini-screen layout: true = switch list; absent = pip grid. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> SCREEN_LIST =
+            DATA_COMPONENTS.register("screen_list", () -> DataComponentType.<Boolean>builder()
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL)
                     .build());
 
     public static void register(IEventBus bus) {
