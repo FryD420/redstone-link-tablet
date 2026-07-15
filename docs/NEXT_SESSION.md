@@ -4,8 +4,11 @@ Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-15, end of day)
-- **v1.2.0 tagged and pushed**; user uploading to CurseForge/Modrinth with the
-  prepared changelog text and updated docs/DESCRIPTION.md (new hero2.png).
+- **v1.2.1 tagged, pushed, and modpack-verified**; user uploading it to
+  CurseForge/Modrinth with the prepared changelog text and updated
+  docs/DESCRIPTION.md (new hero2.png). 1.2.1 = 1.2.0 + a hotfix for a
+  "Not building!" render crash with modded item icons (quads and icons
+  are now drawn in separate passes — see CLAUDE.md gotchas).
 - 1.2.0 added: app reordering (drag-to-rearrange GUI mode), live physical
   screens on held + placed tablets (4x5 icon grid or per-tablet switch-list,
   chosen by the last GUI view used on that tablet), tap-to-toggle on placed

@@ -42,6 +42,11 @@ transmit on Create's Redstone Link network.
   client re-render in `onDataPacket` (tint arrives after the placement
   rebuild). The item model is a `builtin/entity` stub; real geometry is
   standalone-baked `tablet_base(_lit).json` via `ModelEvent.RegisterAdditional`.
+- NEVER interleave custom-RenderType quads with nested item rendering in one
+  loop: an item model needing a non-fixed render type ends the shared buffer
+  batch, killing the cached VertexConsumer ("Not building!" crash — only
+  surfaces with modded icons, not vanilla ones). Draw all quads, then all
+  icons (see TabletScreenRenderer.render, the 1.2.1 hotfix).
 
 ## Release process
 
