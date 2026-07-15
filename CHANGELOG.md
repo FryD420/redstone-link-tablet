@@ -11,7 +11,8 @@
   toggles that app on the spot — no GUI needed. Clicking anywhere else on
   the tablet still opens the full GUI.
 - The held tablet's lit screen now uses the same bright screen texture as
-  the placed tablet.
+  the placed tablet, and empty tablets show the same flat glass as in-use
+  ones (in the world; the inventory icon is unchanged).
 - App reordering: a new rearrange button in the tablet's title bar enters a
   drag-to-rearrange mode (in both grid and list view) — taps stop toggling,
   apps reflow live as you drag, and the order syncs and persists. Works on

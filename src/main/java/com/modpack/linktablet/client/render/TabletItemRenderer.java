@@ -65,8 +65,9 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         itemRenderer.renderModelLists(model, stack, packedLight, packedOverlay, poseStack, vc);
 
         if (context == ItemDisplayContext.GUI) return;
+        // Drawn even with no apps so the empty screen matches the in-use
+        // look (flat glass, no baked home-button art)
         List<SignalApp> apps = stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
-        if (apps.isEmpty()) return;
 
         poseStack.pushPose();
         // Map the shared screen frame (u right, v down, +Y out) onto the

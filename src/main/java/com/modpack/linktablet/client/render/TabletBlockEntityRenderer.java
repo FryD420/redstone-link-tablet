@@ -30,8 +30,9 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
     @Override
     public void render(TabletBlockEntity be, float partialTick, PoseStack poseStack,
                        MultiBufferSource buffers, int packedLight, int packedOverlay) {
+        // Rendered even with no apps: the flat glass replaces the baked
+        // screen art everywhere, so empty and in-use tablets match.
         List<SignalApp> apps = be.getApps();
-        if (apps.isEmpty()) return;
         BlockState state = be.getBlockState();
         if (!state.hasProperty(TabletBlock.LIT)) return;
 
