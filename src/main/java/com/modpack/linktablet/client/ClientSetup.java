@@ -1,7 +1,9 @@
 package com.modpack.linktablet.client;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.client.screen.TabletScreen;
+import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
 import net.minecraft.client.Minecraft;
@@ -34,6 +36,19 @@ public class ClientSetup {
     }
 
     @SubscribeEvent
+    public static void onBlockColors(RegisterColorHandlersEvent.Block event) {
+        event.register((state, getter, pos, tintIndex) -> {
+            if (tintIndex != 0) return -1;
+            if (getter != null && pos != null
+                    && getter.getBlockEntity(pos) instanceof TabletBlockEntity be
+                    && be.getCaseColor() != null) {
+                return 0xFF000000 | be.getCaseColor().getTextureDiffuseColor();
+            }
+            return DEFAULT_CASE_TINT;
+        }, ModBlocks.TABLET.get());
+    }
+
+    @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             // "lit" = 1 while this player has the tablet GUI open on this
@@ -44,8 +59,9 @@ public class ClientSetup {
                     (stack, level, entity, seed) -> {
                         Minecraft mc = Minecraft.getInstance();
                         if (!(mc.screen instanceof TabletScreen tablet)) return 0.0F;
+                        if (!(tablet.view() instanceof AppView.Hand handView)) return 0.0F;
                         if (entity == null || entity != mc.player) return 0.0F;
-                        return entity.getItemInHand(tablet.hand()) == stack ? 1.0F : 0.0F;
+                        return entity.getItemInHand(handView.hand()) == stack ? 1.0F : 0.0F;
                     });
         });
     }

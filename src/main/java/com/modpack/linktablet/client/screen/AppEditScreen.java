@@ -154,8 +154,8 @@ public class AppEditScreen extends Screen {
         if (index != -1) {
             addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.remove"), b -> {
                         UISounds.delete();
-                        PacketDistributor.sendToServer(new ModNetworking.RemoveAppPayload(
-                                parent.hand() == InteractionHand.MAIN_HAND, index));
+                        PacketDistributor.sendToServer(
+                                new ModNetworking.RemoveAppPayload(parent.target(), index));
                         minecraft.setScreen(parent);
                     })
                     .bounds(left, height - 28, PANEL_WIDTH, 20).build());
@@ -163,10 +163,7 @@ public class AppEditScreen extends Screen {
     }
 
     private java.util.List<SignalApp> currentApps() {
-        ItemStack stack = minecraft.player.getItemInHand(parent.hand());
-        return stack.getOrDefault(
-                com.modpack.linktablet.registry.ModDataComponents.TABLET_APPS.get(),
-                java.util.List.of());
+        return parent.view().apps();
     }
 
     private boolean stagedComplete() {
@@ -192,8 +189,8 @@ public class AppEditScreen extends Screen {
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
         SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon);
         UISounds.confirm();
-        PacketDistributor.sendToServer(new ModNetworking.UpsertAppPayload(
-                parent.hand() == InteractionHand.MAIN_HAND, index, app));
+        PacketDistributor.sendToServer(
+                new ModNetworking.UpsertAppPayload(parent.target(), index, app));
         minecraft.setScreen(parent);
     }
 

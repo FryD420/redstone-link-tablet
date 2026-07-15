@@ -3,6 +3,8 @@ package com.modpack.linktablet;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModCreativeTabs;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.modpack.linktablet.registry.ModBlockEntities;
+import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModItems;
 import com.modpack.linktablet.registry.ModRecipeSerializers;
 import net.neoforged.bus.api.IEventBus;
@@ -25,6 +27,8 @@ public class LinkTabletMod {
 
     public LinkTabletMod(IEventBus modEventBus) {
         ModDataComponents.register(modEventBus);
+        ModBlocks.register(modEventBus);
+        ModBlockEntities.register(modEventBus);
         ModItems.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModRecipeSerializers.register(modEventBus);

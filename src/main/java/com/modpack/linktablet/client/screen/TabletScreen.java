@@ -1,16 +1,14 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
-import com.modpack.linktablet.registry.ModDataComponents;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
@@ -68,25 +66,27 @@ public class TabletScreen extends Screen {
     static final int FREQ1_COLOR = 0xFFC93C36;
     static final int FREQ2_COLOR = 0xFF3E52C1;
 
-    private final InteractionHand hand;
+    private final AppView view;
     private double scroll = 0;
 
     /** Index of the momentary app currently held down, or -1. */
     private int heldMomentary = -1;
 
-    public TabletScreen(InteractionHand hand) {
+    public TabletScreen(AppView view) {
         super(Component.translatable("gui.linktablet.tablet.title"));
-        this.hand = hand;
+        this.view = view;
     }
 
-    public InteractionHand hand() {
-        return hand;
+    public AppView view() {
+        return view;
+    }
+
+    ModNetworking.AppTarget target() {
+        return view.target();
     }
 
     private List<SignalApp> apps() {
-        if (minecraft == null || minecraft.player == null) return List.of();
-        ItemStack stack = minecraft.player.getItemInHand(hand);
-        return stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
+        return view.apps();
     }
 
     private boolean listView() {
@@ -471,13 +471,13 @@ public class TabletScreen extends Screen {
                     // Press-and-hold: transmits until mouse release
                     UISounds.toggle(true);
                     heldMomentary = index;
-                    PacketDistributor.sendToServer(new ModNetworking.MomentaryAppPayload(
-                            hand == InteractionHand.MAIN_HAND, index, true));
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.MomentaryAppPayload(target(), index, true));
                 } else {
                     // Left-click: toggle
                     UISounds.toggle(!app.active());
                     PacketDistributor.sendToServer(
-                            new ModNetworking.ToggleAppPayload(hand == InteractionHand.MAIN_HAND, index));
+                            new ModNetworking.ToggleAppPayload(target(), index));
                 }
             }
         } else if (button == 0) {
@@ -500,8 +500,8 @@ public class TabletScreen extends Screen {
 
     private void releaseMomentary() {
         if (heldMomentary == -1) return;
-        PacketDistributor.sendToServer(new ModNetworking.MomentaryAppPayload(
-                hand == InteractionHand.MAIN_HAND, heldMomentary, false));
+        PacketDistributor.sendToServer(
+                new ModNetworking.MomentaryAppPayload(target(), heldMomentary, false));
         heldMomentary = -1;
     }
 

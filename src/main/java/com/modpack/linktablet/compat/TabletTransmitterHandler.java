@@ -6,6 +6,7 @@ import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.item.TabletItem;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.simibubi.create.Create;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -14,6 +15,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,31 +45,31 @@ public class TabletTransmitterHandler {
     /** Active virtual transmitters, per player. */
     private static final Map<UUID, Map<Frequency, VirtualTransmitter>> ACTIVE = new HashMap<>();
 
-    /** One momentary app currently held down: its frequencies and strength. */
-    private record Hold(List<Frequency> frequencies, int strength) {}
-
     /**
-     * Momentary holds per player, keyed by (hand, app index) so a press
-     * and its release always pair up.
+     * One momentary app currently held down: its frequencies, strength,
+     * and — for placed tablets — the block position to broadcast from
+     * (null = broadcast from the player).
      */
-    private static final Map<UUID, Map<Integer, Hold>> HELD = new HashMap<>();
+    private record Hold(List<Frequency> frequencies, int strength, @Nullable BlockPos pos) {}
 
-    private static int holdKey(boolean mainHand, int index) {
-        return (mainHand ? 0 : 1) << 16 | index;
-    }
+    /** Identifies a press so it always pairs up with its release. */
+    private record HoldKey(boolean mainHand, @Nullable BlockPos pos, int index) {}
+
+    /** Momentary holds per player. */
+    private static final Map<UUID, Map<HoldKey, Hold>> HELD = new HashMap<>();
 
     /** Registers a momentary press (called from the network handler). */
-    public static void setHeld(Player player, boolean mainHand, int index,
+    public static void setHeld(Player player, boolean mainHand, @Nullable BlockPos pos, int index,
                                List<Frequency> frequencies, int strength) {
         HELD.computeIfAbsent(player.getUUID(), uuid -> new HashMap<>())
-                .put(holdKey(mainHand, index), new Hold(frequencies, strength));
+                .put(new HoldKey(mainHand, pos, index), new Hold(frequencies, strength, pos));
     }
 
     /** Clears a momentary press (release). */
-    public static void clearHeld(Player player, boolean mainHand, int index) {
-        Map<Integer, Hold> holds = HELD.get(player.getUUID());
+    public static void clearHeld(Player player, boolean mainHand, @Nullable BlockPos pos, int index) {
+        Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
         if (holds == null) return;
-        holds.remove(holdKey(mainHand, index));
+        holds.remove(new HoldKey(mainHand, pos, index));
         if (holds.isEmpty()) HELD.remove(player.getUUID());
     }
 
@@ -95,12 +97,16 @@ public class TabletTransmitterHandler {
                 }
             }
         }
-        Map<Integer, Hold> holds = HELD.get(player.getUUID());
+        Map<Frequency, BlockPos> wantedPos = new HashMap<>();
+        Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
         if (holds != null) {
             for (Hold hold : holds.values()) {
                 for (Frequency freq : hold.frequencies()) {
                     if (!freq.isEmpty()) {
                         wanted.merge(freq, hold.strength(), Math::max);
+                        if (hold.pos() != null) {
+                            wantedPos.putIfAbsent(freq, hold.pos());
+                        }
                     }
                 }
             }
@@ -120,16 +126,17 @@ public class TabletTransmitterHandler {
         }
 
         // 3. Add new transmitters / keep existing ones in sync with the
-        //    player's position, dimension, and requested strength.
+        //    desired position (player, or held block), dimension, and
+        //    requested strength.
         for (Map.Entry<Frequency, Integer> entry : wanted.entrySet()) {
+            BlockPos desiredPos = wantedPos.getOrDefault(entry.getKey(), player.blockPosition());
             VirtualTransmitter transmitter = current.get(entry.getKey());
             if (transmitter == null) {
-                transmitter = new VirtualTransmitter(entry.getKey(), level,
-                        player.blockPosition(), entry.getValue());
+                transmitter = new VirtualTransmitter(entry.getKey(), level, desiredPos, entry.getValue());
                 Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(level, transmitter);
                 current.put(entry.getKey(), transmitter);
             } else {
-                transmitter.update(level, player.blockPosition(), entry.getValue());
+                transmitter.update(level, desiredPos, entry.getValue());
             }
         }
 

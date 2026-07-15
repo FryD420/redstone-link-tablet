@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "face=floor,facing=north,lit=false": { "model": "linktablet:block/tablet" },
+    "face=floor,facing=east,lit=false":  { "model": "linktablet:block/tablet", "y": 90 },
+    "face=floor,facing=south,lit=false": { "model": "linktablet:block/tablet", "y": 180 },
+    "face=floor,facing=west,lit=false":  { "model": "linktablet:block/tablet", "y": 270 },
+    "face=floor,facing=north,lit=true":  { "model": "linktablet:block/tablet_lit" },
+    "face=floor,facing=east,lit=true":   { "model": "linktablet:block/tablet_lit", "y": 90 },
+    "face=floor,facing=south,lit=true":  { "model": "linktablet:block/tablet_lit", "y": 180 },
+    "face=floor,facing=west,lit=true":   { "model": "linktablet:block/tablet_lit", "y": 270 },
+
+    "face=wall,facing=north,lit=false":  { "model": "linktablet:block/tablet", "x": 270, "y": 180 },
+    "face=wall,facing=east,lit=false":   { "model": "linktablet:block/tablet", "x": 270, "y": 270 },
+    "face=wall,facing=south,lit=false":  { "model": "linktablet:block/tablet", "x": 270 },
+    "face=wall,facing=west,lit=false":   { "model": "linktablet:block/tablet", "x": 270, "y": 90 },
+    "face=wall,facing=north,lit=true":   { "model": "linktablet:block/tablet_lit", "x": 270, "y": 180 },
+    "face=wall,facing=east,lit=true":    { "model": "linktablet:block/tablet_lit", "x": 270, "y": 270 },
+    "face=wall,facing=south,lit=true":   { "model": "linktablet:block/tablet_lit", "x": 270 },
+    "face=wall,facing=west,lit=true":    { "model": "linktablet:block/tablet_lit", "x": 270, "y": 90 },
+
+    "face=ceiling,facing=north,lit=false": { "model": "linktablet:block/tablet", "x": 180, "y": 180 },
+    "face=ceiling,facing=east,lit=false":  { "model": "linktablet:block/tablet", "x": 180, "y": 270 },
+    "face=ceiling,facing=south,lit=false": { "model": "linktablet:block/tablet", "x": 180 },
+    "face=ceiling,facing=west,lit=false":  { "model": "linktablet:block/tablet", "x": 180, "y": 90 },
+    "face=ceiling,facing=north,lit=true":  { "model": "linktablet:block/tablet_lit", "x": 180, "y": 180 },
+    "face=ceiling,facing=east,lit=true":   { "model": "linktablet:block/tablet_lit", "x": 180, "y": 270 },
+    "face=ceiling,facing=south,lit=true":  { "model": "linktablet:block/tablet_lit", "x": 180 },
+    "face=ceiling,facing=west,lit=true":   { "model": "linktablet:block/tablet_lit", "x": 180, "y": 90 }
+  }
+}

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Placeable tablet: sneak + right-click any surface to mount the tablet on walls,
+  floors, or ceilings. Right-click to use the same GUI; the mounted tablet transmits
+  from its own position while the chunk is loaded. Its screen switches on (emissive,
+  light level 7) whenever any app is active. Sneak + right-click with an empty hand
+  picks it back up — apps and case color survive placing, breaking, and support loss.
 - Dyed cases: craft the tablet with any dye (shapeless) to color its case — back,
   edges, and front bezel ring. Apps are preserved; re-dye anytime. All 16 colors.
 - Momentary apps: a per-app "Momentary" setting makes the app transmit only while the
