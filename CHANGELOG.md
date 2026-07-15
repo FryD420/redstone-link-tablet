@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — 2026-07-15
+
+- Fixed a crash ("Not building!") when rendering tablet screens whose app
+  icons are items with special render types (common with modded icons):
+  screen quads and item icons are now drawn in separate passes.
+
 ## 1.2.0 — 2026-07-15
 
 - Live tablet screens: both the held tablet and the placed tablet now render

@@ -102,22 +102,41 @@ public final class TabletScreenRenderer {
                 TabletScreenMath.GLASS_U1 + bleed, TabletScreenMath.GLASS_V1 + bleed,
                 0f, backlit ? BG_LIT : BG_OFF, bgLight);
 
+        // All quads first, all icons second: an icon's model may need a
+        // render type that shares the fallback buffer, which ends any
+        // in-progress shared batch — interleaving would leave our quad
+        // buffer dead mid-loop ("Not building!" crash with modded icons).
         int count = TabletScreenMath.visibleApps(apps.size(), list);
         for (int i = 0; i < count; i++) {
             SignalApp app = apps.get(i);
             int color = app.color() | 0xFF000000;
             if (list) {
-                renderSwitchRow(poseStack, pose, vc, buffers, i, app, color, packedLight);
+                renderSwitchRow(pose, vc, i, app, color, packedLight);
             } else {
-                renderPip(poseStack, pose, vc, buffers, i, app, color, packedLight);
+                renderPip(pose, vc, i, app, color, packedLight);
             }
+        }
+        for (int i = 0; i < count; i++) {
+            SignalApp app = apps.get(i);
+            boolean glowing = app.active() && !app.momentary();
+            int light = glowing ? LightTexture.FULL_BRIGHT : packedLight;
+            float cu, cv, size;
+            if (list) {
+                cu = TabletScreenMath.GLASS_U0 + SPACE + TILE_H / 2f;
+                cv = tileV0(i) + TILE_H / 2f;
+                size = LIST_ICON;
+            } else {
+                cu = tileU0(i % TabletScreenMath.COLS) + TILE_W / 2f;
+                cv = tileV0(i / TabletScreenMath.COLS) + TILE_H / 2f;
+                size = app.momentary() ? GRID_ICON_MOMENTARY : GRID_ICON;
+            }
+            renderIcon(poseStack, buffers, app.iconStack(), cu, cv, size, light);
         }
     }
 
-    /** Grid entry: colored plate, app icon on top, glow border = state. */
-    private static void renderPip(PoseStack poseStack, PoseStack.Pose pose, VertexConsumer vc,
-                                  MultiBufferSource buffers, int i, SignalApp app, int color,
-                                  int packedLight) {
+    /** Grid entry: colored plate, glow border = state (icon drawn later). */
+    private static void renderPip(PoseStack.Pose pose, VertexConsumer vc,
+                                  int i, SignalApp app, int color, int packedLight) {
         float u0 = tileU0(i % TabletScreenMath.COLS);
         float v0 = tileV0(i / TabletScreenMath.COLS);
         float u1 = u0 + TILE_W;
@@ -127,20 +146,16 @@ public final class TabletScreenRenderer {
 
         if (app.momentary()) {
             ring(pose, vc, u0, v0, u1, v1, dim(color), packedLight);
-            renderIcon(poseStack, buffers, app.iconStack(), cu, cv, GRID_ICON_MOMENTARY, packedLight);
         } else if (app.active()) {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
-            renderIcon(poseStack, buffers, app.iconStack(), cu, cv, GRID_ICON, LightTexture.FULL_BRIGHT);
         } else {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, dim(color), packedLight);
-            renderIcon(poseStack, buffers, app.iconStack(), cu, cv, GRID_ICON, packedLight);
         }
     }
 
-    /** List row: icon chip left, mini toggle switch (or push button) right. */
-    private static void renderSwitchRow(PoseStack poseStack, PoseStack.Pose pose, VertexConsumer vc,
-                                        MultiBufferSource buffers, int i, SignalApp app, int color,
-                                        int packedLight) {
+    /** List row: colored chip left, mini switch right (icon drawn later). */
+    private static void renderSwitchRow(PoseStack.Pose pose, VertexConsumer vc,
+                                        int i, SignalApp app, int color, int packedLight) {
         float v0 = tileV0(i);
         float v1 = v0 + TILE_H;
         float u0 = TabletScreenMath.GLASS_U0 + SPACE;
@@ -153,8 +168,6 @@ public final class TabletScreenRenderer {
         // Icon chip in the app's color, left end
         fillRect(pose, vc, u0, v0, u0 + TILE_H, v1, LAYER * 2,
                 on ? brighten(color) : dim(color), stateLight);
-        renderIcon(poseStack, buffers, app.iconStack(),
-                u0 + TILE_H / 2f, (v0 + v1) / 2f, LIST_ICON, stateLight);
 
         float su0 = u1 - SWITCH_W;
         if (app.momentary()) {
