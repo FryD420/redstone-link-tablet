@@ -34,6 +34,14 @@ transmit on Create's Redstone Link network.
 - Create 6.x import quirk: `Couple` is `net.createmod.catnip.data.Couple`
   (older Create used `com.simibubi.create.foundation.utility.Couple`) — see
   `compat/VirtualTransmitter.java`.
+- Live-screen rendering (1.2.0): `client/render/` holds the BER + BEWLR;
+  shared geometry/click math in `block/TabletScreenMath.java` (one source of
+  truth for renderer AND server hit-test — keep them together). Screen quads
+  must bleed ~0.5 texel under the bezel ring or the baked art shimmers
+  through the seam. The chunk mesh bakes the case tint, so the BE forces a
+  client re-render in `onDataPacket` (tint arrives after the placement
+  rebuild). The item model is a `builtin/entity` stub; real geometry is
+  standalone-baked `tablet_base(_lit).json` via `ModelEvent.RegisterAdditional`.
 
 ## Release process
 
