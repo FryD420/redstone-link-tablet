@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-07-15
 
 - Live tablet screens: both the held tablet and the placed tablet now render
   a real mini app grid on their physical screens — one colored pip per app
