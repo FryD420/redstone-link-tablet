@@ -4,12 +4,15 @@ Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-16, end of day)
-- **All 1.4.0 code is implemented and compiles** (see CHANGELOG "Unreleased"):
-  text fitting, dye wash (cauldron + fan washing), wrench compat with screen
-  rotation, ItemStack frequencies (registrar "5"→"6"). Boot-tested in the dev
-  client (clean load, no errors). NOT yet in-game verified — needs the user's
-  runClient/FAMILYPACK pass per the CHANGELOG verify list before cutting
-  1.4.0 (version bump, tag). Multiblock design doc: `docs/MULTIBLOCK_DESIGN.md`.
+- **1.4.0 is READY TO SHIP** (user-verified in dev; testers verified the
+  1.3.3 test build it absorbs): ItemStack frequencies (card-mod compat),
+  container-menu app editor with vanilla dragging, wrench rotation +
+  landscape wall mounting, dye wash, text fitting, slider apps with exact
+  click-and-slide on placed tablets, editor keyboard fix. Registrar
+  "5"→"7" across the round. The interim "1.3.3" was TEST-ONLY (no tag, no
+  platform upload; its changelog folded into 1.4.0). Remaining: tag
+  `v1.4.0` + push on the user's go, user uploads to CurseForge/Modrinth,
+  delete the draft GitHub release `v1.3.3-test`.
 - **v1.3.2 is LIVE on CurseForge and Modrinth** with the new listing icon
   (`docs/icon.png`); tagged and pushed. Tester-verified in the FAMILYPACK
   instances over several fix rounds.

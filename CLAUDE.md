@@ -86,6 +86,18 @@ transmit on Create's Redstone Link network.
   `gridLayout(count, rot)`, and the inverse swizzle inside `hitPip` — and the
   renderer's center-pivot pose rotation must stay in lockstep with it. Held
   items always render rotation 0.
+- Slider apps (1.4.0): `active` is DERIVED from `strength > 0` and never
+  user-toggled — that's what keeps the transmitter collectors'
+  `active && !momentary` rule working unchanged. `sanitized()` enforces it.
+- `TabletScreenMath` also owns the screen LAYOUT constants (SPACE, tile
+  helpers, `sliderInset`, `sliderBarU`): the renderer draws through them and
+  the slider drag maps the crosshair against them — three consumers, one
+  source; never fork the numbers.
+- Placed-tablet slider drags are CLIENT-driven: `client/BlockSliderDrag`
+  projects the look-ray onto the screen's infinite plane each tick
+  (`TabletScreenMath.logicalUFromRay`) and sends `SetSliderPayload`s; it also
+  cancels the repeating use-key while dragging so neighbors can't be clicked.
+  The server only ever sees validated payloads.
 
 ## Release process
 

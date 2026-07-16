@@ -1,25 +1,20 @@
 # Changelog
 
-## Unreleased
-
-- New app type: Slider. The transmitted signal follows the slider
-  position, 0 (off) to 15 — drag it live on the tablet GUI (grid tiles
-  get a value bar, list rows a wide track). On a placed tablet's screen,
-  click-and-slide: hold right-click on the slider's tile and sweep your
-  crosshair across the screen — the value follows the full screen width
-  for precision. Pick the type in the app editor (click the Type row to
-  cycle Toggle → Hold → Slider); the strength slider becomes the initial
-  value and allows 0.
-- Note for servers: the network protocol version changed — clients and
-  servers must both be updated.
-
-## 1.3.3 — 2026-07-16
+## 1.4.0 — 2026-07-16
 
 - Frequencies now carry the full item — including its data components —
   so component-based frequency items (Create Unique Cards, Frequency
   Create cards, dyed items, renamed items with dyed color) work as
   distinct channels, exactly matching what Create's own Redstone Links
   distinguish. Old tablets load seamlessly and upgrade on save.
+- New app type: Slider. The transmitted signal follows the slider
+  position, 0 (off) to 15 — drag it live on the tablet GUI (grid tiles
+  get a value bar, list rows a wide track). On a placed tablet's screen,
+  click-and-slide: hold right-click on the slider's tile and sweep your
+  crosshair — the value tracks the crosshair exactly and keeps following
+  even past the tablet's edge. Pick the type in the app editor (click
+  the Type row to cycle Toggle → Hold → Slider); the strength slider
+  becomes the initial value and allows 0.
 - The app editor now includes your real inventory with vanilla drag
   mechanics: pick an item up and drop it on the red/blue frequency slots
   (they take a copy — nothing is consumed), or shift-click it in.
@@ -42,7 +37,7 @@
   inventory key — an 'e' closed the menu mid-word and the rest of the
   keystrokes moved the player. Text fields now own the keyboard while
   focused (ESC still exits).
-- Note for servers: the network protocol version changed — 1.3.3 clients
+- Note for servers: the network protocol version changed — 1.4.0 clients
   and servers must both be updated.
 
 ## 1.3.2 — 2026-07-16
