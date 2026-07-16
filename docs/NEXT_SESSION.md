@@ -4,8 +4,8 @@ Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-16, end of day)
-- **v1.3.2 tagged and pushed; user uploading to CurseForge/Modrinth** with the
-  new listing icon (`docs/icon.png`). Tester-verified in the FAMILYPACK
+- **v1.3.2 is LIVE on CurseForge and Modrinth** with the new listing icon
+  (`docs/icon.png`); tagged and pushed. Tester-verified in the FAMILYPACK
   instances over several fix rounds.
 - The 1.3.x round shipped (see CHANGELOG 1.3.1 + 1.3.2 for the split):
   dynamic screen tiles with outlined name labels, list-mode names +
@@ -24,3 +24,16 @@ at the repo root (auto-loaded every Claude session).
 2. Far-future (parked): interactive GUI on the held tablet (first-person).
 3. Listing screenshots could show the new dynamic tiles/themes — drop new
    captures in docs/images/, wire into docs/DESCRIPTION.md like hero2.png.
+
+## Unconfirmed tester suggestions (need the user's explicit go-ahead)
+These arrived via a message the user later disavowed (someone else at the
+keyboard / a stray paste — see local Claude memory). Reasonable ideas, but
+do NOT build them until the user asks:
+- Creative-mode item tab for the mod (like Create's).
+- More app-icon-friendly defaults (some items render poorly as icons).
+- A "blank white tablet in the ponder scene" report — the user says the
+  scene works for them, but the claim is plausible: ponder's virtual level
+  may skip block color handlers, which would leave the case untinted
+  (bright white). If anyone reproduces it, check tinting in the ponder
+  renderer first.
+- A PurpleFox easter egg (the suspect requested it themselves).
