@@ -5,10 +5,14 @@ import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.item.TabletItem;
+import com.modpack.linktablet.menu.AppEditMenu;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.modpack.linktablet.registry.ModMenus;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -16,6 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -230,9 +235,26 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: open the app edit container menu (server-backed so the
+    // editor gets real, vanilla-feeling inventory slots)
+    // ------------------------------------------------------------------
+    public record OpenEditMenuPayload(AppEditMenu.EditContext context) implements CustomPacketPayload {
+        public static final Type<OpenEditMenuPayload> TYPE = new Type<>(id("open_edit_menu"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, OpenEditMenuPayload> STREAM_CODEC =
+                AppEditMenu.EditContext.STREAM_CODEC.map(OpenEditMenuPayload::new, OpenEditMenuPayload::context);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("5");
+        // "6": 1.4.0 — Frequency's wire format grew from two item IDs to
+        // two full ItemStacks (component-bearing frequency items).
+        PayloadRegistrar registrar = event.registrar("6");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -240,6 +262,24 @@ public class ModNetworking {
         registrar.playToServer(ScreenLayoutPayload.TYPE, ScreenLayoutPayload.STREAM_CODEC, ModNetworking::handleScreenLayout);
         registrar.playToServer(SetThemePayload.TYPE, SetThemePayload.STREAM_CODEC, ModNetworking::handleSetTheme);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
+        registrar.playToServer(OpenEditMenuPayload.TYPE, OpenEditMenuPayload.STREAM_CODEC, ModNetworking::handleOpenEditMenu);
+    }
+
+    private static void handleOpenEditMenu(OpenEditMenuPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        AppEditMenu.EditContext ctx = payload.context();
+        AppHost host = resolve(player, ctx.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        if (ctx.index() < -1 || ctx.index() >= apps.size()) return;
+        if (ctx.index() == -1 && apps.size() >= MAX_APPS) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        serverPlayer.openMenu(new SimpleMenuProvider(
+                        (id, inv, p) -> new AppEditMenu(ModMenus.APP_EDIT.get(), id, inv, ctx),
+                        Component.translatable(ctx.index() == -1
+                                ? "gui.linktablet.edit_app.title.new"
+                                : "gui.linktablet.edit_app.title.edit")),
+                buf -> AppEditMenu.EditContext.STREAM_CODEC.encode(buf, ctx));
     }
 
     private static void playClick(Player player, AppTarget target, boolean on) {

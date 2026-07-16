@@ -2,8 +2,10 @@ package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.ClientPrefs;
+import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.menu.AppEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -302,10 +304,14 @@ public class TabletScreen extends Screen {
     // Rendering
     // ------------------------------------------------------------------
 
+    /** Full name of a hovered entry whose label got ellipsized this frame. */
+    private String hoveredEllipsizedName;
+
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
+        hoveredEllipsizedName = null;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
         if (reorderMode) {
@@ -390,6 +396,8 @@ public class TabletScreen extends Screen {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.reorder"), mouseX, mouseY);
         } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, themeBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.theme.title"), mouseX, mouseY);
+        } else if (hoveredEllipsizedName != null && !themePopupOpen) {
+            graphics.renderTooltip(font, Component.literal(hoveredEllipsizedName), mouseX, mouseY);
         }
     }
 
@@ -545,9 +553,12 @@ public class TabletScreen extends Screen {
             graphics.drawString(font, "x" + app.frequencies().size(), x + 3, y + 3, 0xFFE2E5EB, true);
         }
 
-        // Name (clipped to tile width)
-        String name = font.plainSubstrByWidth(app.name(), TILE_SIZE + TILE_GAP - 2);
+        // Name (ellipsized to tile width; full name via hover tooltip)
+        String name = TextFit.ellipsize(font, app.name(), TILE_SIZE + TILE_GAP - 2);
         drawThemedCentered(graphics, name, x + TILE_SIZE / 2, y + TILE_SIZE + 3, theme.textPrimary);
+        if (hovered && !name.equals(app.name())) {
+            hoveredEllipsizedName = app.name();
+        }
     }
 
     /**
@@ -625,7 +636,10 @@ public class TabletScreen extends Screen {
         // Name (leave room for chip + switch + optional count tag)
         String countTag = app.frequencies().size() > 1 ? " x" + app.frequencies().size() : "";
         int tagWidth = countTag.isEmpty() ? 0 : font.width(countTag);
-        String name = font.plainSubstrByWidth(app.name(), w - 24 - SWITCH_W - 12 - tagWidth);
+        String name = TextFit.ellipsize(font, app.name(), w - 24 - SWITCH_W - 12 - tagWidth);
+        if (hovered && !name.equals(app.name())) {
+            hoveredEllipsizedName = app.name();
+        }
         int nameY = y + (ROW_HEIGHT - 8) / 2;
         graphics.drawString(font, name, x + 26, nameY,
                 lit ? theme.textPrimary : theme.textMuted, theme.textShadow);
@@ -782,9 +796,10 @@ public class TabletScreen extends Screen {
         List<SignalApp> apps = apps();
         if (index < apps.size()) {
             if (button == 1) {
-                // Right-click: edit
+                // Right-click: edit (server opens the container menu)
                 UISounds.page();
-                minecraft.setScreen(new AppEditScreen(this, index, apps.get(index)));
+                PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
+                        AppEditMenu.EditContext.plain(target(), index)));
             } else if (button == 0) {
                 SignalApp app = apps.get(index);
                 if (app.momentary()) {
@@ -803,7 +818,8 @@ public class TabletScreen extends Screen {
         } else if (button == 0) {
             if (apps.size() < ModNetworking.MAX_APPS) {
                 UISounds.page();
-                minecraft.setScreen(new AppEditScreen(this, -1, null));
+                PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
+                        AppEditMenu.EditContext.plain(target(), -1)));
             }
         }
     }

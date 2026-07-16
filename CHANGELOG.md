@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.3 — 2026-07-16
+
+- Frequencies now carry the full item — including its data components —
+  so component-based frequency items (Create Unique Cards, Frequency
+  Create cards, dyed items, renamed items with dyed color) work as
+  distinct channels, exactly matching what Create's own Redstone Links
+  distinguish. Old tablets load seamlessly and upgrade on save.
+- The app editor now includes your real inventory with vanilla drag
+  mechanics: pick an item up and drop it on the red/blue frequency slots
+  (they take a copy — nothing is consumed), or shift-click it in.
+  Components ride along, so frequency cards work naturally. The
+  all-items search picker is still there as an overlay for items you
+  don't carry.
+- Create wrench support on placed tablets: wrench the screen glass to
+  rotate the screen content 90° — tiles, labels, and tap-to-toggle all
+  follow. Wrench the bezel (or any edge) to rotate the tablet itself:
+  floor/ceiling tablets spin on their support, wall tablets physically
+  flip portrait ↔ landscape. Sneak+wrench picks the tablet up with
+  everything intact.
+- Wash a dyed case back to default: dunk the tablet in a water cauldron,
+  or toss it into an encased fan's washing stream (apps, theme, and
+  everything else survive — only the dye comes off).
+- App names no longer get cut off: GUI labels ellipsize (hover a tile for
+  the full name) and the placed screen's labels shrink to fit before
+  truncating.
+- Note for servers: the network protocol version changed — 1.3.3 clients
+  and servers must both be updated.
+
 ## 1.3.2 — 2026-07-16
 
 - Held momentary buttons now light up on a placed tablet's screen for

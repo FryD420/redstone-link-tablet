@@ -68,6 +68,12 @@ public class ClientSetup {
     }
 
     @SubscribeEvent
+    public static void onRegisterMenuScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
+        event.register(com.modpack.linktablet.registry.ModMenus.APP_EDIT.get(),
+                com.modpack.linktablet.client.screen.AppEditScreen::new);
+    }
+
+    @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> PonderIndex.addPlugin(new LinkTabletPonderPlugin()));
     }

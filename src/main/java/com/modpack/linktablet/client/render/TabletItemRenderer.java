@@ -78,8 +78,10 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.mulPose(Axis.XP.rotationDegrees(90));
         boolean listLayout = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         ScreenTheme theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
-        TabletScreenRenderer.render(poseStack, buffers, apps, listLayout, theme, lit, packedLight,
-                heldPips(stack));
+        // Held items ignore the stored screen rotation — it's a mounting
+        // concern; the hand always shows portrait.
+        TabletScreenRenderer.render(poseStack, buffers, apps, listLayout, 0, theme, lit,
+                packedLight, heldPips(stack));
         poseStack.popPose();
     }
 

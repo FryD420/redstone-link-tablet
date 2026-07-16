@@ -1,16 +1,16 @@
 package com.modpack.linktablet.client;
 
-import com.modpack.linktablet.client.screen.AppEditScreen;
 import com.modpack.linktablet.client.screen.TabletScreen;
 import com.modpack.linktablet.frequency.Frequency;
 import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.menu.AppEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
 
@@ -33,15 +33,16 @@ public class ClientHooks {
 
     /**
      * Right-clicked a Redstone Link with the tablet: open the app editor
-     * pre-filled with the link's frequency. If an app already carries
-     * that frequency, edit it instead of duplicating.
+     * pre-filled with the link's frequency (full stacks — components
+     * intact). If an app already carries that frequency, edit it instead
+     * of duplicating.
      */
-    public static void openLinkPrefill(InteractionHand hand, Item item1, Item item2) {
+    public static void openLinkPrefill(InteractionHand hand, ItemStack stack1, ItemStack stack2) {
         Minecraft mc = Minecraft.getInstance();
         AppView view = new AppView.Hand(hand);
         List<SignalApp> apps = view.apps();
-        Frequency freq = Frequency.of(item1, item2);
-        TabletScreen parent = new TabletScreen(view);
+        Frequency freq = Frequency.of(stack1, stack2);
+        ModNetworking.AppTarget target = view.target();
 
         for (int i = 0; i < apps.size(); i++) {
             SignalApp app = apps.get(i);
@@ -49,7 +50,8 @@ public class ClientHooks {
                 mc.player.displayClientMessage(Component.translatable(
                         "message.linktablet.link_already_added", app.name()), true);
                 UISounds.open();
-                mc.setScreen(new AppEditScreen(parent, i, app));
+                PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
+                        AppEditMenu.EditContext.plain(target, i)));
                 return;
             }
         }
@@ -58,12 +60,15 @@ public class ClientHooks {
                     Component.translatable("message.linktablet.tablet_full"), true);
             return;
         }
-        String name = new ItemStack(item1 == net.minecraft.world.item.Items.AIR ? item2 : item1)
-                .getHoverName().getString();
+        String name = (stack1.isEmpty() ? stack2 : stack1).getHoverName().getString();
         if (name.length() > SignalApp.MAX_NAME_LENGTH) {
             name = name.substring(0, SignalApp.MAX_NAME_LENGTH);
         }
         UISounds.open();
-        mc.setScreen(AppEditScreen.withLinkFrequency(parent, item1, item2, name));
+        // A full pair prefills the ghost staging slots (the classic flow —
+        // Save auto-commits); a half-set link commits its lone-item
+        // frequency directly (screen-side), since staging needs both.
+        PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
+                new AppEditMenu.EditContext(target, -1, stack1, stack2, name)));
     }
 }

@@ -1,20 +1,25 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.Frequency;
 import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.menu.AppEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
+import com.modpack.linktablet.theme.ScreenTheme;
+import com.simibubi.create.foundation.gui.menu.GhostItemSubmitPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -26,12 +31,14 @@ import java.util.Optional;
  * (all toggled together — a "scene"), an optional custom icon item, and a
  * tile color.
  * <p>
- * Frequencies are staged in the two slot buttons and committed to the
- * list with the Add button (or automatically on Save, so the classic
- * single-frequency flow is unchanged). Committed frequencies show as
- * chips; clicking a chip removes it.
+ * Backed by {@link AppEditMenu}, so the player inventory is real slots
+ * with vanilla drag mechanics; the two staging frequency slots are GHOST
+ * slots (dropping copies the item, count 1, nothing is consumed).
+ * Committed frequencies show as chips; clicking a chip removes it. The
+ * all-items search picker lives in a {@link PickerOverlay} (a separate
+ * Screen would kill the container session).
  */
-public class AppEditScreen extends Screen {
+public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
     /** Preset tile colors (ARGB). */
     private static final int[] COLORS = {
@@ -42,37 +49,40 @@ public class AppEditScreen extends Screen {
     };
 
     private static final int PANEL_WIDTH = 260;
-    private static final int RIGHT_COL = 160;
+    private static final int PANEL_HEIGHT = 230;
+    private static final int RIGHT_COL = 168;
 
-    // Frequency chips (committed pairs)
+    // Frequency chips (committed pairs), image-local coords
     private static final int CHIP_W = 36;
     private static final int CHIP_H = 20;
     private static final int CHIP_GAP = 4;
     private static final int CHIPS_PER_ROW = 4;
-    private static final int CHIPS_Y = 118;
+    private static final int CHIPS_Y = 84;
 
     // Right column: color button opens a 4x4 swatch popup ("dropdown")
-    private static final int COLOR_BTN_Y = 86;
+    private static final int COLOR_BTN_Y = 68;
     private static final int POPUP_Y = COLOR_BTN_Y + 24;
     private static final int POPUP_SWATCH = 16;
     private static final int POPUP_STRIDE = 18;
     private static final int POPUP_SIZE = 3 * POPUP_STRIDE + POPUP_SWATCH; // 4x4 grid
 
     // Right column: momentary checkbox + strength slider
-    private static final int MOMENTARY_Y = 118;
-    private static final int STRENGTH_LABEL_Y = 142;
-    private static final int TRACK_Y = 154;
+    private static final int MOMENTARY_Y = 94;
+    private static final int STRENGTH_LABEL_Y = 113;
+    private static final int TRACK_Y = 124;
     private static final int TRACK_W = 72;
     private static final int CHECKBOX_SIZE = 12;
 
-    private final TabletScreen parent;
+    // Right-of-inventory action buttons
+    private static final int BTN_X = 176;
+    private static final int BTN_W = 76;
+
     private final int index; // -1 = new app
 
     private EditBox nameBox;
-    private Item stagedItem1 = Items.AIR;
-    private Item stagedItem2 = Items.AIR;
+    private PickerOverlay picker;
     private final List<Frequency> frequencies = new ArrayList<>();
-    private Optional<Item> iconItem = Optional.empty();
+    private Optional<net.minecraft.world.item.Item> iconItem = Optional.empty();
     private int color = SignalApp.DEFAULT_COLOR;
     private boolean wasActive = false;
     private boolean momentary = false;
@@ -83,126 +93,133 @@ public class AppEditScreen extends Screen {
     private Button saveButton;
     private Button addFreqButton;
 
-    /** Name applied to the (fresh) name box on first init — link prefill. */
-    private String pendingName;
-
-    /**
-     * New app pre-filled from a Redstone Link's frequency. A full pair
-     * lands in the staging slots (the classic flow — Save auto-commits
-     * it); a half-set link commits its lone-item frequency directly,
-     * since staging requires both slots.
-     */
-    public static AppEditScreen withLinkFrequency(TabletScreen parent, Item item1, Item item2, String name) {
-        AppEditScreen screen = new AppEditScreen(parent, -1, null);
-        if (item1 != Items.AIR && item2 != Items.AIR) {
-            screen.stagedItem1 = item1;
-            screen.stagedItem2 = item2;
-        } else {
-            screen.frequencies.add(Frequency.of(item1, item2));
-        }
-        screen.pendingName = name;
-        return screen;
-    }
-
-    public AppEditScreen(TabletScreen parent, int index, SignalApp existing) {
-        super(Component.translatable(index == -1
-                ? "gui.linktablet.edit_app.title.new"
-                : "gui.linktablet.edit_app.title.edit"));
-        this.parent = parent;
-        this.index = index;
-        if (existing != null) {
+    public AppEditScreen(AppEditMenu menu, Inventory playerInventory, Component title) {
+        super(menu, playerInventory, title);
+        this.imageWidth = PANEL_WIDTH;
+        this.imageHeight = PANEL_HEIGHT;
+        this.index = menu.contentHolder.index();
+        List<SignalApp> apps = view().apps();
+        if (index >= 0 && index < apps.size()) {
+            SignalApp existing = apps.get(index);
             this.frequencies.addAll(existing.frequencies());
             this.iconItem = existing.icon().map(BuiltInRegistries.ITEM::get);
             this.color = existing.color();
             this.wasActive = existing.active();
             this.momentary = existing.momentary();
             this.strength = existing.strength();
+        } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
+            // Half-set link prefill: commit the lone-item frequency directly
+            this.frequencies.add(Frequency.of(menu.contentHolder.prefill1(), menu.contentHolder.prefill2()));
         }
     }
 
-    private int panelLeft() {
-        return width / 2 - PANEL_WIDTH / 2;
+    private AppView view() {
+        ModNetworking.AppTarget target = menu.contentHolder.target();
+        return target.pos().isPresent()
+                ? new AppView.Block(target.pos().get())
+                : new AppView.Hand(target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+    }
+
+    private ScreenTheme theme() {
+        return view().theme();
     }
 
     @Override
     protected void init() {
-        int left = panelLeft();
+        super.init();
+        int left = leftPos;
+        int top = topPos;
+        picker = new PickerOverlay(font);
 
         String previousName = nameBox != null ? nameBox.getValue() : null;
-        nameBox = new EditBox(font, left, 46, 150, 18,
+        nameBox = new EditBox(font, left + 8, top + 26, 150, 18,
                 Component.translatable("gui.linktablet.edit_app.name"));
         nameBox.setMaxLength(SignalApp.MAX_NAME_LENGTH);
         if (previousName != null) {
             nameBox.setValue(previousName);
         } else if (index != -1) {
-            // Pre-fill when editing
-            var apps = currentApps();
+            List<SignalApp> apps = view().apps();
             if (index < apps.size()) nameBox.setValue(apps.get(index).name());
-        } else if (pendingName != null) {
-            nameBox.setValue(pendingName);
-            pendingName = null;
+        } else if (!menu.contentHolder.prefillName().isEmpty()) {
+            nameBox.setValue(menu.contentHolder.prefillName());
         }
         addRenderableWidget(nameBox);
+        setInitialFocus(nameBox);
 
-        // Staging frequency slots (open the item picker)
-        addRenderableWidget(Button.builder(Component.literal(""), b ->
-                        minecraft.setScreen(new ItemPickerScreen(this, item -> stagedItem1 = item, false)))
-                .bounds(left, 88, 24, 24).build());
-        addRenderableWidget(Button.builder(Component.literal(""), b ->
-                        minecraft.setScreen(new ItemPickerScreen(this, item -> stagedItem2 = item, false)))
-                .bounds(left + 30, 88, 24, 24).build());
-
-        // Commit the staged pair to the frequency list
+        // Commit the staged ghost pair to the frequency list
         addFreqButton = Button.builder(
                         Component.translatable("gui.linktablet.edit_app.add_frequency"),
                         b -> commitStagedFrequency())
-                .bounds(left + 60, 88, 40, 24).build();
+                .bounds(left + 60, top + 58, 40, 20).build();
         addRenderableWidget(addFreqButton);
+
+        // All-items search (for frequency items you don't carry)
+        Button searchButton = Button.builder(Component.literal("..."), b ->
+                        picker.open(width, height, this::stageFromPicker, false))
+                .bounds(left + 104, top + 58, 24, 20).build();
+        searchButton.setTooltip(Tooltip.create(Component.translatable("gui.linktablet.picker.search")));
+        addRenderableWidget(searchButton);
 
         // Icon slot button (picker with a "use default" option)
         addRenderableWidget(Button.builder(Component.literal(""), b ->
-                        minecraft.setScreen(new ItemPickerScreen(this,
-                                item -> iconItem = item == Items.AIR ? Optional.empty() : Optional.of(item),
-                                true)))
-                .bounds(left + RIGHT_COL, 46, 24, 24).build());
+                        picker.open(width, height, stack ->
+                                        iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
+                                true))
+                .bounds(left + RIGHT_COL, top + 26, 24, 24).build());
 
-        // Save / Cancel / Remove
+        // Save / Cancel / Remove, right of the inventory block
         saveButton = Button.builder(Component.translatable("gui.linktablet.edit_app.save"), b -> save())
-                .bounds(left, height - 52, 125, 20).build();
+                .bounds(left + BTN_X, top + 146, BTN_W, 20).build();
         addRenderableWidget(saveButton);
 
         addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.cancel"),
-                        b -> minecraft.setScreen(parent))
-                .bounds(left + 135, height - 52, 125, 20).build());
+                        b -> onClose())
+                .bounds(left + BTN_X, top + 170, BTN_W, 20).build());
 
         if (index != -1) {
             addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.remove"), b -> {
                         UISounds.delete();
                         PacketDistributor.sendToServer(
-                                new ModNetworking.RemoveAppPayload(parent.target(), index));
-                        minecraft.setScreen(parent);
+                                new ModNetworking.RemoveAppPayload(menu.contentHolder.target(), index));
+                        onClose();
                     })
-                    .bounds(left, height - 28, PANEL_WIDTH, 20).build());
+                    .bounds(left + BTN_X, top + 194, BTN_W, 20).build());
         }
     }
 
-    private java.util.List<SignalApp> currentApps() {
-        return parent.view().apps();
+    // ---- Staging (ghost slots) -----------------------------------------
+
+    private ItemStack staged(int slot) {
+        return menu.ghostInventory.getStackInSlot(slot);
+    }
+
+    /** Sets a ghost slot on both sides (Create's packet targets slot 36+N). */
+    private void setStaged(int slot, ItemStack stack) {
+        menu.ghostInventory.setStackInSlot(slot, stack);
+        PacketDistributor.sendToServer(new GhostItemSubmitPacket(stack, slot));
+    }
+
+    /** Picker picks land in the first empty ghost slot (else slot 1). */
+    private void stageFromPicker(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        int slot = staged(0).isEmpty() ? 0 : staged(1).isEmpty() ? 1 : 0;
+        setStaged(slot, stack.copyWithCount(1));
+        UISounds.tick(1.3F);
     }
 
     private boolean stagedComplete() {
-        return stagedItem1 != Items.AIR && stagedItem2 != Items.AIR;
+        return !staged(0).isEmpty() && !staged(1).isEmpty();
     }
 
     private void commitStagedFrequency() {
         if (!stagedComplete() || frequencies.size() >= SignalApp.MAX_FREQUENCIES) return;
-        Frequency freq = Frequency.of(stagedItem1, stagedItem2);
+        Frequency freq = Frequency.of(staged(0), staged(1));
         if (!frequencies.contains(freq)) {
             frequencies.add(freq);
             UISounds.tick(1.6F);
         }
-        stagedItem1 = Items.AIR;
-        stagedItem2 = Items.AIR;
+        setStaged(0, ItemStack.EMPTY);
+        setStaged(1, ItemStack.EMPTY);
     }
 
     private void save() {
@@ -214,35 +231,44 @@ public class AppEditScreen extends Screen {
         SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon);
         UISounds.confirm();
         PacketDistributor.sendToServer(
-                new ModNetworking.UpsertAppPayload(parent.target(), index, app));
-        minecraft.setScreen(parent);
+                new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));
+        onClose();
+    }
+
+    /** Closing the container returns to the tablet home screen. */
+    @Override
+    public void onClose() {
+        super.onClose();
+        minecraft.setScreen(new TabletScreen(view()));
     }
 
     @Override
-    public void tick() {
+    protected void containerTick() {
         // Need at least one committed or fully staged frequency to save
         saveButton.active = !frequencies.isEmpty() || stagedComplete();
         addFreqButton.active = stagedComplete() && frequencies.size() < SignalApp.MAX_FREQUENCIES;
     }
 
     private int chipX(int i) {
-        return panelLeft() + (i % CHIPS_PER_ROW) * (CHIP_W + CHIP_GAP);
+        return leftPos + 8 + (i % CHIPS_PER_ROW) * (CHIP_W + CHIP_GAP);
     }
 
     private int chipY(int i) {
-        return CHIPS_Y + (i / CHIPS_PER_ROW) * (CHIP_H + CHIP_GAP);
+        return topPos + CHIPS_Y + (i / CHIPS_PER_ROW) * (CHIP_H + CHIP_GAP);
     }
+
+    // ---- Input ---------------------------------------------------------
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int left = panelLeft();
-        int rightX = left + RIGHT_COL;
+        if (picker.mouseClicked(mouseX, mouseY, button)) return true;
+        int rightX = leftPos + RIGHT_COL;
 
         // Open color popup swallows every click until it closes
         if (colorPopupOpen) {
             for (int i = 0; i < COLORS.length; i++) {
                 int x = rightX + (i % 4) * POPUP_STRIDE;
-                int y = POPUP_Y + (i / 4) * POPUP_STRIDE;
+                int y = topPos + POPUP_Y + (i / 4) * POPUP_STRIDE;
                 if (mouseX >= x && mouseX < x + POPUP_SWATCH && mouseY >= y && mouseY < y + POPUP_SWATCH) {
                     color = COLORS[i];
                     UISounds.tick(1.4F);
@@ -266,7 +292,7 @@ public class AppEditScreen extends Screen {
 
         // Color button: opens the swatch popup
         if (mouseX >= rightX && mouseX < rightX + 34
-                && mouseY >= COLOR_BTN_Y && mouseY < COLOR_BTN_Y + 20) {
+                && mouseY >= topPos + COLOR_BTN_Y && mouseY < topPos + COLOR_BTN_Y + 20) {
             colorPopupOpen = true;
             UISounds.tick(1.3F);
             return true;
@@ -274,7 +300,7 @@ public class AppEditScreen extends Screen {
 
         // Momentary checkbox (box + label)
         if (mouseX >= rightX && mouseX < rightX + 90
-                && mouseY >= MOMENTARY_Y - 2 && mouseY < MOMENTARY_Y + CHECKBOX_SIZE + 2) {
+                && mouseY >= topPos + MOMENTARY_Y - 2 && mouseY < topPos + MOMENTARY_Y + CHECKBOX_SIZE + 2) {
             momentary = !momentary;
             UISounds.tick(momentary ? 1.6F : 1.1F);
             return true;
@@ -282,7 +308,7 @@ public class AppEditScreen extends Screen {
 
         // Strength slider
         if (mouseX >= rightX - 2 && mouseX < rightX + TRACK_W + 4
-                && mouseY >= TRACK_Y - 6 && mouseY < TRACK_Y + 12) {
+                && mouseY >= topPos + TRACK_Y - 6 && mouseY < topPos + TRACK_Y + 12) {
             draggingStrength = true;
             setStrengthFromMouse(mouseX);
             return true;
@@ -292,6 +318,7 @@ public class AppEditScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (picker.isOpen()) return true;
         if (draggingStrength) {
             setStrengthFromMouse(mouseX);
             return true;
@@ -301,6 +328,7 @@ public class AppEditScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (picker.isOpen()) return true;
         if (draggingStrength) {
             draggingStrength = false;
             UISounds.tick(1.0F + strength / 15.0F);
@@ -309,39 +337,120 @@ public class AppEditScreen extends Screen {
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (picker.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (picker.keyPressed(keyCode, scanCode, modifiers)) return true;
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (picker.charTyped(codePoint, modifiers)) return true;
+        return super.charTyped(codePoint, modifiers);
+    }
+
     private void setStrengthFromMouse(double mouseX) {
-        double rel = (mouseX - (panelLeft() + RIGHT_COL)) / TRACK_W;
+        double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
         strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
                 1, SignalApp.MAX_STRENGTH);
+    }
+
+    // ---- Rendering -------------------------------------------------------
+
+    /** Slot cells + the red/blue staging frames, under the slot items. */
+    @Override
+    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        ScreenTheme theme = theme();
+        for (Slot slot : menu.slots) {
+            drawSlotCell(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, theme);
+        }
+        // Staging slot accents (red/blue, like the Redstone Link's slots)
+        drawGhostFrame(graphics, leftPos + AppEditMenu.GHOST1_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+                TabletScreen.FREQ1_COLOR);
+        drawGhostFrame(graphics, leftPos + AppEditMenu.GHOST2_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+                TabletScreen.FREQ2_COLOR);
+    }
+
+    /**
+     * One 18px slot cell in the vanilla chest style: dark edge top+left,
+     * light edge bottom+right, mid interior — theme-tinted so every
+     * palette keeps the familiar inset grid.
+     */
+    private static void drawSlotCell(GuiGraphics graphics, int x, int y, ScreenTheme theme) {
+        int mid = theme.rowBg;
+        int dark = scale(mid, 50);
+        int light = towardWhite(mid, 35);
+        graphics.fill(x, y, x + 17, y + 1, dark);            // top
+        graphics.fill(x, y + 1, x + 1, y + 17, dark);        // left
+        graphics.fill(x + 17, y + 1, x + 18, y + 18, light); // right
+        graphics.fill(x + 1, y + 17, x + 17, y + 18, light); // bottom
+        graphics.fill(x + 1, y + 1, x + 17, y + 17, mid);    // interior
+        graphics.fill(x + 17, y, x + 18, y + 1, mid);        // corners
+        graphics.fill(x, y + 17, x + 1, y + 18, mid);
+    }
+
+    /** Scale RGB channels to the given percentage. */
+    private static int scale(int argb, int pct) {
+        int r = ((argb >> 16) & 0xFF) * pct / 100;
+        int g = ((argb >> 8) & 0xFF) * pct / 100;
+        int b = (argb & 0xFF) * pct / 100;
+        return (argb & 0xFF000000) | (r << 16) | (g << 8) | b;
+    }
+
+    /** Mix RGB channels the given percentage toward white. */
+    private static int towardWhite(int argb, int pct) {
+        int r = ((argb >> 16) & 0xFF);
+        int g = ((argb >> 8) & 0xFF);
+        int b = (argb & 0xFF);
+        r += (255 - r) * pct / 100;
+        g += (255 - g) * pct / 100;
+        b += (255 - b) * pct / 100;
+        return (argb & 0xFF000000) | (r << 16) | (g << 8) | b;
+    }
+
+    /** Slim 1px red/blue ring hugging a staging slot cell, faint tint inside. */
+    private static void drawGhostFrame(GuiGraphics graphics, int x, int y, int color) {
+        int size = 20;
+        graphics.fill(x, y, x + size, y + 1, color);
+        graphics.fill(x, y + size - 1, x + size, y + size, color);
+        graphics.fill(x, y + 1, x + 1, y + size - 1, color);
+        graphics.fill(x + size - 1, y + 1, x + size, y + size - 1, color);
+        graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, (color & 0x00FFFFFF) | 0x18000000);
+    }
+
+    /** All static text, in image-local coordinates (labels sit a uniform 11px above their control). */
+    @Override
+    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+        ScreenTheme theme = theme();
+        boolean shadow = theme.textShadow;
+        graphics.drawString(font, title, imageWidth / 2 - font.width(title) / 2, 5,
+                theme.textPrimary, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.name"), 8, 15, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.frequencies"), 8, 48, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.icon"), RIGHT_COL, 15, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.color"), RIGHT_COL, 57, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.picker.inventory"), 8, 134, theme.textMuted, shadow);
+        if (frequencies.isEmpty()) {
+            graphics.drawString(font,
+                    Component.translatable("gui.linktablet.edit_app.no_frequencies"),
+                    8, CHIPS_Y + 6, theme.textFaint, shadow);
+        }
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        com.modpack.linktablet.theme.ScreenTheme theme = parent.view().theme();
+        ScreenTheme theme = theme();
         boolean shadow = theme.textShadow;
-        int left = panelLeft();
-
-        // Centered manually: drawCenteredString always drops a shadow,
-        // which smears dark text on light themes.
-        graphics.drawString(font, title, width / 2 - font.width(title) / 2, 18,
-                theme.textPrimary, shadow);
-
-        // Left column labels
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.name"), left, 34, theme.textMuted, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.frequencies"), left, 76, theme.textMuted, shadow);
-
-        // Right column labels
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.icon"), left + RIGHT_COL, 34, theme.textMuted, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.color"), left + RIGHT_COL, 76, theme.textMuted, shadow);
-
-        // Staging slot accents (red/blue, like the Redstone Link's slots)
-        drawSlotFrame(graphics, left, 88, 24, TabletScreen.FREQ1_COLOR);
-        drawSlotFrame(graphics, left + 30, 88, 24, TabletScreen.FREQ2_COLOR);
-
-        // Staging slot contents
-        if (stagedItem1 != Items.AIR) graphics.renderItem(new ItemStack(stagedItem1), left + 4, 92);
-        if (stagedItem2 != Items.AIR) graphics.renderItem(new ItemStack(stagedItem2), left + 34, 92);
+        int left = leftPos;
+        int top = topPos;
+        int rightX = left + RIGHT_COL;
 
         // Committed frequency chips
         boolean hoveredChip = false;
@@ -359,51 +468,45 @@ public class AppEditScreen extends Screen {
             graphics.fill(x + 2, y + CHIP_H - 2, x + CHIP_W / 2, y + CHIP_H, TabletScreen.FREQ1_COLOR);
             graphics.fill(x + CHIP_W / 2, y + CHIP_H - 2, x + CHIP_W - 2, y + CHIP_H, TabletScreen.FREQ2_COLOR);
         }
-        if (frequencies.isEmpty()) {
-            graphics.drawString(font,
-                    Component.translatable("gui.linktablet.edit_app.no_frequencies"),
-                    left, CHIPS_Y + 6, theme.textFaint, shadow);
-        }
 
         // Icon slot content (default = show first frequency's item dimmed)
-        ItemStack defaultIcon = frequencies.isEmpty()
-                ? (stagedItem1 != Items.AIR ? new ItemStack(stagedItem1) : ItemStack.EMPTY)
-                : frequencies.getFirst().icon1();
+        ItemStack defaultIcon = frequencies.isEmpty() ? staged(0) : frequencies.getFirst().icon1();
         if (iconItem.isPresent()) {
-            graphics.renderItem(new ItemStack(iconItem.get()), left + RIGHT_COL + 4, 50);
+            graphics.renderItem(new ItemStack(iconItem.get()), rightX + 4, top + 30);
         } else if (!defaultIcon.isEmpty()) {
-            graphics.renderItem(defaultIcon, left + RIGHT_COL + 4, 50);
-            graphics.fill(left + RIGHT_COL + 2, 48, left + RIGHT_COL + 22, 68, 0x88000000);
+            graphics.renderItem(defaultIcon, rightX + 4, top + 30);
+            graphics.fill(rightX + 2, top + 28, rightX + 22, top + 48, 0x88000000);
         }
 
-        int rightX = left + RIGHT_COL;
-
         // Color button (opens the swatch popup) with a small dropdown arrow
-        graphics.fill(rightX - 1, COLOR_BTN_Y - 1, rightX + 21, COLOR_BTN_Y + 21, theme.switchOff);
-        graphics.fill(rightX, COLOR_BTN_Y, rightX + 20, COLOR_BTN_Y + 20, color | 0xFF000000);
+        int colorY = top + COLOR_BTN_Y;
+        graphics.fill(rightX - 1, colorY - 1, rightX + 21, colorY + 21, theme.switchOff);
+        graphics.fill(rightX, colorY, rightX + 20, colorY + 20, color | 0xFF000000);
         int ax = rightX + 26;
-        int ay = COLOR_BTN_Y + 8;
+        int ay = colorY + 8;
         graphics.fill(ax, ay, ax + 6, ay + 2, theme.textMuted);
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
 
         // Momentary checkbox
-        graphics.fill(rightX, MOMENTARY_Y, rightX + CHECKBOX_SIZE, MOMENTARY_Y + CHECKBOX_SIZE, theme.switchOff);
-        graphics.fill(rightX + 1, MOMENTARY_Y + 1, rightX + CHECKBOX_SIZE - 1, MOMENTARY_Y + CHECKBOX_SIZE - 1, theme.bodyInner);
+        int momY = top + MOMENTARY_Y;
+        graphics.fill(rightX, momY, rightX + CHECKBOX_SIZE, momY + CHECKBOX_SIZE, theme.switchOff);
+        graphics.fill(rightX + 1, momY + 1, rightX + CHECKBOX_SIZE - 1, momY + CHECKBOX_SIZE - 1, theme.bodyInner);
         if (momentary) {
-            graphics.fill(rightX + 3, MOMENTARY_Y + 3, rightX + CHECKBOX_SIZE - 3, MOMENTARY_Y + CHECKBOX_SIZE - 3, theme.accent);
+            graphics.fill(rightX + 3, momY + 3, rightX + CHECKBOX_SIZE - 3, momY + CHECKBOX_SIZE - 3, theme.accent);
         }
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.momentary"),
-                rightX + CHECKBOX_SIZE + 4, MOMENTARY_Y + 2, theme.textMuted, shadow);
+                rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
 
         // Strength slider
+        int trackY = top + TRACK_Y;
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
-                rightX, STRENGTH_LABEL_Y, theme.textMuted, shadow);
-        graphics.fill(rightX, TRACK_Y, rightX + TRACK_W, TRACK_Y + 4, theme.switchOff);
+                rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
+        graphics.fill(rightX, trackY, rightX + TRACK_W, trackY + 4, theme.switchOff);
         int handleX = rightX + (int) ((strength - 1) / (float) (SignalApp.MAX_STRENGTH - 1) * (TRACK_W - 4));
-        graphics.fill(rightX, TRACK_Y, handleX + 2, TRACK_Y + 4, theme.accentDim);
-        graphics.fill(handleX, TRACK_Y - 4, handleX + 4, TRACK_Y + 8, theme.textPrimary);
-        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, TRACK_Y - 2,
+        graphics.fill(rightX, trackY, handleX + 2, trackY + 4, theme.accentDim);
+        graphics.fill(handleX, trackY - 4, handleX + 4, trackY + 8, theme.textPrimary);
+        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, trackY - 2,
                 theme.textPrimary, shadow);
 
         // Color popup, z-lifted above the batched text/items so nothing
@@ -411,10 +514,10 @@ public class AppEditScreen extends Screen {
         if (colorPopupOpen) {
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 300);
-            graphics.fill(rightX - 4, POPUP_Y - 4, rightX + POPUP_SIZE + 4, POPUP_Y + POPUP_SIZE + 4, theme.bodyOuter);
+            graphics.fill(rightX - 4, top + POPUP_Y - 4, rightX + POPUP_SIZE + 4, top + POPUP_Y + POPUP_SIZE + 4, theme.bodyOuter);
             for (int i = 0; i < COLORS.length; i++) {
                 int x = rightX + (i % 4) * POPUP_STRIDE;
-                int y = POPUP_Y + (i / 4) * POPUP_STRIDE;
+                int y = top + POPUP_Y + (i / 4) * POPUP_STRIDE;
                 if (COLORS[i] == color) {
                     graphics.fill(x - 1, y - 1, x + POPUP_SWATCH + 1, y + POPUP_SWATCH + 1, 0xFFFFFFFF);
                 }
@@ -423,23 +526,21 @@ public class AppEditScreen extends Screen {
             graphics.pose().popPose();
         }
 
-        if (hoveredChip) {
-            graphics.renderTooltip(font,
-                    Component.translatable("gui.linktablet.edit_app.chip_remove"), mouseX, mouseY);
-        } else if (!colorPopupOpen && mouseX >= rightX && mouseX < rightX + 90
-                && mouseY >= MOMENTARY_Y - 2 && mouseY < MOMENTARY_Y + CHECKBOX_SIZE + 2) {
-            graphics.renderTooltip(font,
-                    Component.translatable("gui.linktablet.edit_app.momentary.tooltip"), mouseX, mouseY);
+        if (!picker.isOpen() && !colorPopupOpen) {
+            if (hoveredChip) {
+                graphics.renderTooltip(font,
+                        Component.translatable("gui.linktablet.edit_app.chip_remove"), mouseX, mouseY);
+            } else if (mouseX >= rightX && mouseX < rightX + 90
+                    && mouseY >= momY - 2 && mouseY < momY + CHECKBOX_SIZE + 2) {
+                graphics.renderTooltip(font,
+                        Component.translatable("gui.linktablet.edit_app.momentary.tooltip"), mouseX, mouseY);
+            } else {
+                // Hovered inventory/ghost slot tooltip (vanilla)
+                renderTooltip(graphics, mouseX, mouseY);
+            }
         }
-    }
 
-    /** 2px colored frame with a faint interior tint, drawn over a slot button. */
-    private static void drawSlotFrame(GuiGraphics graphics, int x, int y, int size, int color) {
-        graphics.fill(x, y, x + size, y + 2, color);                       // top
-        graphics.fill(x, y + size - 2, x + size, y + size, color);         // bottom
-        graphics.fill(x, y + 2, x + 2, y + size - 2, color);               // left
-        graphics.fill(x + size - 2, y + 2, x + size, y + size - 2, color); // right
-        graphics.fill(x + 2, y + 2, x + size - 2, y + size - 2, (color & 0x00FFFFFF) | 0x28000000);
+        picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
     }
 
     @Override

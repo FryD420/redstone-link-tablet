@@ -3,6 +3,7 @@ package com.modpack.linktablet.client.render;
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
 import com.modpack.linktablet.block.TabletScreenMath.GridLayout;
+import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -65,12 +66,13 @@ public final class TabletScreenRenderer {
         return TabletScreenMath.GLASS_V0 + SPACE + row * (tileH + SPACE);
     }
 
-    /** List rows keep the fixed five-row height regardless of app count. */
-    private static final float LIST_ROW_H =
-            tileSize(TabletScreenMath.GLASS_V1 - TabletScreenMath.GLASS_V0, TabletScreenMath.LIST_ROWS);
+    /** List rows split the (rotation-dependent) glass height five ways. */
+    private static float listRowH(float glassH) {
+        return tileSize(glassH, TabletScreenMath.LIST_ROWS);
+    }
 
-    private static float listV0(int row) {
-        return tileV0(row, LIST_ROW_H);
+    private static float listV0(int row, float rowH) {
+        return tileV0(row, rowH);
     }
 
     /** Hollow-ring (momentary) thickness in texels at the densest grid. */
@@ -106,6 +108,8 @@ public final class TabletScreenRenderer {
     /**
      * @param list     the tablet's stored screen layout (switch list vs
      *                 pip grid)
+     * @param rot      screen content rotation, quarter turns CW (0–3) —
+     *                 must match the {@code rot} the hit-test uses
      * @param theme    the tablet's stored UI theme
      * @param backlit  true when the screen's emissive state is on (block
      *                 LIT / item GUI-open) — brightens the background
@@ -114,8 +118,26 @@ public final class TabletScreenRenderer {
      *                 those pips render lit
      */
     public static void render(PoseStack poseStack, MultiBufferSource buffers,
-                              List<SignalApp> apps, boolean list, ScreenTheme theme,
+                              List<SignalApp> apps, boolean list, int rot, ScreenTheme theme,
                               boolean backlit, int packedLight, Set<Integer> heldPips) {
+        // Content rotation: draw in a "logical" glass (landscape when rot
+        // is odd) spun about the physical glass center. The pivot maps
+        // the logical rect exactly onto the physical one; the hit-test
+        // applies the same quarter-turns in reverse (TabletScreenMath).
+        float glassW = TabletScreenMath.glassW(rot);
+        float glassH = TabletScreenMath.glassH(rot);
+        float u1 = TabletScreenMath.GLASS_U0 + glassW;
+        float v1 = TabletScreenMath.GLASS_V0 + glassH;
+        poseStack.pushPose();
+        if ((rot & 3) != 0) {
+            float pivotU = (TabletScreenMath.GLASS_U0 + TabletScreenMath.GLASS_U1) / 2f / 16f;
+            float pivotV = (TabletScreenMath.GLASS_V0 + TabletScreenMath.GLASS_V1) / 2f / 16f;
+            float logicalU = (TabletScreenMath.GLASS_U0 + glassW / 2f) / 16f;
+            float logicalV = (TabletScreenMath.GLASS_V0 + glassH / 2f) / 16f;
+            poseStack.translate(pivotU, 0, pivotV);
+            poseStack.mulPose(Axis.YN.rotationDegrees(90 * (rot & 3)));
+            poseStack.translate(-logicalU, 0, -logicalV);
+        }
         VertexConsumer vc = buffers.getBuffer(SCREEN_TYPE);
         PoseStack.Pose pose = poseStack.last();
 
@@ -126,13 +148,14 @@ public final class TabletScreenRenderer {
         int bgLight = backlit ? LightTexture.FULL_BRIGHT : packedLight;
         fillRect(pose, vc,
                 TabletScreenMath.GLASS_U0 - bleed, TabletScreenMath.GLASS_V0 - bleed,
-                TabletScreenMath.GLASS_U1 + bleed, TabletScreenMath.GLASS_V1 + bleed,
+                u1 + bleed, v1 + bleed,
                 0f, backlit ? theme.screenBgLit : theme.screenBgOff, bgLight);
 
         int count = TabletScreenMath.visibleApps(apps.size(), list);
-        GridLayout grid = TabletScreenMath.gridLayout(apps.size());
-        float tileW = tileSize(TabletScreenMath.GLASS_U1 - TabletScreenMath.GLASS_U0, grid.cols());
-        float tileH = tileSize(TabletScreenMath.GLASS_V1 - TabletScreenMath.GLASS_V0, grid.rows());
+        GridLayout grid = TabletScreenMath.gridLayout(apps.size(), rot);
+        float rowH = listRowH(glassH);
+        float tileW = tileSize(glassW, grid.cols());
+        float tileH = tileSize(glassH, grid.rows());
         boolean labels = !list && grid.cells() <= LABEL_CELLS_MAX;
         float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
         // Bottom strip of each big tile reserved for the name label
@@ -149,7 +172,7 @@ public final class TabletScreenRenderer {
             int color = app.color() | 0xFF000000;
             boolean held = heldPips.contains(i);
             if (list) {
-                renderSwitchRow(pose, vc, i, app, color, theme, packedLight, held);
+                renderSwitchRow(pose, vc, i, app, color, theme, packedLight, held, rowH, u1);
             } else {
                 float u0 = tileU0(i % grid.cols(), tileW);
                 float v0 = tileV0(i / grid.cols(), tileH);
@@ -162,9 +185,9 @@ public final class TabletScreenRenderer {
             int light = glowing ? LightTexture.FULL_BRIGHT : packedLight;
             float cu, cv, size;
             if (list) {
-                cu = TabletScreenMath.GLASS_U0 + SPACE + LIST_ROW_H / 2f;
-                cv = listV0(i) + LIST_ROW_H / 2f;
-                size = LIST_ICON;
+                cu = TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
+                cv = listV0(i, rowH) + rowH / 2f;
+                size = Math.min(LIST_ICON, rowH - 0.35f);
             } else {
                 cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
                 cv = tileV0(i / grid.cols(), tileH) + (tileH - labelZone) / 2f;
@@ -179,15 +202,15 @@ public final class TabletScreenRenderer {
         if (list) {
             float scale = LIST_TEXT_H / 16f / FONT_LINE;
             // Between the icon chip and the switch
-            float textU0 = TabletScreenMath.GLASS_U0 + SPACE + LIST_ROW_H + 0.4f;
-            float textU1 = TabletScreenMath.GLASS_U1 - SPACE - SWITCH_MARGIN - SWITCH_W - 0.4f;
+            float textU0 = TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
+            float textU1 = u1 - SPACE - SWITCH_MARGIN - SWITCH_W - 0.4f;
             int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
             for (int i = 0; i < count; i++) {
-                String name = font.plainSubstrByWidth(apps.get(i).name(), maxPx);
-                if (name.isBlank()) continue;
-                float top = listV0(i) + (LIST_ROW_H - LIST_TEXT_H) / 2f;
+                FittedLabel label = fitLabel(font, apps.get(i).name(), maxPx);
+                if (label.text().isBlank()) continue;
+                float top = listV0(i, rowH) + (rowH - LIST_TEXT_H * label.fit()) / 2f;
                 // Plain text: rows sit on the themed track, no outline needed
-                drawLabel(poseStack, buffers, font, name, textU0, top, scale,
+                drawLabel(poseStack, buffers, font, label.text(), textU0, top, scale * label.fit(),
                         false, false, theme.textPrimary, bgLight);
             }
         } else if (labels) {
@@ -195,16 +218,37 @@ public final class TabletScreenRenderer {
             int maxPx = (int) ((tileW - 2 * SPACE) * FONT_LINE / textH);
             float scale = textH / 16f / FONT_LINE;
             for (int i = 0; i < count; i++) {
-                String name = font.plainSubstrByWidth(apps.get(i).name(), maxPx);
-                if (name.isBlank()) continue;
+                FittedLabel label = fitLabel(font, apps.get(i).name(), maxPx);
+                if (label.text().isBlank()) continue;
                 float cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
-                float top = tileV0(i / grid.cols(), tileH) + tileH - textH - SPACE;
+                // Bottom-aligned so a shrunk label hugs the tile edge
+                float top = tileV0(i / grid.cols(), tileH) + tileH - textH * label.fit() - SPACE;
                 // White with a black outline: the label sits on the app's
                 // own tile color (any brightness), not the theme surface
-                drawLabel(poseStack, buffers, font, name, cu, top, scale,
+                drawLabel(poseStack, buffers, font, label.text(), cu, top, scale * label.fit(),
                         true, true, 0xFFFFFFFF, bgLight);
             }
         }
+        poseStack.popPose();
+    }
+
+    /** Label after fitting: possibly ellipsized text + the scale multiplier applied. */
+    private record FittedLabel(String text, float fit) {
+    }
+
+    /** Minimum shrink before long names fall back to ellipsizing. */
+    private static final float MIN_LABEL_FIT = 0.7f;
+
+    /**
+     * Shrink a too-wide name down to {@link #MIN_LABEL_FIT}; if it still
+     * overflows at minimum scale, ellipsize against the enlarged budget.
+     */
+    private static FittedLabel fitLabel(Font font, String name, int maxPx) {
+        float fit = TextFit.fitScale(font, name, maxPx, MIN_LABEL_FIT);
+        if (font.width(name) * fit <= maxPx) {
+            return new FittedLabel(name, fit);
+        }
+        return new FittedLabel(TextFit.ellipsize(font, name, (int) (maxPx / MIN_LABEL_FIT)), MIN_LABEL_FIT);
     }
 
     /**
@@ -253,25 +297,26 @@ public final class TabletScreenRenderer {
     /** List row: colored chip left, mini switch right (icon drawn later). */
     private static void renderSwitchRow(PoseStack.Pose pose, VertexConsumer vc,
                                         int i, SignalApp app, int color,
-                                        ScreenTheme theme, int packedLight, boolean held) {
-        float v0 = listV0(i);
-        float v1 = v0 + LIST_ROW_H;
+                                        ScreenTheme theme, int packedLight, boolean held,
+                                        float rowH, float glassU1) {
+        float v0 = listV0(i, rowH);
+        float v1 = v0 + rowH;
         float u0 = TabletScreenMath.GLASS_U0 + SPACE;
-        float u1 = TabletScreenMath.GLASS_U1 - SPACE;
+        float u1 = glassU1 - SPACE;
         boolean on = (app.active() && !app.momentary()) || held;
         int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
 
         fillRect(pose, vc, u0, v0, u1, v1, LAYER, theme.screenTrack, packedLight);
 
         // Icon chip in the app's color, left end
-        fillRect(pose, vc, u0, v0, u0 + LIST_ROW_H, v1, LAYER * 2,
+        fillRect(pose, vc, u0, v0, u0 + rowH, v1, LAYER * 2,
                 on ? brighten(color) : dim(color), stateLight);
 
         // Track vertically centered in the row and inset from the row's
         // right edge, GUI-style
         float su1 = u1 - SWITCH_MARGIN;
         float su0 = su1 - SWITCH_W;
-        float sv0 = v0 + (LIST_ROW_H - SWITCH_H) / 2f;
+        float sv0 = v0 + (rowH - SWITCH_H) / 2f;
         float sv1 = sv0 + SWITCH_H;
         if (app.momentary()) {
             // Push button: dot lights while held, mirroring the GUI

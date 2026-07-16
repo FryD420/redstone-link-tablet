@@ -45,6 +45,8 @@ public class TabletBlockEntity extends BlockEntity {
     private boolean screenList;
     /** UI theme; DARK is the default and is never persisted. */
     private ScreenTheme theme = ScreenTheme.DARK;
+    /** Screen content rotation, quarter turns CW; 0 is never persisted. */
+    private int screenRotation;
 
     /** Server-side transmitters keyed by frequency (max strength wins). */
     private final Map<Frequency, VirtualTransmitter> transmitters = new HashMap<>();
@@ -106,6 +108,19 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    public int getScreenRotation() {
+        return screenRotation;
+    }
+
+    /** One wrench click: turn the screen content a quarter turn CW. */
+    public void rotateScreen() {
+        screenRotation = (screenRotation + 1) & 3;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public ScreenTheme getTheme() {
         return theme;
     }
@@ -129,11 +144,12 @@ public class TabletBlockEntity extends BlockEntity {
         refreshTransmitters();
     }
 
-    /** Copies apps, case color, screen layout, and theme from the placed item. */
+    /** Copies apps, case color, screen layout, theme, and rotation from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
         this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         this.theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        this.screenRotation = stack.getOrDefault(ModDataComponents.SCREEN_ROTATION.get(), 0) & 3;
         setApps(stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of()));
     }
 
@@ -151,6 +167,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (theme != ScreenTheme.DARK) {
             stack.set(ModDataComponents.THEME.get(), theme);
+        }
+        if (screenRotation != 0) {
+            stack.set(ModDataComponents.SCREEN_ROTATION.get(), screenRotation);
         }
         return stack;
     }
@@ -245,6 +264,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (theme != ScreenTheme.DARK) {
             tag.putString("theme", theme.getSerializedName());
         }
+        if (screenRotation != 0) {
+            tag.putInt("screen_rotation", screenRotation);
+        }
     }
 
     @Override
@@ -256,6 +278,7 @@ public class TabletBlockEntity extends BlockEntity {
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
+        this.screenRotation = tag.getInt("screen_rotation") & 3;
         // Only ever present in sync tags (see getUpdateTag) — a disk load
         // always clears the transient held-pip visuals.
         heldPips.clear();

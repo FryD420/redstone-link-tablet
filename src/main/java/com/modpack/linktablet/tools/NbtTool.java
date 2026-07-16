@@ -11,6 +11,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Items;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -92,9 +93,7 @@ public final class NbtTool {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", "linktablet:tablet");
         SignalApp app = new SignalApp("Lamp",
-                List.of(new Frequency(
-                        ResourceLocation.withDefaultNamespace("redstone_torch"),
-                        ResourceLocation.withDefaultNamespace("redstone_torch"))),
+                List.of(Frequency.of(Items.REDSTONE_TORCH, Items.REDSTONE_TORCH)),
                 false, false, SignalApp.MAX_STRENGTH, 0xFFF9801D, Optional.empty());
         SignalApp.CODEC.listOf().encodeStart(NbtOps.INSTANCE, List.of(app))
                 .result().ifPresent(t -> tag.put("apps", t));

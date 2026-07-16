@@ -68,6 +68,24 @@ transmit on Create's Redstone Link network.
   `linktablet.ponder.<sceneId>.header` and `.text_<n>`, where n follows the
   program order of `.text()` calls. Reordering scene text beats means
   renumbering the lang keys.
+- Frequencies (1.4.0): `Frequency` stores two full ItemStacks (count forced
+  to 1); channel identity DELEGATES to Create's
+  `RedstoneLinkNetworkHandler.Frequency` (item + dyed_color component only —
+  other components are ignored, matching Create's network exactly). Pre-1.4.0
+  NBT (`item1`/`item2` item IDs) decodes forever via the LEGACY_CODEC
+  alternative in `Frequency.CODEC` — never remove it. The ponder schematic
+  still carries legacy-format NBT on purpose (free regression test).
+- Create fan processing picks ONE type per position by priority (descending;
+  SPLASHING=400). `compat/TabletWashingType` (500) shadows splashing in water
+  and therefore MUST delegate everything that isn't a dyed tablet back to
+  `AllFanProcessingTypes.SPLASHING` — a water-valid type that doesn't
+  delegate silently kills sand→clay etc.
+- Screen content rotation (1.4.0): quarter-turn count lives on the BE
+  (`screen_rotation`, 0 never persisted, SCREEN_ROTATION component for the
+  item round-trip). `TabletScreenMath` owns the transform — `glassW/H(rot)`,
+  `gridLayout(count, rot)`, and the inverse swizzle inside `hitPip` — and the
+  renderer's center-pivot pose rotation must stay in lockstep with it. Held
+  items always render rotation 0.
 
 ## Release process
 

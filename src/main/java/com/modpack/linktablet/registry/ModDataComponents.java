@@ -47,6 +47,13 @@ public class ModDataComponents {
                     .networkSynchronized(ScreenTheme.STREAM_CODEC)
                     .build());
 
+    /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCREEN_ROTATION =
+            DATA_COMPONENTS.register("screen_rotation", () -> DataComponentType.<Integer>builder()
+                    .persistent(Codec.intRange(0, 3))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT)
+                    .build());
+
     public static void register(IEventBus bus) {
         DATA_COMPONENTS.register(bus);
     }

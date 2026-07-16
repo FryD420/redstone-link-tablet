@@ -103,7 +103,7 @@ public class TabletItem extends Item {
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
         if (level.isClientSide) {
-            ClientHooks.openLinkPrefill(context.getHand(), first.getItem(), second.getItem());
+            ClientHooks.openLinkPrefill(context.getHand(), first, second);
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

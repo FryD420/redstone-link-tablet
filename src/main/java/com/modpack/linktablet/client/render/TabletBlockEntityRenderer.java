@@ -37,18 +37,23 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         if (!state.hasProperty(TabletBlock.LIT)) return;
 
         poseStack.pushPose();
-        // Same rotation the blockstate applies to the baked model
+        // Same rotation the blockstate applies to the baked model; the
+        // landscape model's baked pre-rotation goes last (it's applied
+        // to vertices first).
         poseStack.translate(0.5, 0.5, 0.5);
         int yRot = TabletScreenMath.yRot(state);
         int xRot = TabletScreenMath.xRot(state);
+        int preRot = TabletScreenMath.preRot(state);
         if (yRot != 0) poseStack.mulPose(Axis.YN.rotationDegrees(yRot));
         if (xRot != 0) poseStack.mulPose(Axis.XN.rotationDegrees(xRot));
+        if (preRot != 0) poseStack.mulPose(Axis.YN.rotationDegrees(preRot));
         poseStack.translate(-0.5, -0.5, -0.5);
         // Screen artwork origin in the canonical floor/north frame
         poseStack.translate(2 / 16f, SCREEN_HEIGHT, 1 / 16f);
 
         TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
-                be.getTheme(), state.getValue(TabletBlock.LIT), packedLight, be.getHeldPips());
+                be.getScreenRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                packedLight, be.getHeldPips());
         poseStack.popPose();
     }
 }

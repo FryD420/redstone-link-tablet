@@ -1,0 +1,38 @@
+{
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "linktablet:item/tablet_back",
+    "front": "linktablet:item/tablet_off",
+    "back": "linktablet:item/tablet_back",
+    "backdetail": "linktablet:item/tablet_back_detail",
+    "bezel": "linktablet:item/tablet_front_bezel"
+  },
+  "elements": [
+    {
+      "from": [1, 0, 2],
+      "to": [15, 1, 14],
+      "faces": {
+        "up":    { "uv": [2, 1, 14, 15], "texture": "#front", "rotation": 90 },
+        "down":  { "uv": [2, 15, 14, 1], "texture": "#back", "rotation": 270, "tintindex": 0 },
+        "north": { "uv": [1, 1, 15, 2], "texture": "#back", "tintindex": 0 },
+        "south": { "uv": [1, 1, 15, 2], "texture": "#back", "tintindex": 0 },
+        "west":  { "uv": [2, 1, 14, 2], "texture": "#back", "tintindex": 0 },
+        "east":  { "uv": [2, 1, 14, 2], "texture": "#back", "tintindex": 0 }
+      }
+    },
+    {
+      "from": [1, 1, 2],
+      "to": [15, 1.05, 14],
+      "faces": {
+        "up": { "uv": [2, 1, 14, 15], "texture": "#bezel", "rotation": 90, "tintindex": 0 }
+      }
+    },
+    {
+      "from": [1, -0.05, 2],
+      "to": [15, 0, 14],
+      "faces": {
+        "down": { "uv": [2, 15, 14, 1], "texture": "#backdetail", "rotation": 270 }
+      }
+    }
+  ]
+}

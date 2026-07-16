@@ -32,9 +32,12 @@ public class VirtualTransmitter implements IRedstoneLinkable {
         this.level = level;
         this.position = position;
         this.strength = strength;
+        // The real stored stacks (components intact) reach Create's
+        // network — component-bearing frequency items match receivers
+        // exactly as Create's own links would.
         this.networkKey = Couple.create(
-                RedstoneLinkNetworkHandler.Frequency.of(frequency.icon1()),
-                RedstoneLinkNetworkHandler.Frequency.of(frequency.icon2()));
+                RedstoneLinkNetworkHandler.Frequency.of(frequency.stack1()),
+                RedstoneLinkNetworkHandler.Frequency.of(frequency.stack2()));
     }
 
     /**

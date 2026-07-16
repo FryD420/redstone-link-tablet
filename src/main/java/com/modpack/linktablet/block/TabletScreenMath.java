@@ -69,6 +69,46 @@ public final class TabletScreenMath {
         return new GridLayout(COLS, ROWS);
     }
 
+    // ------------------------------------------------------------------
+    // Screen content rotation (wrench): the layout lives in a "logical"
+    // glass whose axes turn with the content — landscape when the
+    // rotation is odd. Renderer (pose rotation about the glass center)
+    // and hit-test (inverse swizzle in hitPip) both derive from the
+    // quarter-turn count and these dimensions; keep them in lockstep.
+    // ------------------------------------------------------------------
+
+    /** Logical glass width for a content rotation (0–3 quarter turns CW). */
+    public static float glassW(int rot) {
+        return (rot & 1) == 0 ? GLASS_U1 - GLASS_U0 : GLASS_V1 - GLASS_V0;
+    }
+
+    /** Logical glass height for a content rotation (0–3 quarter turns CW). */
+    public static float glassH(int rot) {
+        return (rot & 1) == 0 ? GLASS_V1 - GLASS_V0 : GLASS_U1 - GLASS_U0;
+    }
+
+    /**
+     * Layout for a rotated screen: odd quarter-turns swap cols and rows
+     * so tiles keep their portrait/landscape sense (2 apps sit
+     * side-by-side on a landscape screen instead of stacked).
+     */
+    public static GridLayout gridLayout(int appCount, int rot) {
+        GridLayout grid = gridLayout(appCount);
+        return (rot & 1) == 0 ? grid : new GridLayout(grid.rows(), grid.cols());
+    }
+
+    /**
+     * Pre-rotation baked into the landscape model geometry, in degrees
+     * about the canonical vertical axis (one blockstate-y-style CW
+     * step). MUST mirror blockstates/tablet.json: landscape wall
+     * variants use tablet_landscape(_lit), whose elements are the
+     * portrait model turned 90° about the block center.
+     */
+    public static int preRot(BlockState state) {
+        return state.getValue(TabletBlock.FACE) == AttachFace.WALL
+                && state.getValue(TabletBlock.LANDSCAPE) ? 90 : 0;
+    }
+
     /** Blockstate model rotation about X, matching blockstates/tablet.json. */
     public static int xRot(BlockState state) {
         return switch (state.getValue(TabletBlock.FACE)) {
@@ -108,23 +148,21 @@ public final class TabletScreenMath {
     }
 
     /**
-     * App index of the entry under a block click, or -1 for a miss
-     * (wrong face, off the glass, or beyond the visible entries). Grid
-     * hit cells are each pip expanded a quarter texel per side (making
-     * the grid contiguous but leaving the bezel ring a GUI target);
-     * list rows are hit across their full width. Pure math on the hit
-     * vec — deterministic across client and server.
+     * Screen-local texels {@code {u, v}} under a click, or null when the
+     * clicked face isn't the screen. Undoes the blockstate rotation with
+     * exact 90° integer swizzles — deterministic across client/server.
      */
-    public static int hitPip(BlockState state, BlockPos pos, BlockHitResult hit, int appCount, boolean list) {
-        if (appCount <= 0 || hit.getDirection() != screenFace(state)) return -1;
+    private static double[] screenUV(BlockState state, BlockPos pos, Direction face, Vec3 location) {
+        if (face != screenFace(state)) return null;
 
-        Vec3 loc = hit.getLocation();
-        double x = loc.x - pos.getX();
-        double y = loc.y - pos.getY();
-        double z = loc.z - pos.getZ();
+        double x = location.x - pos.getX();
+        double y = location.y - pos.getY();
+        double z = location.z - pos.getZ();
 
         // Undo the blockstate rotation: inverse Y steps first, then X
-        // (the model applies X to vertices first, then Y).
+        // (the model applies X to vertices first, then Y), then the
+        // landscape model's baked pre-rotation (applied to vertices
+        // before everything, so undone last; same swizzle as a Y step).
         for (int i = yRot(state) / 90; i > 0; i--) {
             double nx = z;
             z = 1 - x;
@@ -135,9 +173,46 @@ public final class TabletScreenMath {
             z = y;
             y = ny;
         }
+        for (int i = preRot(state) / 90; i > 0; i--) {
+            double nx = z;
+            z = 1 - x;
+            x = nx;
+        }
 
-        double u = 16 * x - 2;
-        double v = 16 * z - 1;
+        return new double[]{16 * x - 2, 16 * z - 1};
+    }
+
+    /**
+     * Whether a click lands on the glass (vs the bezel ring / case).
+     * {@code inset} shrinks the glass region (texels per side) — the
+     * wrench uses 1 so the 1-texel bezel ring is a reachable target.
+     */
+    public static boolean isOnGlass(BlockState state, BlockPos pos, Direction face, Vec3 location,
+                                    double inset) {
+        double[] uv = screenUV(state, pos, face, location);
+        return uv != null
+                && uv[0] >= GLASS_U0 + inset && uv[0] < GLASS_U1 - inset
+                && uv[1] >= GLASS_V0 + inset && uv[1] < GLASS_V1 - inset;
+    }
+
+    /**
+     * App index of the entry under a block click, or -1 for a miss
+     * (wrong face, off the glass, or beyond the visible entries). Grid
+     * hit cells are each pip expanded a quarter texel per side (making
+     * the grid contiguous but leaving the bezel ring a GUI target);
+     * list rows are hit across their full width. Pure math on the hit
+     * vec — deterministic across client and server.
+     *
+     * @param rot screen content rotation in quarter turns CW (0–3); must
+     *            match the rotation the renderer draws with
+     */
+    public static int hitPip(BlockState state, BlockPos pos, BlockHitResult hit,
+                             int appCount, boolean list, int rot) {
+        if (appCount <= 0) return -1;
+        double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
+        if (uv == null) return -1;
+        double u = uv[0];
+        double v = uv[1];
 
         // Only the glass is ever a toggle target; the bezel ring always
         // falls through to the GUI. Cells divide the glass evenly, so
@@ -145,13 +220,29 @@ public final class TabletScreenMath {
         if (u < GLASS_U0 || u >= GLASS_U1) return -1;
         if (v < GLASS_V0 || v >= GLASS_V1) return -1;
 
+        // Undo the content rotation: one inverse CW quarter-turn per
+        // step, tracking the (possibly swapped) space dimensions.
+        double pu = u - GLASS_U0;
+        double pv = v - GLASS_V0;
+        double w = GLASS_U1 - GLASS_U0;
+        double h = GLASS_V1 - GLASS_V0;
+        for (int i = 0; i < (rot & 3); i++) {
+            double nu = pv;
+            double nv = w - pu;
+            pu = nu;
+            pv = nv;
+            double t = w;
+            w = h;
+            h = t;
+        }
+
         int index;
         if (list) {
-            index = (int) ((v - GLASS_V0) * LIST_ROWS / (GLASS_V1 - GLASS_V0));
+            index = (int) (pv * LIST_ROWS / h);
         } else {
-            GridLayout grid = gridLayout(appCount);
-            int row = (int) ((v - GLASS_V0) * grid.rows() / (GLASS_V1 - GLASS_V0));
-            int col = (int) ((u - GLASS_U0) * grid.cols() / (GLASS_U1 - GLASS_U0));
+            GridLayout grid = gridLayout(appCount, rot);
+            int row = (int) (pv * grid.rows() / h);
+            int col = (int) (pu * grid.cols() / w);
             index = row * grid.cols() + col;
         }
         return index < visibleApps(appCount, list) ? index : -1;
