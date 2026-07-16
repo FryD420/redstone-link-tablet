@@ -4,6 +4,7 @@ import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
@@ -22,6 +23,8 @@ public sealed interface AppView {
 
     ModNetworking.AppTarget target();
 
+    ScreenTheme theme();
+
     record Hand(InteractionHand hand) implements AppView {
         @Override
         public List<SignalApp> apps() {
@@ -34,6 +37,14 @@ public sealed interface AppView {
         @Override
         public ModNetworking.AppTarget target() {
             return ModNetworking.AppTarget.ofHand(hand);
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return ScreenTheme.DARK;
+            return mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         }
     }
 
@@ -48,6 +59,14 @@ public sealed interface AppView {
         @Override
         public ModNetworking.AppTarget target() {
             return ModNetworking.AppTarget.ofBlock(pos);
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return ScreenTheme.DARK;
+            return mc.level.getBlockEntity(pos) instanceof TabletBlockEntity be
+                    ? be.getTheme() : ScreenTheme.DARK;
         }
     }
 }

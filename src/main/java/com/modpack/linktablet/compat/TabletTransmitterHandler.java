@@ -1,9 +1,11 @@
 package com.modpack.linktablet.compat;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.frequency.Frequency;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.item.TabletItem;
+import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.simibubi.create.Create;
 import net.minecraft.core.BlockPos;
@@ -46,11 +48,30 @@ public class TabletTransmitterHandler {
     private static final Map<UUID, Map<Frequency, VirtualTransmitter>> ACTIVE = new HashMap<>();
 
     /**
-     * One momentary app currently held down: its frequencies, strength,
-     * and — for placed tablets — the block position to broadcast from
-     * (null = broadcast from the player).
+     * Ticks a block-tap hold survives without being refreshed. Holding
+     * right-click on a block re-fires the use action every 4 ticks, so 8
+     * bridges one dropped repeat; releasing drops the signal within this.
      */
-    private record Hold(List<Frequency> frequencies, int strength, @Nullable BlockPos pos) {}
+    public static final int BLOCK_HOLD_TICKS = 8;
+
+    /**
+     * Minimum ticks every press transmits, however fast the release
+     * lands. A quick GUI click can deliver press and release in the same
+     * server tick — without this floor the hold would come and go before
+     * the transmitter tick ever saw it, producing no pulse at all.
+     */
+    public static final int MIN_PULSE_TICKS = 4;
+
+    /**
+     * One momentary app currently held down: its frequencies, strength,
+     * for placed tablets the block position to broadcast from (null =
+     * broadcast from the player), the game time the hold expires unless
+     * refreshed (-1 = held until an explicit release packet), and the
+     * game time before which a release only shortens — never cancels —
+     * the pulse.
+     */
+    private record Hold(List<Frequency> frequencies, int strength, @Nullable BlockPos pos,
+                        long expireAt, long minUntil) {}
 
     /** Identifies a press so it always pairs up with its release. */
     private record HoldKey(boolean mainHand, @Nullable BlockPos pos, int index) {}
@@ -61,16 +82,52 @@ public class TabletTransmitterHandler {
     /** Registers a momentary press (called from the network handler). */
     public static void setHeld(Player player, boolean mainHand, @Nullable BlockPos pos, int index,
                                List<Frequency> frequencies, int strength) {
+        long now = player.level().getGameTime();
         HELD.computeIfAbsent(player.getUUID(), uuid -> new HashMap<>())
-                .put(new HoldKey(mainHand, pos, index), new Hold(frequencies, strength, pos));
+                .put(new HoldKey(mainHand, pos, index),
+                        new Hold(frequencies, strength, pos, -1, now + MIN_PULSE_TICKS));
+        setBePip(player, pos, index, true);
+    }
+
+    /**
+     * Registers or refreshes a tap-and-hold press on a placed tablet's
+     * screen; it expires on its own unless the (repeating) block use
+     * refreshes it. Returns true when this started a new press.
+     */
+    public static boolean pressBlockPip(Player player, BlockPos pos, int index,
+                                        List<Frequency> frequencies, int strength, long gameTime) {
+        boolean newPress = HELD.computeIfAbsent(player.getUUID(), uuid -> new HashMap<>())
+                .put(new HoldKey(true, pos, index),
+                        new Hold(frequencies, strength, pos,
+                                gameTime + BLOCK_HOLD_TICKS, gameTime + MIN_PULSE_TICKS)) == null;
+        if (newPress) setBePip(player, pos, index, true);
+        return newPress;
     }
 
     /** Clears a momentary press (release). */
     public static void clearHeld(Player player, boolean mainHand, @Nullable BlockPos pos, int index) {
         Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
         if (holds == null) return;
-        holds.remove(new HoldKey(mainHand, pos, index));
+        HoldKey key = new HoldKey(mainHand, pos, index);
+        Hold hold = holds.get(key);
+        if (hold == null) return;
+        if (player.level().getGameTime() < hold.minUntil()) {
+            // Released faster than the minimum pulse: let the expiry
+            // loop finish it so the click always produces a signal.
+            holds.put(key, new Hold(hold.frequencies(), hold.strength(), hold.pos(),
+                    hold.minUntil(), hold.minUntil()));
+            return;
+        }
+        holds.remove(key);
         if (holds.isEmpty()) HELD.remove(player.getUUID());
+        setBePip(player, pos, index, false);
+    }
+
+    /** Updates a placed tablet's held-pip screen visual, if any. */
+    private static void setBePip(Player player, @Nullable BlockPos pos, int index, boolean held) {
+        if (pos != null && player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+            be.setPipHeld(index, held);
+        }
     }
 
     /**
@@ -83,6 +140,10 @@ public class TabletTransmitterHandler {
         if (pos != null) {
             HELD.values().forEach(holds -> holds.keySet().removeIf(key -> pos.equals(key.pos())));
             HELD.values().removeIf(Map::isEmpty);
+            // Indices shifted, so every held-pip visual on it is stale
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                be.clearHeldPips();
+            }
         } else {
             Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
             if (holds == null) return;
@@ -118,6 +179,22 @@ public class TabletTransmitterHandler {
         Map<Frequency, BlockPos> wantedPos = new HashMap<>();
         Map<HoldKey, Hold> holds = HELD.get(player.getUUID());
         if (holds != null) {
+            // Expire timed holds: block-taps that stopped being refreshed
+            // (the player let go of right-click) and fast GUI clicks
+            // finishing their minimum pulse. The release click mirrors
+            // the press's.
+            Iterator<Map.Entry<HoldKey, Hold>> holdIt = holds.entrySet().iterator();
+            while (holdIt.hasNext()) {
+                Map.Entry<HoldKey, Hold> entry = holdIt.next();
+                Hold hold = entry.getValue();
+                if (hold.expireAt() >= 0 && level.getGameTime() > hold.expireAt()) {
+                    holdIt.remove();
+                    setBePip(player, hold.pos(), entry.getKey().index(), false);
+                    ModNetworking.playToggleClick(level, null,
+                            hold.pos() != null ? hold.pos() : player.blockPosition(), false);
+                }
+            }
+            if (holds.isEmpty()) HELD.remove(player.getUUID());
             for (Hold hold : holds.values()) {
                 for (Frequency freq : hold.frequencies()) {
                     if (!freq.isEmpty()) {
@@ -165,7 +242,12 @@ public class TabletTransmitterHandler {
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        HELD.remove(event.getEntity().getUUID());
+        Map<HoldKey, Hold> holds = HELD.remove(event.getEntity().getUUID());
+        if (holds != null) {
+            // Never leave a pip visually stuck lit by a disconnect
+            holds.forEach((key, hold) ->
+                    setBePip(event.getEntity(), hold.pos(), key.index(), false));
+        }
         Map<Frequency, VirtualTransmitter> current = ACTIVE.remove(event.getEntity().getUUID());
         if (current == null) return;
         current.values().forEach(VirtualTransmitter::removeFromNetwork);

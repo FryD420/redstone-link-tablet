@@ -83,6 +83,27 @@ public class AppEditScreen extends Screen {
     private Button saveButton;
     private Button addFreqButton;
 
+    /** Name applied to the (fresh) name box on first init — link prefill. */
+    private String pendingName;
+
+    /**
+     * New app pre-filled from a Redstone Link's frequency. A full pair
+     * lands in the staging slots (the classic flow — Save auto-commits
+     * it); a half-set link commits its lone-item frequency directly,
+     * since staging requires both slots.
+     */
+    public static AppEditScreen withLinkFrequency(TabletScreen parent, Item item1, Item item2, String name) {
+        AppEditScreen screen = new AppEditScreen(parent, -1, null);
+        if (item1 != Items.AIR && item2 != Items.AIR) {
+            screen.stagedItem1 = item1;
+            screen.stagedItem2 = item2;
+        } else {
+            screen.frequencies.add(Frequency.of(item1, item2));
+        }
+        screen.pendingName = name;
+        return screen;
+    }
+
     public AppEditScreen(TabletScreen parent, int index, SignalApp existing) {
         super(Component.translatable(index == -1
                 ? "gui.linktablet.edit_app.title.new"
@@ -117,6 +138,9 @@ public class AppEditScreen extends Screen {
             // Pre-fill when editing
             var apps = currentApps();
             if (index < apps.size()) nameBox.setValue(apps.get(index).name());
+        } else if (pendingName != null) {
+            nameBox.setValue(pendingName);
+            pendingName = null;
         }
         addRenderableWidget(nameBox);
 
@@ -294,17 +318,22 @@ public class AppEditScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+        com.modpack.linktablet.theme.ScreenTheme theme = parent.view().theme();
+        boolean shadow = theme.textShadow;
         int left = panelLeft();
 
-        graphics.drawCenteredString(font, title, width / 2, 18, 0xFFFFFF);
+        // Centered manually: drawCenteredString always drops a shadow,
+        // which smears dark text on light themes.
+        graphics.drawString(font, title, width / 2 - font.width(title) / 2, 18,
+                theme.textPrimary, shadow);
 
         // Left column labels
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.name"), left, 34, 0x9AA0AC);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.frequencies"), left, 76, 0x9AA0AC);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.name"), left, 34, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.frequencies"), left, 76, theme.textMuted, shadow);
 
         // Right column labels
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.icon"), left + RIGHT_COL, 34, 0x9AA0AC);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.color"), left + RIGHT_COL, 76, 0x9AA0AC);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.icon"), left + RIGHT_COL, 34, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.color"), left + RIGHT_COL, 76, theme.textMuted, shadow);
 
         // Staging slot accents (red/blue, like the Redstone Link's slots)
         drawSlotFrame(graphics, left, 88, 24, TabletScreen.FREQ1_COLOR);
@@ -323,7 +352,7 @@ public class AppEditScreen extends Screen {
             boolean hovered = mouseX >= x && mouseX < x + CHIP_W && mouseY >= y && mouseY < y + CHIP_H;
             hoveredChip |= hovered;
 
-            graphics.fill(x, y, x + CHIP_W, y + CHIP_H, hovered ? 0xFF5A3038 : 0xFF2C303A);
+            graphics.fill(x, y, x + CHIP_W, y + CHIP_H, hovered ? 0xFF5A3038 : theme.rowBg);
             graphics.renderItem(freq.icon1(), x + 2, y + 1);
             graphics.renderItem(freq.icon2(), x + 18, y + 1);
             // Red/blue pair markers along the chip's bottom edge
@@ -333,7 +362,7 @@ public class AppEditScreen extends Screen {
         if (frequencies.isEmpty()) {
             graphics.drawString(font,
                     Component.translatable("gui.linktablet.edit_app.no_frequencies"),
-                    left, CHIPS_Y + 6, 0x565D6B);
+                    left, CHIPS_Y + 6, theme.textFaint, shadow);
         }
 
         // Icon slot content (default = show first frequency's item dimmed)
@@ -350,38 +379,39 @@ public class AppEditScreen extends Screen {
         int rightX = left + RIGHT_COL;
 
         // Color button (opens the swatch popup) with a small dropdown arrow
-        graphics.fill(rightX - 1, COLOR_BTN_Y - 1, rightX + 21, COLOR_BTN_Y + 21, 0xFF444955);
+        graphics.fill(rightX - 1, COLOR_BTN_Y - 1, rightX + 21, COLOR_BTN_Y + 21, theme.switchOff);
         graphics.fill(rightX, COLOR_BTN_Y, rightX + 20, COLOR_BTN_Y + 20, color | 0xFF000000);
         int ax = rightX + 26;
         int ay = COLOR_BTN_Y + 8;
-        graphics.fill(ax, ay, ax + 6, ay + 2, 0xFF9AA0AC);
-        graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, 0xFF9AA0AC);
-        graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, 0xFF9AA0AC);
+        graphics.fill(ax, ay, ax + 6, ay + 2, theme.textMuted);
+        graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
+        graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
 
         // Momentary checkbox
-        graphics.fill(rightX, MOMENTARY_Y, rightX + CHECKBOX_SIZE, MOMENTARY_Y + CHECKBOX_SIZE, 0xFF444955);
-        graphics.fill(rightX + 1, MOMENTARY_Y + 1, rightX + CHECKBOX_SIZE - 1, MOMENTARY_Y + CHECKBOX_SIZE - 1, 0xFF23262E);
+        graphics.fill(rightX, MOMENTARY_Y, rightX + CHECKBOX_SIZE, MOMENTARY_Y + CHECKBOX_SIZE, theme.switchOff);
+        graphics.fill(rightX + 1, MOMENTARY_Y + 1, rightX + CHECKBOX_SIZE - 1, MOMENTARY_Y + CHECKBOX_SIZE - 1, theme.bodyInner);
         if (momentary) {
-            graphics.fill(rightX + 3, MOMENTARY_Y + 3, rightX + CHECKBOX_SIZE - 3, MOMENTARY_Y + CHECKBOX_SIZE - 3, 0xFF4ADE80);
+            graphics.fill(rightX + 3, MOMENTARY_Y + 3, rightX + CHECKBOX_SIZE - 3, MOMENTARY_Y + CHECKBOX_SIZE - 3, theme.accent);
         }
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.momentary"),
-                rightX + CHECKBOX_SIZE + 4, MOMENTARY_Y + 2, 0x9AA0AC);
+                rightX + CHECKBOX_SIZE + 4, MOMENTARY_Y + 2, theme.textMuted, shadow);
 
         // Strength slider
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
-                rightX, STRENGTH_LABEL_Y, 0x9AA0AC);
-        graphics.fill(rightX, TRACK_Y, rightX + TRACK_W, TRACK_Y + 4, 0xFF444955);
+                rightX, STRENGTH_LABEL_Y, theme.textMuted, shadow);
+        graphics.fill(rightX, TRACK_Y, rightX + TRACK_W, TRACK_Y + 4, theme.switchOff);
         int handleX = rightX + (int) ((strength - 1) / (float) (SignalApp.MAX_STRENGTH - 1) * (TRACK_W - 4));
-        graphics.fill(rightX, TRACK_Y, handleX + 2, TRACK_Y + 4, 0xFF2F855A);
-        graphics.fill(handleX, TRACK_Y - 4, handleX + 4, TRACK_Y + 8, 0xFFE2E5EB);
-        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, TRACK_Y - 2, 0xFFE2E5EB);
+        graphics.fill(rightX, TRACK_Y, handleX + 2, TRACK_Y + 4, theme.accentDim);
+        graphics.fill(handleX, TRACK_Y - 4, handleX + 4, TRACK_Y + 8, theme.textPrimary);
+        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, TRACK_Y - 2,
+                theme.textPrimary, shadow);
 
         // Color popup, z-lifted above the batched text/items so nothing
         // bleeds through it
         if (colorPopupOpen) {
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 300);
-            graphics.fill(rightX - 4, POPUP_Y - 4, rightX + POPUP_SIZE + 4, POPUP_Y + POPUP_SIZE + 4, 0xFF16181D);
+            graphics.fill(rightX - 4, POPUP_Y - 4, rightX + POPUP_SIZE + 4, POPUP_Y + POPUP_SIZE + 4, theme.bodyOuter);
             for (int i = 0; i < COLORS.length; i++) {
                 int x = rightX + (i % 4) * POPUP_STRIDE;
                 int y = POPUP_Y + (i / 4) * POPUP_STRIDE;

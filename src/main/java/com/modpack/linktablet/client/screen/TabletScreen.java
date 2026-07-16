@@ -5,6 +5,7 @@ import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
+import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -80,6 +81,8 @@ public class TabletScreen extends Screen {
     // server-synced list matches it (no snap-back flicker).
     private boolean reorderMode = false;
     private List<SignalApp> workingApps = null;
+    /** Theme dropdown open (swallows clicks like the edit screen's swatches). */
+    private boolean themePopupOpen = false;
     /** Frames the retired overlay has waited for server sync. */
     private int overlayFrames = 0;
     /** Current slot of the grabbed app while dragging, or -1. */
@@ -95,6 +98,25 @@ public class TabletScreen extends Screen {
 
     public AppView view() {
         return view;
+    }
+
+    /** Momentary app currently held in this GUI, or -1 (item renderer). */
+    public int heldMomentaryIndex() {
+        return heldMomentary;
+    }
+
+    ScreenTheme theme() {
+        return view.theme();
+    }
+
+    // drawCenteredString always drops a shadow; themed text needs the
+    // shadow off on light backgrounds, so center manually.
+    private void drawThemedCentered(GuiGraphics graphics, Component text, int cx, int y, int color) {
+        graphics.drawString(font, text, cx - font.width(text) / 2, y, color, theme().textShadow);
+    }
+
+    private void drawThemedCentered(GuiGraphics graphics, String text, int cx, int y, int color) {
+        graphics.drawString(font, text, cx - font.width(text) / 2, y, color, theme().textShadow);
     }
 
     ModNetworking.AppTarget target() {
@@ -187,6 +209,23 @@ public class TabletScreen extends Screen {
     /** Rearrange-mode toggle button, top-left of the body. */
     private int reorderBtnX() {
         return panelLeft() + 4;
+    }
+
+    /** Theme picker button, right of the rearrange button. */
+    private int themeBtnX() {
+        return reorderBtnX() + MODE_BTN_SIZE + 4;
+    }
+
+    // Theme dropdown: one row per theme (swatches + name), below the button
+    private static final int THEME_ROW_H = 14;
+    private static final int THEME_POPUP_W = 96;
+
+    private int themePopupX() {
+        return themeBtnX();
+    }
+
+    private int themePopupY() {
+        return modeBtnY() + MODE_BTN_SIZE + 4;
     }
 
     private boolean overModeBtn(double mouseX, double mouseY, int btnX) {
@@ -293,19 +332,20 @@ public class TabletScreen extends Screen {
             }
         }
 
+        ScreenTheme theme = theme();
         int left = panelLeft();
         int pw = panelWidth();
         int top = bodyTop();
         int bottom = top + bodyHeight();
 
         // Tablet body
-        graphics.fill(left - 6, top - 2, left + pw + 6, bottom + 2, 0xFF16181D);
-        graphics.fill(left - 4, top, left + pw + 4, bottom, 0xFF23262E);
+        graphics.fill(left - 6, top - 2, left + pw + 6, bottom + 2, theme.bodyOuter);
+        graphics.fill(left - 4, top, left + pw + 4, bottom, theme.bodyInner);
 
         Component titleText = reorderMode
                 ? Component.translatable("gui.linktablet.reorder.title")
                 : title;
-        graphics.drawCenteredString(font, titleText, width / 2, top + 12, 0xFFFFFF);
+        drawThemedCentered(graphics, titleText, width / 2, top + 12, theme.textPrimary);
         renderModeButtons(graphics, mouseX, mouseY);
 
         List<SignalApp> apps = apps();
@@ -332,9 +372,13 @@ public class TabletScreen extends Screen {
         }
 
         if (apps.isEmpty()) {
-            graphics.drawCenteredString(font,
+            drawThemedCentered(graphics,
                     Component.translatable("gui.linktablet.no_apps"),
-                    width / 2, bottom + 8, 0x9AA0AC);
+                    width / 2, bottom + 8, theme.textMuted);
+        }
+
+        if (themePopupOpen) {
+            renderThemePopup(graphics, mouseX, mouseY, theme);
         }
 
         // Tooltips last, on top of everything
@@ -344,7 +388,39 @@ public class TabletScreen extends Screen {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
         } else if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.reorder"), mouseX, mouseY);
+        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, themeBtnX())) {
+            graphics.renderTooltip(font, Component.translatable("gui.linktablet.theme.title"), mouseX, mouseY);
         }
+    }
+
+    /** Theme dropdown, z-lifted above the batched content like the edit
+     *  screen's color swatches. */
+    private void renderThemePopup(GuiGraphics graphics, int mouseX, int mouseY, ScreenTheme current) {
+        int px = themePopupX();
+        int py = themePopupY();
+        ScreenTheme[] themes = ScreenTheme.values();
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 300);
+        graphics.fill(px - 4, py - 4, px + THEME_POPUP_W + 4, py + themes.length * THEME_ROW_H + 4,
+                current.bodyOuter);
+        for (int i = 0; i < themes.length; i++) {
+            ScreenTheme t = themes[i];
+            int y = py + i * THEME_ROW_H;
+            boolean hovered = mouseX >= px && mouseX < px + THEME_POPUP_W
+                    && mouseY >= y && mouseY < y + THEME_ROW_H;
+            if (t == current || hovered) {
+                graphics.fill(px, y, px + THEME_POPUP_W, y + THEME_ROW_H,
+                        t == current ? current.rowBgHover : current.rowBg);
+            }
+            // Swatch trio: panel, accent, text — the theme at a glance
+            graphics.fill(px + 2, y + 3, px + 10, y + 11, t.screenBgLit);
+            graphics.fill(px + 12, y + 3, px + 20, y + 11, t.accent);
+            graphics.fill(px + 22, y + 3, px + 30, y + 11, t.textPrimary);
+            graphics.drawString(font, t.displayName(), px + 34, y + 3,
+                    t == current ? current.accent : current.textPrimary, current.textShadow);
+        }
+        graphics.pose().popPose();
     }
 
     private void renderModeButtons(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -375,11 +451,23 @@ public class TabletScreen extends Screen {
         graphics.fill(rx + 8, y + 2, rx + 10, y + 8, reorderColor);
         graphics.fill(rx + 7, y + 8, rx + 11, y + 9, reorderColor);
         graphics.fill(rx + 8, y + 9, rx + 10, y + 10, reorderColor);
+
+        // Theme glyph: frame + three color dots (a tiny palette)
+        int tx = themeBtnX();
+        int frame = glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, tx));
+        graphics.fill(tx + 1, y + 1, tx + 11, y + 2, frame);
+        graphics.fill(tx + 1, y + 10, tx + 11, y + 11, frame);
+        graphics.fill(tx + 1, y + 2, tx + 2, y + 10, frame);
+        graphics.fill(tx + 10, y + 2, tx + 11, y + 10, frame);
+        graphics.fill(tx + 3, y + 3, tx + 6, y + 6, 0xFF4ADE80);
+        graphics.fill(tx + 6, y + 6, tx + 9, y + 9, 0xFFB07CFF);
+        graphics.fill(tx + 3, y + 6, tx + 6, y + 9, 0xFF3AB3DA);
     }
 
-    private static int glyphColor(boolean active, boolean hovered) {
-        if (active) return 0xFF4ADE80;
-        return hovered ? 0xFFB0B6C2 : 0xFF565D6B;
+    private int glyphColor(boolean active, boolean hovered) {
+        ScreenTheme theme = theme();
+        if (active) return theme.accent;
+        return hovered ? theme.glyphHover : theme.textFaint;
     }
 
     // ---- Grid mode ----------------------------------------------------
@@ -416,13 +504,14 @@ public class TabletScreen extends Screen {
     /** Empty slot the dragged app was lifted out of. */
     private void renderPlaceholderTile(GuiGraphics graphics, int x, int y) {
         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
-        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, 0xFF262A33);
+        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, theme().surfaceLo);
     }
 
     private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered, boolean held) {
+        ScreenTheme theme = theme();
         // Active glow border (momentary apps glow while held)
         if (app.active() || held) {
-            graphics.fill(x - 2, y - 2, x + TILE_SIZE + 2, y + TILE_SIZE + 2, 0xFF4ADE80);
+            graphics.fill(x - 2, y - 2, x + TILE_SIZE + 2, y + TILE_SIZE + 2, theme.accent);
         } else if (hovered) {
             graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
         }
@@ -445,7 +534,7 @@ public class TabletScreen extends Screen {
         }
 
         // ON/OFF pip; momentary apps get a hollow ring (solid while held)
-        int pipColor = (app.active() || held) ? 0xFF4ADE80 : 0xFF444955;
+        int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
         graphics.fill(x + TILE_SIZE - 8, y + 4, x + TILE_SIZE - 4, y + 8, pipColor);
         if (app.momentary() && !held) {
             graphics.fill(x + TILE_SIZE - 7, y + 5, x + TILE_SIZE - 5, y + 7, app.color() | 0xFF000000);
@@ -458,7 +547,7 @@ public class TabletScreen extends Screen {
 
         // Name (clipped to tile width)
         String name = font.plainSubstrByWidth(app.name(), TILE_SIZE + TILE_GAP - 2);
-        graphics.drawCenteredString(font, name, x + TILE_SIZE / 2, y + TILE_SIZE + 3, 0xFFE2E5EB);
+        drawThemedCentered(graphics, name, x + TILE_SIZE / 2, y + TILE_SIZE + 3, theme.textPrimary);
     }
 
     /**
@@ -471,9 +560,10 @@ public class TabletScreen extends Screen {
     }
 
     private void renderAddTile(GuiGraphics graphics, int x, int y, boolean hovered) {
-        int bg = hovered ? 0xFF3A3F4B : 0xFF2C303A;
+        ScreenTheme theme = theme();
+        int bg = hovered ? theme.surfaceHi : theme.rowBg;
         graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, bg);
-        graphics.drawCenteredString(font, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, 0xFF9AA0AC);
+        drawThemedCentered(graphics, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, theme.textMuted);
     }
 
     // ---- List mode -----------------------------------------------------
@@ -519,13 +609,14 @@ public class TabletScreen extends Screen {
     /** Empty slot the dragged app was lifted out of. */
     private void renderPlaceholderRow(GuiGraphics graphics, int x, int y, int w) {
         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF5A6070);
-        graphics.fill(x, y, x + w, y + ROW_HEIGHT, 0xFF262A33);
+        graphics.fill(x, y, x + w, y + ROW_HEIGHT, theme().surfaceLo);
     }
 
     private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
                               boolean hovered, boolean held) {
+        ScreenTheme theme = theme();
         boolean lit = app.active() || held;
-        graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? 0xFF353A46 : 0xFF2C303A);
+        graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? theme.rowBgHover : theme.rowBg);
 
         // Colored icon chip
         graphics.fill(x + 4, y + 4, x + 20, y + 20, app.color() | 0xFF000000);
@@ -537,34 +628,36 @@ public class TabletScreen extends Screen {
         String name = font.plainSubstrByWidth(app.name(), w - 24 - SWITCH_W - 12 - tagWidth);
         int nameY = y + (ROW_HEIGHT - 8) / 2;
         graphics.drawString(font, name, x + 26, nameY,
-                lit ? 0xFFE2E5EB : 0xFF9AA0AC);
+                lit ? theme.textPrimary : theme.textMuted, theme.textShadow);
         if (!countTag.isEmpty()) {
-            graphics.drawString(font, countTag, x + 26 + font.width(name), nameY, 0xFF6A7284);
+            graphics.drawString(font, countTag, x + 26 + font.width(name), nameY,
+                    0xFF6A7284, theme.textShadow);
         }
 
         int sx = x + w - SWITCH_W - 4;
         int sy = y + (ROW_HEIGHT - SWITCH_H) / 2;
         if (app.momentary()) {
             // Push button: center dot lights while held
-            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? 0xFF2F855A : 0xFF444955);
+            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? theme.accentDim : theme.switchOff);
             int cx = sx + SWITCH_W / 2;
             int cy = sy + SWITCH_H / 2;
-            graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, held ? 0xFF4ADE80 : 0xFF9AA0AC);
+            graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, held ? theme.accent : theme.textMuted);
         } else {
             // Toggle switch
-            int track = app.active() ? 0xFF2F855A : 0xFF444955;
+            int track = app.active() ? theme.accentDim : theme.switchOff;
             graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, track);
             int knobX = app.active() ? sx + SWITCH_W - 10 : sx + 2;
             graphics.fill(knobX, sy + 2, knobX + 8, sy + SWITCH_H - 2,
-                    app.active() ? 0xFF4ADE80 : 0xFF9AA0AC);
+                    app.active() ? theme.accent : theme.textMuted);
         }
     }
 
     private void renderAddRow(GuiGraphics graphics, int x, int y, int w, boolean hovered) {
-        graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? 0xFF3A3F4B : 0xFF262A33);
-        graphics.drawCenteredString(font,
+        ScreenTheme theme = theme();
+        graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? theme.surfaceHi : theme.surfaceLo);
+        drawThemedCentered(graphics,
                 Component.translatable("gui.linktablet.add_app_row"),
-                x + w / 2, y + (ROW_HEIGHT - 8) / 2, 0xFF9AA0AC);
+                x + w / 2, y + (ROW_HEIGHT - 8) / 2, theme.textMuted);
     }
 
     // ------------------------------------------------------------------
@@ -573,7 +666,30 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Open theme popup swallows every click until it closes
+        if (themePopupOpen) {
+            int px = themePopupX();
+            int py = themePopupY();
+            ScreenTheme[] themes = ScreenTheme.values();
+            if (mouseX >= px && mouseX < px + THEME_POPUP_W
+                    && mouseY >= py && mouseY < py + themes.length * THEME_ROW_H) {
+                ScreenTheme picked = themes[(int) ((mouseY - py) / THEME_ROW_H)];
+                if (picked != theme()) {
+                    UISounds.tick(1.4F);
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.SetThemePayload(target(), picked));
+                }
+            }
+            themePopupOpen = false;
+            return true;
+        }
+
         if (button == 0) {
+            if (overModeBtn(mouseX, mouseY, themeBtnX())) {
+                themePopupOpen = true;
+                UISounds.tick(1.3F);
+                return true;
+            }
             if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
                 if (reorderMode) {
                     exitReorderMode();

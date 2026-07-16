@@ -2,17 +2,20 @@ package com.modpack.linktablet.client;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletBlockEntity;
+import com.modpack.linktablet.client.ponder.LinkTabletPonderPlugin;
 import com.modpack.linktablet.client.render.TabletBlockEntityRenderer;
 import com.modpack.linktablet.client.render.TabletItemRenderer;
 import com.modpack.linktablet.registry.ModBlockEntities;
 import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
+import net.createmod.ponder.foundation.PonderIndex;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.DyeColor;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
@@ -62,6 +65,11 @@ public class ClientSetup {
         // draws (the item model JSON itself is a builtin/entity stub).
         event.register(TabletItemRenderer.MODEL_BASE);
         event.register(TabletItemRenderer.MODEL_LIT);
+    }
+
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> PonderIndex.addPlugin(new LinkTabletPonderPlugin()));
     }
 
     @SubscribeEvent

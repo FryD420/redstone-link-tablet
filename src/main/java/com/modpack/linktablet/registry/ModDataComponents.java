@@ -2,6 +2,7 @@ package com.modpack.linktablet.registry;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -37,6 +38,13 @@ public class ModDataComponents {
             DATA_COMPONENTS.register("screen_list", () -> DataComponentType.<Boolean>builder()
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL)
+                    .build());
+
+    /** UI theme; absent = {@link ScreenTheme#DARK} (never written). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ScreenTheme>> THEME =
+            DATA_COMPONENTS.register("theme", () -> DataComponentType.<ScreenTheme>builder()
+                    .persistent(ScreenTheme.CODEC)
+                    .networkSynchronized(ScreenTheme.STREAM_CODEC)
                     .build());
 
     public static void register(IEventBus bus) {

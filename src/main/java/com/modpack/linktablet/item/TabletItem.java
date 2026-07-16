@@ -4,6 +4,10 @@ import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.simibubi.create.content.redstone.link.LinkBehaviour;
+import com.simibubi.create.content.redstone.link.RedstoneLinkNetworkHandler;
+import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import net.createmod.catnip.data.Couple;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -41,11 +45,19 @@ public class TabletItem extends Item {
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }
 
-    /** Sneak + right-click a surface: mount the tablet as a block. */
+    /**
+     * Sneak + right-click a surface: mount the tablet as a block.
+     * Plain right-click on a Redstone Link (anything with Create's
+     * {@code LinkBehaviour}): open the app editor pre-filled with that
+     * link's frequency.
+     */
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
-        if (player == null || !player.isSecondaryUseActive()) {
+        if (player == null) return InteractionResult.PASS;
+        if (!player.isSecondaryUseActive()) {
+            InteractionResult linkResult = tryOpenLink(context, player);
+            if (linkResult != null) return linkResult;
             return InteractionResult.PASS; // fall through to use() → GUI
         }
         BlockPlaceContext placeContext = new BlockPlaceContext(context);
@@ -64,6 +76,34 @@ public class TabletItem extends Item {
             if (!player.getAbilities().instabuild) {
                 context.getItemInHand().shrink(1);
             }
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /**
+     * Consumes the click when the target block carries a link frequency,
+     * or null to fall through. The editor itself only opens client-side;
+     * the eventual save travels the normal UpsertApp path.
+     */
+    private static InteractionResult tryOpenLink(UseOnContext context, Player player) {
+        Level level = context.getLevel();
+        LinkBehaviour link = BlockEntityBehaviour.get(level, context.getClickedPos(), LinkBehaviour.TYPE);
+        if (link == null) return null;
+
+        // Link frequencies sync to clients (Create renders them in-world),
+        // so both sides read the same key here.
+        Couple<RedstoneLinkNetworkHandler.Frequency> key = link.getNetworkKey();
+        ItemStack first = key.getFirst().getStack();
+        ItemStack second = key.getSecond().getStack();
+        if (first.isEmpty() && second.isEmpty()) {
+            if (level.isClientSide) {
+                player.displayClientMessage(
+                        Component.translatable("message.linktablet.link_no_frequency"), true);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        if (level.isClientSide) {
+            ClientHooks.openLinkPrefill(context.getHand(), first.getItem(), second.getItem());
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

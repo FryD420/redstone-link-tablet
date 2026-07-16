@@ -1,6 +1,7 @@
 package com.modpack.linktablet.block;
 
 import com.modpack.linktablet.client.ClientHooks;
+import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModItems;
@@ -109,10 +110,25 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
             List<SignalApp> apps = be.getApps();
             int index = TabletScreenMath.hitPip(state, pos, hitResult, apps.size(), be.isScreenList());
-            if (index >= 0 && !apps.get(index).momentary()) {
+            if (index >= 0) {
+                SignalApp app = apps.get(index);
+                if (app.momentary()) {
+                    // Tap-and-hold: holding right-click repeats the use
+                    // action, refreshing a self-expiring hold — the
+                    // signal drops shortly after letting go. CONSUME
+                    // (not SUCCESS) so the repeats don't swing the arm:
+                    // feedback is the click sound and the lit pip.
+                    if (!level.isClientSide) {
+                        boolean newPress = TabletTransmitterHandler.pressBlockPip(player, pos,
+                                index, app.frequencies(), app.strength(), level.getGameTime());
+                        if (newPress) {
+                            ModNetworking.playToggleClick(level, null, pos, true);
+                        }
+                    }
+                    return InteractionResult.CONSUME;
+                }
                 if (!level.isClientSide) {
                     List<SignalApp> updated = new ArrayList<>(apps);
-                    SignalApp app = updated.get(index);
                     updated.set(index, app.withActive(!app.active()));
                     be.setApps(updated);
                     // Unlike the GUI path, the clicker has no UI sound

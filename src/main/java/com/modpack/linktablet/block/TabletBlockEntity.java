@@ -6,6 +6,7 @@ import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.registry.ModBlockEntities;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
+import com.modpack.linktablet.theme.ScreenTheme;
 import com.simibubi.create.Create;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -22,9 +23,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A mounted tablet. Stores the same app list and case color as the item,
@@ -40,9 +43,18 @@ public class TabletBlockEntity extends BlockEntity {
     private DyeColor caseColor;
     /** Physical mini-screen layout: true = switch list, false = pip grid. */
     private boolean screenList;
+    /** UI theme; DARK is the default and is never persisted. */
+    private ScreenTheme theme = ScreenTheme.DARK;
 
     /** Server-side transmitters keyed by frequency (max strength wins). */
     private final Map<Frequency, VirtualTransmitter> transmitters = new HashMap<>();
+
+    /**
+     * Momentary pips currently held down, purely for the screen visual.
+     * Transient: synced to clients via the update tag but never written
+     * to disk, so a crash can't leave a pip stuck lit.
+     */
+    private final Set<Integer> heldPips = new HashSet<>();
 
     public TabletBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.TABLET.get(), pos, state);
@@ -70,6 +82,43 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    public Set<Integer> getHeldPips() {
+        return heldPips;
+    }
+
+    /** Lights/unlights one momentary pip on the screen (server side). */
+    public void setPipHeld(int index, boolean held) {
+        boolean changed = held ? heldPips.add(index) : heldPips.remove(index);
+        if (changed) syncHeldPips();
+    }
+
+    /** Drops every held-pip visual (app reorder invalidates indices). */
+    public void clearHeldPips() {
+        if (heldPips.isEmpty()) return;
+        heldPips.clear();
+        syncHeldPips();
+    }
+
+    private void syncHeldPips() {
+        // No setChanged: nothing to persist, only clients care
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public ScreenTheme getTheme() {
+        return theme;
+    }
+
+    public void setTheme(ScreenTheme theme) {
+        if (this.theme == theme) return;
+        this.theme = theme;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void setApps(List<SignalApp> newApps) {
         this.apps = List.copyOf(newApps);
         setChanged();
@@ -80,10 +129,11 @@ public class TabletBlockEntity extends BlockEntity {
         refreshTransmitters();
     }
 
-    /** Copies apps, case color, and screen layout from the placed item. */
+    /** Copies apps, case color, screen layout, and theme from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
         this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
+        this.theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         setApps(stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of()));
     }
 
@@ -98,6 +148,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (screenList) {
             stack.set(ModDataComponents.SCREEN_LIST.get(), true);
+        }
+        if (theme != ScreenTheme.DARK) {
+            stack.set(ModDataComponents.THEME.get(), theme);
         }
         return stack;
     }
@@ -189,6 +242,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenList) {
             tag.putBoolean("screen_list", true);
         }
+        if (theme != ScreenTheme.DARK) {
+            tag.putString("theme", theme.getSerializedName());
+        }
     }
 
     @Override
@@ -199,11 +255,22 @@ public class TabletBlockEntity extends BlockEntity {
                 : SignalApp.CODEC.listOf().parse(NbtOps.INSTANCE, appsTag).result().orElse(List.of());
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
+        this.theme = ScreenTheme.byName(tag.getString("theme"));
+        // Only ever present in sync tags (see getUpdateTag) — a disk load
+        // always clears the transient held-pip visuals.
+        heldPips.clear();
+        for (int index : tag.getIntArray("held_pips")) {
+            heldPips.add(index);
+        }
     }
 
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        return saveWithoutMetadata(registries);
+        CompoundTag tag = saveWithoutMetadata(registries);
+        if (!heldPips.isEmpty()) {
+            tag.putIntArray("held_pips", heldPips.stream().mapToInt(Integer::intValue).toArray());
+        }
+        return tag;
     }
 
     @Override

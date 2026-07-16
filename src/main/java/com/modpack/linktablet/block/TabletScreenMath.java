@@ -26,7 +26,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class TabletScreenMath {
 
-    /** Pip grid dimensions; the list layout shows one app per grid row. */
+    /** Densest pip grid; the list layout shows one app per grid row. */
     public static final int COLS = 4;
     public static final int ROWS = 5;
     public static final int MAX_PIPS = COLS * ROWS;
@@ -43,6 +43,30 @@ public final class TabletScreenMath {
     /** Apps visible on the physical screen in the given layout. */
     public static int visibleApps(int appCount, boolean list) {
         return Math.min(appCount, list ? LIST_ROWS : MAX_PIPS);
+    }
+
+    /** Grid dimensions for a given app count. */
+    public record GridLayout(int cols, int rows) {
+        public int cells() {
+            return cols * rows;
+        }
+    }
+
+    /**
+     * The pip grid sizes itself to the app count — one app fills the
+     * whole glass, few apps get big tiles, converging on the densest
+     * {@link #COLS}×{@link #ROWS} grid. Renderer and click hit-test both
+     * derive their geometry from this table; never duplicate it.
+     */
+    public static GridLayout gridLayout(int appCount) {
+        if (appCount <= 1) return new GridLayout(1, 1);
+        if (appCount == 2) return new GridLayout(1, 2);
+        if (appCount <= 4) return new GridLayout(2, 2);
+        if (appCount <= 6) return new GridLayout(2, 3);
+        if (appCount <= 9) return new GridLayout(3, 3);
+        if (appCount <= 12) return new GridLayout(3, 4);
+        if (appCount <= 16) return new GridLayout(4, 4);
+        return new GridLayout(COLS, ROWS);
     }
 
     /** Blockstate model rotation about X, matching blockstates/tablet.json. */
@@ -121,10 +145,15 @@ public final class TabletScreenMath {
         if (u < GLASS_U0 || u >= GLASS_U1) return -1;
         if (v < GLASS_V0 || v >= GLASS_V1) return -1;
 
-        int row = (int) ((v - GLASS_V0) * ROWS / (GLASS_V1 - GLASS_V0));
-        int index = list
-                ? row
-                : row * COLS + (int) ((u - GLASS_U0) * COLS / (GLASS_U1 - GLASS_U0));
+        int index;
+        if (list) {
+            index = (int) ((v - GLASS_V0) * LIST_ROWS / (GLASS_V1 - GLASS_V0));
+        } else {
+            GridLayout grid = gridLayout(appCount);
+            int row = (int) ((v - GLASS_V0) * grid.rows() / (GLASS_V1 - GLASS_V0));
+            int col = (int) ((u - GLASS_U0) * grid.cols() / (GLASS_U1 - GLASS_U0));
+            index = row * grid.cols() + col;
+        }
         return index < visibleApps(appCount, list) ? index : -1;
     }
 }

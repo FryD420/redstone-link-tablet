@@ -6,6 +6,7 @@ import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.item.TabletItem;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -195,6 +196,23 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: set the tablet's UI theme
+    // ------------------------------------------------------------------
+    public record SetThemePayload(AppTarget target, ScreenTheme theme) implements CustomPacketPayload {
+        public static final Type<SetThemePayload> TYPE = new Type<>(id("set_theme"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetThemePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SetThemePayload::target,
+                        ScreenTheme.STREAM_CODEC, SetThemePayload::theme,
+                        SetThemePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: remove an app
     // ------------------------------------------------------------------
     public record RemoveAppPayload(AppTarget target, int index) implements CustomPacketPayload {
@@ -214,12 +232,13 @@ public class ModNetworking {
     // ------------------------------------------------------------------
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("4");
+        PayloadRegistrar registrar = event.registrar("5");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
         registrar.playToServer(ReorderAppPayload.TYPE, ReorderAppPayload.STREAM_CODEC, ModNetworking::handleReorder);
         registrar.playToServer(ScreenLayoutPayload.TYPE, ScreenLayoutPayload.STREAM_CODEC, ModNetworking::handleScreenLayout);
+        registrar.playToServer(SetThemePayload.TYPE, SetThemePayload.STREAM_CODEC, ModNetworking::handleSetTheme);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
     }
 
@@ -328,6 +347,31 @@ public class ModNetworking {
                 stack.set(ModDataComponents.SCREEN_LIST.get(), true);
             } else {
                 stack.remove(ModDataComponents.SCREEN_LIST.get());
+            }
+        }
+    }
+
+    private static void handleSetTheme(SetThemePayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+                    > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                be.setTheme(payload.theme());
+            }
+            return;
+        }
+        ItemStack stack = player.getItemInHand(
+                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        if (stack.getItem() instanceof TabletItem) {
+            // DARK is the default and is never written, so 1.2.x tablets
+            // stay component-free.
+            if (payload.theme() == ScreenTheme.DARK) {
+                stack.remove(ModDataComponents.THEME.get());
+            } else {
+                stack.set(ModDataComponents.THEME.get(), payload.theme());
             }
         }
     }

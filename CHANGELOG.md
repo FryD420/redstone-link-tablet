@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.2 — 2026-07-16
+
+- Held momentary buttons now light up on a placed tablet's screen for
+  everyone nearby — including presses made through the GUI, and on your
+  own tablet's screen in first person.
+- Fixed: clicking a momentary app faster than a server tick could produce
+  no signal at all; every press now transmits a short minimum pulse.
+- Fixed: holding a momentary button on a placed tablet made the character
+  punch the tablet repeatedly.
+
+## 1.3.1 — 2026-07-16
+
+- Dynamic app tiles on the physical screen: the pip grid now sizes itself to
+  the app count — one app fills the whole glass, two split it, and so on,
+  converging on the old 4x5 grid at 17+ apps. Big tiles (up to 4 apps) also
+  show the app's name under its icon, outlined so it stays readable on
+  bright tile colors. Tap-to-toggle follows the new layout exactly.
+- The physical screen's list mode now shows each app's name between its
+  icon chip and switch.
+- Momentary apps are now pressable directly on a placed tablet's screen:
+  hold right-click on the button to transmit, let go to stop (the signal
+  drops within about half a second of release).
+- Right-click any Redstone Link (or anything with a link frequency, like
+  elevator contacts) while holding the tablet: the app editor opens with that
+  link's frequency pre-filled and a name suggested — just hit Save. If an app
+  already has that frequency, the editor opens on it instead of duplicating.
+- Themes: a new palette button in the tablet GUI (next to rearrange) picks
+  one of six UI themes — Dark (the classic), Light, AMOLED, Brass, Terminal,
+  and PurpleFox (named for the player who suggested it and helped test).
+  The theme is stored per tablet and
+  recolors the GUI, the edit screen, and the physical screen for everyone.
+- Ponder: the tablet now has a Ponder scene (hold W over the item) showing a
+  mounted tablet toggling a Redstone Link and lamp, plus the new
+  link-to-app shortcut.
+- Note for servers: the network protocol version changed — 1.3.0 clients and
+  servers must both be updated.
+
 ## 1.2.1 — 2026-07-15
 
 - Fixed a crash ("Not building!") when rendering tablet screens whose app

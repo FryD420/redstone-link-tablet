@@ -5,6 +5,7 @@ import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.screen.TabletScreen;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.registry.ModDataComponents;
+import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -20,6 +21,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Custom item renderer for the tablet: draws the baked model (base or
@@ -75,8 +77,23 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.translate(2 / 16f, 15 / 16f, SCREEN_Z);
         poseStack.mulPose(Axis.XP.rotationDegrees(90));
         boolean listLayout = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
-        TabletScreenRenderer.render(poseStack, buffers, apps, listLayout, lit, packedLight);
+        ScreenTheme theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        TabletScreenRenderer.render(poseStack, buffers, apps, listLayout, theme, lit, packedLight,
+                heldPips(stack));
         poseStack.popPose();
+    }
+
+    /**
+     * While this player holds a momentary app down in the GUI open on
+     * this stack, mirror it on the first-person screen.
+     */
+    private static Set<Integer> heldPips(ItemStack stack) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!(mc.screen instanceof TabletScreen tablet)) return Set.of();
+        if (!(tablet.view() instanceof AppView.Hand handView)) return Set.of();
+        if (mc.player == null || mc.player.getItemInHand(handView.hand()) != stack) return Set.of();
+        int held = tablet.heldMomentaryIndex();
+        return held >= 0 ? Set.of(held) : Set.of();
     }
 
     /**

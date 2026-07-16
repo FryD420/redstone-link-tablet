@@ -32,5 +32,23 @@
   "gui.linktablet.edit_app.cancel": "Cancel",
   "gui.linktablet.edit_app.remove": "Remove App",
   "gui.linktablet.picker.search": "Search items...",
-  "gui.linktablet.picker.clear_icon": "Use frequency as icon"
+  "gui.linktablet.picker.clear_icon": "Use frequency as icon",
+
+  "message.linktablet.link_no_frequency": "This link has no frequency set",
+  "message.linktablet.link_already_added": "Already added — editing %s",
+  "message.linktablet.tablet_full": "Tablet is full",
+
+  "linktablet.ponder.tablet.header": "Controlling Redstone Links remotely",
+  "linktablet.ponder.tablet.text_1": "This Redstone Link receives on the frequency set by its two item slots",
+  "linktablet.ponder.tablet.text_2": "The Link Tablet holds apps: named switches that transmit on those same frequencies",
+  "linktablet.ponder.tablet.text_3": "Tapping an app on a mounted tablet's screen toggles every Link on its frequency",
+  "linktablet.ponder.tablet.text_4": "Tip: right-click any Redstone Link while holding the tablet to add its frequency as an app",
+
+  "gui.linktablet.theme.title": "Theme",
+  "gui.linktablet.theme.dark": "Dark",
+  "gui.linktablet.theme.light": "Light",
+  "gui.linktablet.theme.amoled": "AMOLED",
+  "gui.linktablet.theme.brass": "Brass",
+  "gui.linktablet.theme.terminal": "Terminal",
+  "gui.linktablet.theme.purple": "PurpleFox"
 }

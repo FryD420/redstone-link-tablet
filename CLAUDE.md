@@ -46,7 +46,28 @@ transmit on Create's Redstone Link network.
   loop: an item model needing a non-fixed render type ends the shared buffer
   batch, killing the cached VertexConsumer ("Not building!" crash — only
   surfaces with modded icons, not vanilla ones). Draw all quads, then all
-  icons (see TabletScreenRenderer.render, the 1.2.1 hotfix).
+  icons, then all text (see TabletScreenRenderer.render; font rendering has
+  its own render types, so labels are a third pass — 1.3.0 extension of the
+  1.2.1 rule).
+- Dynamic screen grid (1.3.0): `TabletScreenMath.gridLayout(appCount)` is the
+  ONLY count→cols×rows table; renderer and server hit-test both call it —
+  never duplicate the breakpoints.
+- Themes (1.3.0): `theme/ScreenTheme` — DARK must stay byte-identical to the
+  pre-1.3.0 hardcoded colors and is never persisted (no component, no NBT),
+  so 1.2.x tablets stay untouched.
+- Ponder 1.0.82 API is builder-style: `overlay().showControls(vec, Pointing,
+  ticks).rightClick()` (no InputWindowElement); `Pointing` lives in
+  `net.createmod.catnip.math`. Plugin registered via `PonderIndex.addPlugin`
+  in `FMLClientSetupEvent`. The scene schematic
+  `assets/linktablet/ponder/tablet.nbt` is regenerated with
+  `./gradlew nbtTool --args="gen <path>"` (space-free path — Gradle splits
+  args on spaces; the tools/ class is excluded from the shipped jar).
+- Ponder text is LANG-KEY based at runtime: the inline strings in scene code
+  only feed datagen (which this project doesn't run). Every `scene.title` and
+  `.text(...)` needs a manual en_us.json entry —
+  `linktablet.ponder.<sceneId>.header` and `.text_<n>`, where n follows the
+  program order of `.text()` calls. Reordering scene text beats means
+  renumbering the lang keys.
 
 ## Release process
 

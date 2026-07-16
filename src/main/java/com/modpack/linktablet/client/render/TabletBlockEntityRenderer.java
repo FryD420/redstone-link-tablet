@@ -48,7 +48,7 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         poseStack.translate(2 / 16f, SCREEN_HEIGHT, 1 / 16f);
 
         TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
-                state.getValue(TabletBlock.LIT), packedLight);
+                be.getTheme(), state.getValue(TabletBlock.LIT), packedLight, be.getHeldPips());
         poseStack.popPose();
     }
 }

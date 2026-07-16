@@ -65,6 +65,23 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+// Dev-only NBT tool (dumps/generates the ponder schematic). The class
+// stays in the repo for future scene edits but is excluded from the jar.
+tasks.register('nbtTool', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.modpack.linktablet.tools.NbtTool'
+}
+
+// Dev-only listing-icon generator, same rules as nbtTool.
+tasks.register('iconTool', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.modpack.linktablet.tools.IconTool'
+}
+
+tasks.named('jar', Jar) {
+    exclude('com/modpack/linktablet/tools/**')
+}
+
 tasks.named('processResources', ProcessResources) {
     var replaceProperties = [
         minecraft_version      : minecraft_version,

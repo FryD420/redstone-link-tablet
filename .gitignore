@@ -5,6 +5,7 @@ build/
 # Dev runs (worlds, logs, server files)
 run/
 runs/
+logs/
 
 # IDE
 .idea/

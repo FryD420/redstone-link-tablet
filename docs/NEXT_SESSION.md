@@ -3,26 +3,24 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-15, end of day)
-- **v1.2.1 tagged, pushed, and modpack-verified**; user uploading it to
-  CurseForge/Modrinth with the prepared changelog text and updated
-  docs/DESCRIPTION.md (new hero2.png). 1.2.1 = 1.2.0 + a hotfix for a
-  "Not building!" render crash with modded item icons (quads and icons
-  are now drawn in separate passes — see CLAUDE.md gotchas).
-- 1.2.0 added: app reordering (drag-to-rearrange GUI mode), live physical
-  screens on held + placed tablets (4x5 icon grid or per-tablet switch-list,
-  chosen by the last GUI view used on that tablet), tap-to-toggle on placed
-  tablets, plus fixes (momentary stuck-signal, dye tint on placement,
-  empty-screen consistency).
-- All dev-tested by the user through many visual iteration rounds; the final
-  jar was headed for real-modpack testing at session end.
+## Status (2026-07-16, end of day)
+- **v1.3.2 tagged and pushed; user uploading to CurseForge/Modrinth** with the
+  new listing icon (`docs/icon.png`). Tester-verified in the FAMILYPACK
+  instances over several fix rounds.
+- The 1.3.x round shipped (see CHANGELOG 1.3.1 + 1.3.2 for the split):
+  dynamic screen tiles with outlined name labels, list-mode names +
+  GUI-matched switches, right-click-a-link quick-add, six themes (DARK never
+  persists; "PurpleFox" honors a tester), a ponder scene, hold-to-press
+  momentary buttons on placed tablets (lit pips, minimum pulse, no punch
+  animation), and a Light-theme text-shadow fix. Network registrar "4" → "5".
+- New dev tooling in `tools/` (excluded from the jar):
+  `./gradlew nbtTool --args="gen|dump <path>"` regenerates/dumps the ponder
+  schematic; `./gradlew iconTool --args="docs/icon.png"` regenerates the
+  listing icon (composites `docs/images/icon-bg.png` under the 3D tablet).
+  Relative, space-free args only — Gradle splits on spaces.
 
-## NEXT TASK: Ponder scene
-Create-style Ponder scene(s): craft → open → add app → toggle → mount → tap
-the screen. Start the session in plan mode.
-
-## After that (priority order)
+## After 1.3.2 (priority order)
 1. Small stuff: cauldron dye-wash, open-tablet keybind.
 2. Far-future (parked): interactive GUI on the held tablet (first-person).
-3. User may bring new gameplay screenshots for the listings — drop in
-   docs/images/, wire into docs/DESCRIPTION.md like hero2.png was.
+3. Listing screenshots could show the new dynamic tiles/themes — drop new
+   captures in docs/images/, wire into docs/DESCRIPTION.md like hero2.png.
