@@ -36,6 +36,10 @@
 - App names no longer get cut off: GUI labels ellipsize (hover a tile for
   the full name) and the placed screen's labels shrink to fit before
   truncating.
+- Fixed: typing in the app editor's name field could trigger the
+  inventory key — an 'e' closed the menu mid-word and the rest of the
+  keystrokes moved the player. Text fields now own the keyboard while
+  focused (ESC still exits).
 - Note for servers: the network protocol version changed — 1.3.3 clients
   and servers must both be updated.
 
