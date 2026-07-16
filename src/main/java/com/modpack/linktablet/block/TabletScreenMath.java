@@ -38,7 +38,54 @@ public final class TabletScreenMath {
     public static final float GLASS_U1 = 11f;
     public static final float GLASS_V1 = 13f;
 
+    /**
+     * Uniform breathing room between entries and against the bezel, in
+     * texels — layout geometry shared by renderer AND slider hit math.
+     */
+    public static final float SPACE = 0.25f;
+
+    /** List row mini-switch width / right inset (see renderer's row art). */
+    public static final float LIST_SWITCH_W = 2.0f;
+    public static final float LIST_SWITCH_MARGIN = 0.35f;
+
     private TabletScreenMath() {}
+
+    /** Entry size along a span divided into n cells with SPACE gaps. */
+    public static float tileSize(float span, int n) {
+        return (span - (n + 1) * SPACE) / n;
+    }
+
+    public static float tileU0(int col, float tileW) {
+        return GLASS_U0 + SPACE + col * (tileW + SPACE);
+    }
+
+    public static float tileV0(int row, float tileH) {
+        return GLASS_V0 + SPACE + row * (tileH + SPACE);
+    }
+
+    /** Inset of a slider tile's value bar from its tile edges. */
+    public static float sliderInset(float tileW) {
+        return Math.min(0.3f, tileW * 0.1f);
+    }
+
+    /**
+     * Logical-u span {from, to} of a slider app's value bar — the drag
+     * maps the crosshair against exactly this span so the bar's end
+     * tracks the crosshair 1:1. MUST stay in lockstep with the
+     * renderer's slider art (which draws through these same helpers).
+     */
+    public static float[] sliderBarU(int index, int appCount, boolean list, int rot) {
+        float w = glassW(rot);
+        if (list) {
+            float su1 = GLASS_U0 + w - SPACE - LIST_SWITCH_MARGIN;
+            return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
+        }
+        GridLayout grid = gridLayout(appCount, rot);
+        float tileW = tileSize(w, grid.cols());
+        float u0 = tileU0(index % grid.cols(), tileW);
+        float inset = sliderInset(tileW);
+        return new float[]{u0 + inset, u0 + tileW - inset};
+    }
 
     /** Apps visible on the physical screen in the given layout. */
     public static int visibleApps(int appCount, boolean list) {
@@ -182,6 +229,55 @@ public final class TabletScreenMath {
         return new double[]{16 * x - 2, 16 * z - 1};
     }
 
+    /** World coordinate (on the screen normal's axis) of the glass plane. */
+    private static double screenPlaneCoord(BlockState state, BlockPos pos) {
+        return switch (state.getValue(TabletBlock.FACE)) {
+            case FLOOR -> pos.getY() + 1 / 16.0;
+            case CEILING -> pos.getY() + 15 / 16.0;
+            case WALL -> switch (state.getValue(TabletBlock.FACING)) {
+                case SOUTH -> pos.getZ() + 1 / 16.0;
+                case EAST -> pos.getX() + 1 / 16.0;
+                case WEST -> pos.getX() + 15 / 16.0;
+                default -> pos.getZ() + 15 / 16.0; // NORTH
+            };
+        };
+    }
+
+    /**
+     * The logical-u texel (content space, unclamped — may run past the
+     * glass) a look-ray points at, intersecting the ray with the INFINITE
+     * screen plane — the slider drag keeps following the crosshair even
+     * past the tablet's edge. NaN when the ray is parallel to or points
+     * away from the plane.
+     */
+    public static float logicalUFromRay(BlockState state, BlockPos pos, Vec3 eye, Vec3 look, int rot) {
+        Direction face = screenFace(state);
+        double plane = screenPlaneCoord(state, pos);
+        double eyeCoord = face.getAxis().choose(eye.x, eye.y, eye.z);
+        double lookCoord = face.getAxis().choose(look.x, look.y, look.z);
+        if (Math.abs(lookCoord) < 1.0E-6) return Float.NaN;
+        double t = (plane - eyeCoord) / lookCoord;
+        if (t <= 0) return Float.NaN;
+        double[] uv = screenUV(state, pos, face, eye.add(look.scale(t)));
+        if (uv == null) return Float.NaN;
+
+        // Same inverse content-rotation swizzle as hitPipDetailed
+        double pu = uv[0] - GLASS_U0;
+        double pv = uv[1] - GLASS_V0;
+        double w = GLASS_U1 - GLASS_U0;
+        double h = GLASS_V1 - GLASS_V0;
+        for (int i = 0; i < (rot & 3); i++) {
+            double nu = pv;
+            double nv = w - pu;
+            pu = nu;
+            pv = nv;
+            double tmp = w;
+            w = h;
+            h = tmp;
+        }
+        return (float) (GLASS_U0 + pu);
+    }
+
     /**
      * Whether a click lands on the glass (vs the bezel ring / case).
      * {@code inset} shrinks the glass region (texels per side) — the
@@ -213,10 +309,11 @@ public final class TabletScreenMath {
     }
 
     /**
-     * A hit entry plus where along the cell's width it landed (0..1,
-     * left→right in content space) — the slider apps' click-to-set input.
+     * A hit entry plus the logical-u texel it landed on (content space) —
+     * slider apps map it against their bar span ({@link #sliderBarU}) so
+     * the bar's end tracks the click point exactly.
      */
-    public record PipHit(int index, float along) {
+    public record PipHit(int index, float logicalU) {
     }
 
     /** Like {@link #hitPip}, but null for a miss and with the along-fraction. */
@@ -251,19 +348,15 @@ public final class TabletScreenMath {
         }
 
         int index;
-        double along;
         if (list) {
             index = (int) (pv * LIST_ROWS / h);
-            along = pu / w;
         } else {
             GridLayout grid = gridLayout(appCount, rot);
             int row = (int) (pv * grid.rows() / h);
-            double colPos = pu * grid.cols() / w;
-            int col = (int) colPos;
+            int col = (int) (pu * grid.cols() / w);
             index = row * grid.cols() + col;
-            along = colPos - col;
         }
         if (index >= visibleApps(appCount, list)) return null;
-        return new PipHit(index, (float) Math.clamp(along, 0.0, 1.0));
+        return new PipHit(index, (float) (GLASS_U0 + pu));
     }
 }

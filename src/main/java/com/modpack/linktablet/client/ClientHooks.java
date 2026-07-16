@@ -31,6 +31,11 @@ public class ClientHooks {
         Minecraft.getInstance().setScreen(new TabletScreen(new AppView.Block(pos)));
     }
 
+    /** Begins a placed-tablet slider drag (client drives it from here). */
+    public static void startBlockSliderDrag(BlockPos pos, int index) {
+        BlockSliderDrag.start(pos, index);
+    }
+
     /**
      * Right-clicked a Redstone Link with the tablet: open the app editor
      * pre-filled with the link's frequency (full stacks — components

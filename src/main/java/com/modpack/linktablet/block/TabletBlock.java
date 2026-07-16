@@ -143,27 +143,41 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             List<SignalApp> apps = be.getApps();
             TabletScreenMath.PipHit pipHit = TabletScreenMath.hitPipDetailed(state, pos, hitResult,
                     apps.size(), be.isScreenList(), be.getScreenRotation());
+
+            // Slider click-and-slide: the click grabs the slider and sets
+            // the initial value (full glass-width mapping — 16 stops on
+            // one tile would be untargetable); from there the CLIENT
+            // drives the drag (BlockSliderDrag), projecting the look-ray
+            // onto the screen plane every tick so sliding keeps working
+            // past the tablet's edge. CONSUME: no arm swing.
+            if (pipHit != null && apps.get(pipHit.index()).slider()) {
+                int index = pipHit.index();
+                if (level.isClientSide) {
+                    ClientHooks.startBlockSliderDrag(pos, index);
+                } else {
+                    SignalApp app = apps.get(index);
+                    float[] bar = TabletScreenMath.sliderBarU(index, apps.size(),
+                            be.isScreenList(), be.getScreenRotation());
+                    float frac = net.minecraft.util.Mth.clamp(
+                            (pipHit.logicalU() - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
+                    SignalApp updated = app.withSliderValue(
+                            Math.round(frac * SignalApp.MAX_STRENGTH));
+                    if (updated.strength() != app.strength()) {
+                        boolean wasOn = app.strength() > 0;
+                        List<SignalApp> updatedApps = new ArrayList<>(apps);
+                        updatedApps.set(index, updated);
+                        be.setApps(updatedApps);
+                        if (wasOn != (updated.strength() > 0)) {
+                            ModNetworking.playToggleClick(level, null, pos, updated.strength() > 0);
+                        }
+                    }
+                }
+                return InteractionResult.CONSUME;
+            }
+
             if (pipHit != null) {
                 int index = pipHit.index();
                 SignalApp app = apps.get(index);
-                if (app.slider()) {
-                    // Click-to-set: the tap position along the tile picks
-                    // the value; far left is 0 (off), far right 15.
-                    if (!level.isClientSide) {
-                        SignalApp updated = app.withSliderValue(
-                                Math.round(pipHit.along() * SignalApp.MAX_STRENGTH));
-                        if (updated.strength() != app.strength()) {
-                            boolean wasOn = app.strength() > 0;
-                            List<SignalApp> updatedApps = new ArrayList<>(apps);
-                            updatedApps.set(index, updated);
-                            be.setApps(updatedApps);
-                            if (wasOn != (updated.strength() > 0)) {
-                                ModNetworking.playToggleClick(level, null, pos, updated.strength() > 0);
-                            }
-                        }
-                    }
-                    return InteractionResult.sidedSuccess(level.isClientSide);
-                }
                 if (app.momentary()) {
                     // Tap-and-hold: holding right-click repeats the use
                     // action, refreshing a self-expiring hold — the

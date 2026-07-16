@@ -50,20 +50,21 @@ public final class TabletScreenRenderer {
      * Uniform breathing room: the same margin against the bezel and gap
      * between entries, everywhere. Tile sizes fall out of the glass
      * dimensions and the count-driven grid; click cells divide the glass
-     * evenly and always contain their tile.
+     * evenly and always contain their tile. The values live in
+     * TabletScreenMath — slider drags map against this exact geometry.
      */
-    private static final float SPACE = 0.25f;
+    private static final float SPACE = TabletScreenMath.SPACE;
 
     private static float tileSize(float span, int n) {
-        return (span - (n + 1) * SPACE) / n;
+        return TabletScreenMath.tileSize(span, n);
     }
 
     private static float tileU0(int col, float tileW) {
-        return TabletScreenMath.GLASS_U0 + SPACE + col * (tileW + SPACE);
+        return TabletScreenMath.tileU0(col, tileW);
     }
 
     private static float tileV0(int row, float tileH) {
-        return TabletScreenMath.GLASS_V0 + SPACE + row * (tileH + SPACE);
+        return TabletScreenMath.tileV0(row, tileH);
     }
 
     /** List rows split the (rotation-dependent) glass height five ways. */
@@ -94,10 +95,10 @@ public final class TabletScreenRenderer {
 
     // List row mini-switch, matching the GUI toggle's proportions
     // (GUI: 22×12 switch in a 24px row, 8-wide knob inset 2px)
-    private static final float SWITCH_W = 2.0f;
+    private static final float SWITCH_W = TabletScreenMath.LIST_SWITCH_W;
     private static final float SWITCH_H = 1.1f;
     /** Right inset from the row edge — the GUI's 4px-in-24 margin, scaled. */
-    private static final float SWITCH_MARGIN = 0.35f;
+    private static final float SWITCH_MARGIN = TabletScreenMath.LIST_SWITCH_MARGIN;
     private static final float KNOB_W = 0.75f;
     private static final float KNOB_INSET = 0.2f;
     private static final float LIST_ICON = 1.75f;
@@ -288,7 +289,7 @@ public final class TabletScreenRenderer {
             boolean on = app.strength() > 0;
             fillRect(pose, vc, u0, v0, u1, v1, LAYER,
                     on ? color : dim(color), on ? LightTexture.FULL_BRIGHT : packedLight);
-            float inset = Math.min(0.3f, (u1 - u0) * 0.1f);
+            float inset = TabletScreenMath.sliderInset(u1 - u0);
             float barH = Mth.clamp((v1 - v0) * 0.18f, 0.25f, 0.6f);
             float bu0 = u0 + inset;
             float bu1 = u1 - inset;

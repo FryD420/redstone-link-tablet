@@ -4,10 +4,12 @@
 
 - New app type: Slider. The transmitted signal follows the slider
   position, 0 (off) to 15 — drag it live on the tablet GUI (grid tiles
-  get a value bar, list rows a wide track), or tap along the tile on a
-  placed tablet's screen to set the value in-world. Pick the type in the
-  app editor (click the Type row to cycle Toggle → Hold → Slider); the
-  strength slider becomes the initial value and allows 0.
+  get a value bar, list rows a wide track). On a placed tablet's screen,
+  click-and-slide: hold right-click on the slider's tile and sweep your
+  crosshair across the screen — the value follows the full screen width
+  for precision. Pick the type in the app editor (click the Type row to
+  cycle Toggle → Hold → Slider); the strength slider becomes the initial
+  value and allows 0.
 - Note for servers: the network protocol version changed — clients and
   servers must both be updated.
 
