@@ -346,6 +346,16 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (picker.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (keyCode == 256) { // ESC always exits (checked before the write guard)
+            onClose();
+            return true;
+        }
+        // Anvil rule: while the name box is writable it OWNS the keyboard.
+        // EditBox returns false for plain letters (they arrive via
+        // charTyped), and an unhandled 'E' would fall through to
+        // AbstractContainerScreen's inventory-close — swallowing here is
+        // what lets you type 'e' into a name at all.
+        if (nameBox.keyPressed(keyCode, scanCode, modifiers) || nameBox.canConsumeInput()) return true;
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
