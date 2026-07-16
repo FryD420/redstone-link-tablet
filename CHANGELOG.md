@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- New app type: Slider. The transmitted signal follows the slider
+  position, 0 (off) to 15 — drag it live on the tablet GUI (grid tiles
+  get a value bar, list rows a wide track), or tap along the tile on a
+  placed tablet's screen to set the value in-world. Pick the type in the
+  app editor (click the Type row to cycle Toggle → Hold → Slider); the
+  strength slider becomes the initial value and allows 0.
+- Note for servers: the network protocol version changed — clients and
+  servers must both be updated.
+
 ## 1.3.3 — 2026-07-16
 
 - Frequencies now carry the full item — including its data components —

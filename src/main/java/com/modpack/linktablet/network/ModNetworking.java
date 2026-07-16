@@ -235,6 +235,24 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: set a slider app's live value (0..15)
+    // ------------------------------------------------------------------
+    public record SetSliderPayload(AppTarget target, int index, int value) implements CustomPacketPayload {
+        public static final Type<SetSliderPayload> TYPE = new Type<>(id("set_slider"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetSliderPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SetSliderPayload::target,
+                        ByteBufCodecs.VAR_INT, SetSliderPayload::index,
+                        ByteBufCodecs.VAR_INT, SetSliderPayload::value,
+                        SetSliderPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: open the app edit container menu (server-backed so the
     // editor gets real, vanilla-feeling inventory slots)
     // ------------------------------------------------------------------
@@ -252,9 +270,11 @@ public class ModNetworking {
     // ------------------------------------------------------------------
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        // "6": 1.4.0 — Frequency's wire format grew from two item IDs to
+        // "6": 1.3.3 — Frequency's wire format grew from two item IDs to
         // two full ItemStacks (component-bearing frequency items).
-        PayloadRegistrar registrar = event.registrar("6");
+        // "7": slider apps — SignalApp gained the slider flag and
+        // SetSliderPayload was added.
+        PayloadRegistrar registrar = event.registrar("7");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -263,6 +283,27 @@ public class ModNetworking {
         registrar.playToServer(SetThemePayload.TYPE, SetThemePayload.STREAM_CODEC, ModNetworking::handleSetTheme);
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
         registrar.playToServer(OpenEditMenuPayload.TYPE, OpenEditMenuPayload.STREAM_CODEC, ModNetworking::handleOpenEditMenu);
+        registrar.playToServer(SetSliderPayload.TYPE, SetSliderPayload.STREAM_CODEC, ModNetworking::handleSetSlider);
+    }
+
+    private static void handleSetSlider(SetSliderPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        AppHost host = resolve(player, payload.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        if (payload.index() < 0 || payload.index() >= apps.size()) return;
+        SignalApp app = apps.get(payload.index());
+        if (!app.slider()) return;
+        boolean wasOn = app.strength() > 0;
+        SignalApp updated = app.withSliderValue(payload.value());
+        if (updated.strength() == app.strength()) return;
+        apps.set(payload.index(), updated);
+        host.save(apps);
+        // Click only on the off↔on edge — not on every drag step
+        boolean nowOn = updated.strength() > 0;
+        if (wasOn != nowOn) {
+            playClick(player, payload.target(), nowOn);
+        }
     }
 
     private static void handleOpenEditMenu(OpenEditMenuPayload payload, IPayloadContext context) {
@@ -305,6 +346,7 @@ public class ModNetworking {
         if (payload.index() < 0 || payload.index() >= apps.size()) return;
         SignalApp app = apps.get(payload.index());
         if (app.momentary()) return; // momentary apps use MomentaryAppPayload
+        if (app.slider()) return;    // sliders use SetSliderPayload
         boolean nowActive = !app.active();
         apps.set(payload.index(), app.withActive(nowActive));
         host.save(apps);

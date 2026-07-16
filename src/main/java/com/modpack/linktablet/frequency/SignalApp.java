@@ -26,13 +26,18 @@ import java.util.Optional;
  *                    transient and server-side only)
  * @param momentary   true = transmits only while the button is held,
  *                    false = classic toggle
- * @param strength    transmitted signal strength, 1..15
+ * @param strength    transmitted signal strength — 1..15, except slider
+ *                    apps where it doubles as the LIVE slider value 0..15
  * @param color       ARGB tile background color
  * @param icon        optional custom icon item; when empty the first
  *                    frequency's item pair is drawn as the icon instead
+ * @param slider      true = analog slider: output follows {@link #strength},
+ *                    and {@code active} is DERIVED (strength &gt; 0), never
+ *                    user-toggled — that keeps the transmitter collectors'
+ *                    {@code active && !momentary} rule working unchanged
  */
 public record SignalApp(String name, List<Frequency> frequencies, boolean active, boolean momentary,
-                        int strength, int color, Optional<ResourceLocation> icon) {
+                        int strength, int color, Optional<ResourceLocation> icon, boolean slider) {
 
     public static final int MAX_NAME_LENGTH = 24;
     public static final int MAX_FREQUENCIES = 8;
@@ -46,13 +51,15 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             Codec.BOOL.optionalFieldOf("momentary", false).forGetter(SignalApp::momentary),
             Codec.INT.optionalFieldOf("strength", MAX_STRENGTH).forGetter(SignalApp::strength),
             Codec.INT.optionalFieldOf("color", DEFAULT_COLOR).forGetter(SignalApp::color),
-            ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(SignalApp::icon)
+            ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(SignalApp::icon),
+            Codec.BOOL.optionalFieldOf("slider", false).forGetter(SignalApp::slider)
     ).apply(instance, SignalApp::new));
 
     private static final StreamCodec<RegistryFriendlyByteBuf, List<Frequency>> FREQ_LIST_STREAM_CODEC =
             Frequency.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_FREQUENCIES));
 
-    /** Hand-rolled: too many fields for StreamCodec.composite. */
+    /** Hand-rolled: too many fields for StreamCodec.composite. New fields
+     * go at the END of decode AND encode, in the same order. */
     public static final StreamCodec<RegistryFriendlyByteBuf, SignalApp> STREAM_CODEC = new StreamCodec<>() {
         @Override
         public SignalApp decode(RegistryFriendlyByteBuf buf) {
@@ -63,7 +70,8 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             int strength = buf.readVarInt();
             int color = buf.readInt();
             Optional<ResourceLocation> icon = buf.readOptional(FriendlyByteBuf::readResourceLocation);
-            return new SignalApp(name, frequencies, active, momentary, strength, color, icon);
+            boolean slider = buf.readBoolean();
+            return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider);
         }
 
         @Override
@@ -75,11 +83,18 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             buf.writeVarInt(app.strength());
             buf.writeInt(app.color());
             buf.writeOptional(app.icon(), FriendlyByteBuf::writeResourceLocation);
+            buf.writeBoolean(app.slider());
         }
     };
 
     public SignalApp withActive(boolean newActive) {
-        return new SignalApp(name, frequencies, newActive, momentary, strength, color, icon);
+        return new SignalApp(name, frequencies, newActive, momentary, strength, color, icon, slider);
+    }
+
+    /** Slider apps: set the live value; {@code active} follows (value > 0). */
+    public SignalApp withSliderValue(int value) {
+        int clean = Mth.clamp(value, 0, MAX_STRENGTH);
+        return new SignalApp(name, frequencies, clean > 0, false, clean, color, icon, true);
     }
 
     /** First frequency, used as the default tile icon. */
@@ -106,9 +121,15 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
                 .distinct()
                 .limit(MAX_FREQUENCIES)
                 .toList();
+        if (slider) {
+            // Sliders can rest at 0; active is derived, momentary excluded
+            int cleanValue = Mth.clamp(strength, 0, MAX_STRENGTH);
+            return new SignalApp(cleanName.strip(), cleanFreqs, cleanValue > 0, false,
+                    cleanValue, color, icon, true);
+        }
         // Momentary apps never persist an active state
         boolean cleanActive = !momentary && active;
         return new SignalApp(cleanName.strip(), cleanFreqs, cleanActive, momentary,
-                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon);
+                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false);
     }
 }

@@ -208,17 +208,31 @@ public final class TabletScreenMath {
      */
     public static int hitPip(BlockState state, BlockPos pos, BlockHitResult hit,
                              int appCount, boolean list, int rot) {
-        if (appCount <= 0) return -1;
+        PipHit detailed = hitPipDetailed(state, pos, hit, appCount, list, rot);
+        return detailed == null ? -1 : detailed.index();
+    }
+
+    /**
+     * A hit entry plus where along the cell's width it landed (0..1,
+     * left→right in content space) — the slider apps' click-to-set input.
+     */
+    public record PipHit(int index, float along) {
+    }
+
+    /** Like {@link #hitPip}, but null for a miss and with the along-fraction. */
+    public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
+                                        int appCount, boolean list, int rot) {
+        if (appCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
-        if (uv == null) return -1;
+        if (uv == null) return null;
         double u = uv[0];
         double v = uv[1];
 
         // Only the glass is ever a toggle target; the bezel ring always
         // falls through to the GUI. Cells divide the glass evenly, so
         // they track the renderer's margin/gap layout automatically.
-        if (u < GLASS_U0 || u >= GLASS_U1) return -1;
-        if (v < GLASS_V0 || v >= GLASS_V1) return -1;
+        if (u < GLASS_U0 || u >= GLASS_U1) return null;
+        if (v < GLASS_V0 || v >= GLASS_V1) return null;
 
         // Undo the content rotation: one inverse CW quarter-turn per
         // step, tracking the (possibly swapped) space dimensions.
@@ -237,14 +251,19 @@ public final class TabletScreenMath {
         }
 
         int index;
+        double along;
         if (list) {
             index = (int) (pv * LIST_ROWS / h);
+            along = pu / w;
         } else {
             GridLayout grid = gridLayout(appCount, rot);
             int row = (int) (pv * grid.rows() / h);
-            int col = (int) (pu * grid.cols() / w);
+            double colPos = pu * grid.cols() / w;
+            int col = (int) colPos;
             index = row * grid.cols() + col;
+            along = colPos - col;
         }
-        return index < visibleApps(appCount, list) ? index : -1;
+        if (index >= visibleApps(appCount, list)) return null;
+        return new PipHit(index, (float) Math.clamp(along, 0.0, 1.0));
     }
 }

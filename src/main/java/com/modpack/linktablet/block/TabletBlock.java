@@ -141,10 +141,29 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         // so client and server always agree on pip-vs-GUI.
         if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
             List<SignalApp> apps = be.getApps();
-            int index = TabletScreenMath.hitPip(state, pos, hitResult, apps.size(),
-                    be.isScreenList(), be.getScreenRotation());
-            if (index >= 0) {
+            TabletScreenMath.PipHit pipHit = TabletScreenMath.hitPipDetailed(state, pos, hitResult,
+                    apps.size(), be.isScreenList(), be.getScreenRotation());
+            if (pipHit != null) {
+                int index = pipHit.index();
                 SignalApp app = apps.get(index);
+                if (app.slider()) {
+                    // Click-to-set: the tap position along the tile picks
+                    // the value; far left is 0 (off), far right 15.
+                    if (!level.isClientSide) {
+                        SignalApp updated = app.withSliderValue(
+                                Math.round(pipHit.along() * SignalApp.MAX_STRENGTH));
+                        if (updated.strength() != app.strength()) {
+                            boolean wasOn = app.strength() > 0;
+                            List<SignalApp> updatedApps = new ArrayList<>(apps);
+                            updatedApps.set(index, updated);
+                            be.setApps(updatedApps);
+                            if (wasOn != (updated.strength() > 0)) {
+                                ModNetworking.playToggleClick(level, null, pos, updated.strength() > 0);
+                            }
+                        }
+                    }
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
                 if (app.momentary()) {
                     // Tap-and-hold: holding right-click repeats the use
                     // action, refreshing a self-expiring hold — the

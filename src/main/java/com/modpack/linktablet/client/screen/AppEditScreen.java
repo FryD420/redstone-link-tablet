@@ -86,6 +86,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private int color = SignalApp.DEFAULT_COLOR;
     private boolean wasActive = false;
     private boolean momentary = false;
+    private boolean slider = false;
     private int strength = SignalApp.MAX_STRENGTH;
     private boolean draggingStrength = false;
     private boolean colorPopupOpen = false;
@@ -106,6 +107,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             this.color = existing.color();
             this.wasActive = existing.active();
             this.momentary = existing.momentary();
+            this.slider = existing.slider();
             this.strength = existing.strength();
         } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
             // Half-set link prefill: commit the lone-item frequency directly
@@ -228,7 +230,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         if (frequencies.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
-        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon);
+        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon, slider);
         UISounds.confirm();
         PacketDistributor.sendToServer(
                 new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));
@@ -298,11 +300,20 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             return true;
         }
 
-        // Momentary checkbox (box + label)
+        // App type row: click cycles Toggle → Hold → Slider
         if (mouseX >= rightX && mouseX < rightX + 90
                 && mouseY >= topPos + MOMENTARY_Y - 2 && mouseY < topPos + MOMENTARY_Y + CHECKBOX_SIZE + 2) {
-            momentary = !momentary;
-            UISounds.tick(momentary ? 1.6F : 1.1F);
+            if (!momentary && !slider) {
+                momentary = true;
+            } else if (momentary) {
+                momentary = false;
+                slider = true;
+                if (strength < 0) strength = 0;
+            } else {
+                slider = false;
+                if (strength < 1) strength = 1;
+            }
+            UISounds.tick(1.4F);
             return true;
         }
 
@@ -355,10 +366,16 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         return super.charTyped(codePoint, modifiers);
     }
 
+    /** Sliders may rest at 0 (off); the other types keep the 1..15 range. */
+    private int minStrength() {
+        return slider ? 0 : 1;
+    }
+
     private void setStrengthFromMouse(double mouseX) {
+        int min = minStrength();
         double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
-        strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
-                1, SignalApp.MAX_STRENGTH);
+        strength = net.minecraft.util.Mth.clamp((int) Math.round(min + rel * (SignalApp.MAX_STRENGTH - min)),
+                min, SignalApp.MAX_STRENGTH);
     }
 
     // ---- Rendering -------------------------------------------------------
@@ -488,22 +505,28 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
 
-        // Momentary checkbox
+        // App type row (click cycles): small accent square + current type
         int momY = top + MOMENTARY_Y;
         graphics.fill(rightX, momY, rightX + CHECKBOX_SIZE, momY + CHECKBOX_SIZE, theme.switchOff);
         graphics.fill(rightX + 1, momY + 1, rightX + CHECKBOX_SIZE - 1, momY + CHECKBOX_SIZE - 1, theme.bodyInner);
-        if (momentary) {
+        if (momentary || slider) {
             graphics.fill(rightX + 3, momY + 3, rightX + CHECKBOX_SIZE - 3, momY + CHECKBOX_SIZE - 3, theme.accent);
         }
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.momentary"),
+        String typeKey = slider ? "gui.linktablet.edit_app.type.slider"
+                : momentary ? "gui.linktablet.edit_app.type.momentary"
+                : "gui.linktablet.edit_app.type.toggle";
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
 
-        // Strength slider
+        // Strength slider ("initial value" for slider apps, which allow 0)
         int trackY = top + TRACK_Y;
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
+        int min = minStrength();
+        graphics.drawString(font, Component.translatable(slider
+                        ? "gui.linktablet.edit_app.initial_value"
+                        : "gui.linktablet.edit_app.strength"),
                 rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
         graphics.fill(rightX, trackY, rightX + TRACK_W, trackY + 4, theme.switchOff);
-        int handleX = rightX + (int) ((strength - 1) / (float) (SignalApp.MAX_STRENGTH - 1) * (TRACK_W - 4));
+        int handleX = rightX + (int) ((strength - min) / (float) (SignalApp.MAX_STRENGTH - min) * (TRACK_W - 4));
         graphics.fill(rightX, trackY, handleX + 2, trackY + 4, theme.accentDim);
         graphics.fill(handleX, trackY - 4, handleX + 4, trackY + 8, theme.textPrimary);
         graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, trackY - 2,
@@ -532,8 +555,11 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
                         Component.translatable("gui.linktablet.edit_app.chip_remove"), mouseX, mouseY);
             } else if (mouseX >= rightX && mouseX < rightX + 90
                     && mouseY >= momY - 2 && mouseY < momY + CHECKBOX_SIZE + 2) {
-                graphics.renderTooltip(font,
-                        Component.translatable("gui.linktablet.edit_app.momentary.tooltip"), mouseX, mouseY);
+                graphics.renderTooltip(font, Component.translatable(slider
+                        ? "gui.linktablet.edit_app.type.slider.tooltip"
+                        : momentary
+                        ? "gui.linktablet.edit_app.momentary.tooltip"
+                        : "gui.linktablet.edit_app.type.toggle.tooltip"), mouseX, mouseY);
             } else {
                 // Hovered inventory/ghost slot tooltip (vanilla)
                 renderTooltip(graphics, mouseX, mouseY);

@@ -76,6 +76,12 @@ public class TabletScreen extends Screen {
     /** Index of the momentary app currently held down, or -1. */
     private int heldMomentary = -1;
 
+    /** Index of the slider app currently being dragged, or -1. */
+    private int draggingSlider = -1;
+
+    /** List-mode slider track width (wider than a switch — 16 stops). */
+    private static final int LIST_SLIDER_W = 60;
+
     // Rearrange mode: while active, clicks grab-and-drag apps instead of
     // toggling them. The screen works on an optimistic local copy of the
     // list ({@code workingApps}) so drags reflow instantly; each drop
@@ -541,11 +547,26 @@ public class TabletScreen extends Screen {
             drawFreqPairMarkers(graphics, cx, iy);
         }
 
-        // ON/OFF pip; momentary apps get a hollow ring (solid while held)
-        int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
-        graphics.fill(x + TILE_SIZE - 8, y + 4, x + TILE_SIZE - 4, y + 8, pipColor);
-        if (app.momentary() && !held) {
-            graphics.fill(x + TILE_SIZE - 7, y + 5, x + TILE_SIZE - 5, y + 7, app.color() | 0xFF000000);
+        if (app.slider()) {
+            // Value bar along the tile bottom; the value replaces the pip
+            int tx0 = x + 4;
+            int tx1 = x + TILE_SIZE - 4;
+            int ty = y + TILE_SIZE - 9;
+            graphics.fill(tx0, ty, tx1, ty + 5, theme.switchOff);
+            if (app.strength() > 0) {
+                int fill = tx0 + (tx1 - tx0) * app.strength() / SignalApp.MAX_STRENGTH;
+                graphics.fill(tx0, ty, fill, ty + 5, theme.accent);
+            }
+            graphics.drawString(font, String.valueOf(app.strength()),
+                    x + TILE_SIZE - 4 - font.width(String.valueOf(app.strength())), y + 4,
+                    0xFFE2E5EB, true);
+        } else {
+            // ON/OFF pip; momentary apps get a hollow ring (solid while held)
+            int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
+            graphics.fill(x + TILE_SIZE - 8, y + 4, x + TILE_SIZE - 4, y + 8, pipColor);
+            if (app.momentary() && !held) {
+                graphics.fill(x + TILE_SIZE - 7, y + 5, x + TILE_SIZE - 5, y + 7, app.color() | 0xFF000000);
+            }
         }
 
         // Frequency count badge for scene apps
@@ -633,10 +654,11 @@ public class TabletScreen extends Screen {
         graphics.fill(x + 4, y + 4, x + 20, y + 20, app.color() | 0xFF000000);
         graphics.renderItem(app.iconStack(), x + 4, y + 4);
 
-        // Name (leave room for chip + switch + optional count tag)
+        // Name (leave room for chip + switch/track + optional count tag)
         String countTag = app.frequencies().size() > 1 ? " x" + app.frequencies().size() : "";
         int tagWidth = countTag.isEmpty() ? 0 : font.width(countTag);
-        String name = TextFit.ellipsize(font, app.name(), w - 24 - SWITCH_W - 12 - tagWidth);
+        int controlW = app.slider() ? LIST_SLIDER_W : SWITCH_W;
+        String name = TextFit.ellipsize(font, app.name(), w - 24 - controlW - 12 - tagWidth);
         if (hovered && !name.equals(app.name())) {
             hoveredEllipsizedName = app.name();
         }
@@ -646,6 +668,20 @@ public class TabletScreen extends Screen {
         if (!countTag.isEmpty()) {
             graphics.drawString(font, countTag, x + 26 + font.width(name), nameY,
                     0xFF6A7284, theme.textShadow);
+        }
+
+        if (app.slider()) {
+            // Wide track with a knob at the current value
+            int tx1 = x + w - 4;
+            int tx0 = tx1 - LIST_SLIDER_W;
+            int ty = y + ROW_HEIGHT / 2 - 2;
+            graphics.fill(tx0, ty, tx1, ty + 4, theme.switchOff);
+            int knobX = tx0 + (tx1 - tx0 - 4) * app.strength() / SignalApp.MAX_STRENGTH;
+            if (app.strength() > 0) {
+                graphics.fill(tx0, ty, knobX + 2, ty + 4, theme.accentDim);
+            }
+            graphics.fill(knobX, ty - 3, knobX + 4, ty + 7, lit ? theme.accent : theme.textMuted);
+            return;
         }
 
         int sx = x + w - SWITCH_W - 4;
@@ -748,7 +784,7 @@ public class TabletScreen extends Screen {
 
         int index = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
         if (index != -1) {
-            handleEntryClick(index, button);
+            handleEntryClick(index, button, mouseX);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -760,7 +796,38 @@ public class TabletScreen extends Screen {
             updateDragHover(mouseX, mouseY);
             return true;
         }
+        if (button == 0 && draggingSlider != -1) {
+            sendSliderValue(draggingSlider, sliderValueFromMouse(draggingSlider, mouseX));
+            return true;
+        }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    // ---- Slider apps ---------------------------------------------------
+
+    /** Horizontal span of an entry's slider control (screen-x px). */
+    private int[] sliderSpan(int index) {
+        if (listView()) {
+            int right = rowX() + rowWidth() - 4;
+            return new int[]{right - LIST_SLIDER_W, right};
+        }
+        int x = entryX(index);
+        return new int[]{x + 4, x + TILE_SIZE - 4};
+    }
+
+    private int sliderValueFromMouse(int index, double mouseX) {
+        int[] span = sliderSpan(index);
+        double rel = (mouseX - span[0]) / (span[1] - span[0]);
+        return Mth.clamp((int) Math.round(rel * SignalApp.MAX_STRENGTH), 0, SignalApp.MAX_STRENGTH);
+    }
+
+    /** Sends only actual changes — a drag emits at most 16 packets. */
+    private void sendSliderValue(int index, int value) {
+        List<SignalApp> apps = apps();
+        if (index >= apps.size()) return;
+        SignalApp app = apps.get(index);
+        if (!app.slider() || app.strength() == value) return;
+        PacketDistributor.sendToServer(new ModNetworking.SetSliderPayload(target(), index, value));
     }
 
     /** Tile index under the mouse in grid mode, or -1. */
@@ -792,7 +859,7 @@ public class TabletScreen extends Screen {
         return -1;
     }
 
-    private void handleEntryClick(int index, int button) {
+    private void handleEntryClick(int index, int button, double mouseX) {
         List<SignalApp> apps = apps();
         if (index < apps.size()) {
             if (button == 1) {
@@ -802,6 +869,13 @@ public class TabletScreen extends Screen {
                         AppEditMenu.EditContext.plain(target(), index)));
             } else if (button == 0) {
                 SignalApp app = apps.get(index);
+                if (app.slider()) {
+                    // Click sets the value from position; keep dragging to sweep
+                    draggingSlider = index;
+                    UISounds.tick(1.2F);
+                    sendSliderValue(index, sliderValueFromMouse(index, mouseX));
+                    return;
+                }
                 if (app.momentary()) {
                     // Press-and-hold: transmits until mouse release
                     UISounds.toggle(true);
@@ -834,6 +908,14 @@ public class TabletScreen extends Screen {
         if (button == 0 && heldMomentary != -1) {
             UISounds.toggle(false);
             releaseMomentary();
+            return true;
+        }
+        if (button == 0 && draggingSlider != -1) {
+            List<SignalApp> apps = apps();
+            if (draggingSlider < apps.size()) {
+                UISounds.tick(1.0F + apps.get(draggingSlider).strength() / 15.0F);
+            }
+            draggingSlider = -1;
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);

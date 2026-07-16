@@ -275,11 +275,32 @@ public final class TabletScreenRenderer {
         poseStack.popPose();
     }
 
+    /** Neutral dark track behind slider value bars (no theme in this path). */
+    private static final int SLIDER_TRACK = 0xFF14161C;
+
     /** Grid entry: colored plate, glow border = state (icon drawn later). */
     private static void renderPip(PoseStack.Pose pose, VertexConsumer vc,
                                   float u0, float v0, float u1, float v1,
                                   SignalApp app, int color, int packedLight, float ringW,
                                   boolean held) {
+        if (app.slider()) {
+            // Plate lights with any output; a top strip shows the value
+            boolean on = app.strength() > 0;
+            fillRect(pose, vc, u0, v0, u1, v1, LAYER,
+                    on ? color : dim(color), on ? LightTexture.FULL_BRIGHT : packedLight);
+            float inset = Math.min(0.3f, (u1 - u0) * 0.1f);
+            float barH = Mth.clamp((v1 - v0) * 0.18f, 0.25f, 0.6f);
+            float bu0 = u0 + inset;
+            float bu1 = u1 - inset;
+            float bv0 = v0 + inset;
+            fillRect(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 2, SLIDER_TRACK, packedLight);
+            if (on) {
+                float fill = bu0 + (bu1 - bu0) * app.strength() / SignalApp.MAX_STRENGTH;
+                fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
+                        brighten(color), LightTexture.FULL_BRIGHT);
+            }
+            return;
+        }
         if (app.momentary()) {
             if (held) {
                 // Pressed: fills solid and glows, like an active toggle
@@ -318,6 +339,20 @@ public final class TabletScreenRenderer {
         float su0 = su1 - SWITCH_W;
         float sv0 = v0 + (rowH - SWITCH_H) / 2f;
         float sv1 = sv0 + SWITCH_H;
+        if (app.slider()) {
+            // Wider mini track with a knob at the current value
+            float tu0 = su1 - SWITCH_W * 1.6f;
+            float tv0 = v0 + (rowH - SWITCH_H * 0.5f) / 2f;
+            float tv1 = tv0 + SWITCH_H * 0.5f;
+            fillRect(pose, vc, tu0, tv0, su1, tv1, LAYER * 2, theme.switchOff, packedLight);
+            float knob = tu0 + (su1 - tu0 - KNOB_W) * app.strength() / SignalApp.MAX_STRENGTH;
+            if (app.strength() > 0) {
+                fillRect(pose, vc, tu0, tv0, knob + KNOB_W / 2f, tv1, LAYER * 2, theme.accentDim, stateLight);
+            }
+            fillRect(pose, vc, knob, sv0, knob + KNOB_W, sv1, LAYER * 3,
+                    on ? theme.accent : theme.textMuted, stateLight);
+            return;
+        }
         if (app.momentary()) {
             // Push button: dot lights while held, mirroring the GUI
             fillRect(pose, vc, su0, sv0, su1, sv1, LAYER * 2,
