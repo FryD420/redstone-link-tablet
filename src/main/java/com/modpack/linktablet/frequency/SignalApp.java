@@ -40,15 +40,19 @@ import java.util.Optional;
  *                    means the slider can never rest at 0 — the app is
  *                    always transmitting, by design (no off notch)
  * @param sliderMax   top of a slider's travel (sliderMin+1..15)
+ * @param note        free-text player note, "" = none (the empty default
+ *                    is never persisted, so pre-notes NBT round-trips
+ *                    unchanged)
  */
 public record SignalApp(String name, List<Frequency> frequencies, boolean active, boolean momentary,
                         int strength, int color, Optional<ResourceLocation> icon, boolean slider,
-                        int sliderMin, int sliderMax) {
+                        int sliderMin, int sliderMax, String note) {
 
     public static final int MAX_NAME_LENGTH = 24;
     public static final int MAX_FREQUENCIES = 8;
     public static final int MAX_STRENGTH = 15;
     public static final int DEFAULT_COLOR = 0xFF3A3F4B;
+    public static final int MAX_NOTE_LENGTH = 1024;
 
     public static final Codec<SignalApp> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("name").forGetter(SignalApp::name),
@@ -60,7 +64,8 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(SignalApp::icon),
             Codec.BOOL.optionalFieldOf("slider", false).forGetter(SignalApp::slider),
             Codec.INT.optionalFieldOf("slider_min", 0).forGetter(SignalApp::sliderMin),
-            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(SignalApp::sliderMax)
+            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(SignalApp::sliderMax),
+            Codec.STRING.optionalFieldOf("note", "").forGetter(SignalApp::note)
     ).apply(instance, SignalApp::new));
 
     private static final StreamCodec<RegistryFriendlyByteBuf, List<Frequency>> FREQ_LIST_STREAM_CODEC =
@@ -81,8 +86,9 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             boolean slider = buf.readBoolean();
             int sliderMin = buf.readVarInt();
             int sliderMax = buf.readVarInt();
+            String note = ByteBufCodecs.STRING_UTF8.decode(buf);
             return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
-                    sliderMin, sliderMax);
+                    sliderMin, sliderMax, note);
         }
 
         @Override
@@ -97,12 +103,13 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             buf.writeBoolean(app.slider());
             buf.writeVarInt(app.sliderMin());
             buf.writeVarInt(app.sliderMax());
+            ByteBufCodecs.STRING_UTF8.encode(buf, app.note());
         }
     };
 
     public SignalApp withActive(boolean newActive) {
         return new SignalApp(name, frequencies, newActive, momentary, strength, color, icon, slider,
-                sliderMin, sliderMax);
+                sliderMin, sliderMax, note);
     }
 
     /** Slider apps: set the live value; {@code active} follows (value > 0).
@@ -111,7 +118,22 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
     public SignalApp withSliderValue(int value) {
         int clean = Mth.clamp(value, sliderMin, sliderMax);
         return new SignalApp(name, frequencies, clean > 0, false, clean, color, icon, true,
-                sliderMin, sliderMax);
+                sliderMin, sliderMax, note);
+    }
+
+    /** Server-side note write; the caller sends the whole new text. */
+    public SignalApp withNote(String newNote) {
+        return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
+                sliderMin, sliderMax, cleanNote(newNote));
+    }
+
+    public boolean hasNote() {
+        return !note.isBlank();
+    }
+
+    private static String cleanNote(String raw) {
+        String clean = raw.length() > MAX_NOTE_LENGTH ? raw.substring(0, MAX_NOTE_LENGTH) : raw;
+        return clean.isBlank() ? "" : clean;
     }
 
     /**
@@ -164,12 +186,13 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             int cleanMax = Mth.clamp(sliderMax, cleanMin + 1, MAX_STRENGTH);
             int cleanValue = Mth.clamp(strength, cleanMin, cleanMax);
             return new SignalApp(cleanName.strip(), cleanFreqs, cleanValue > 0, false,
-                    cleanValue, color, icon, true, cleanMin, cleanMax);
+                    cleanValue, color, icon, true, cleanMin, cleanMax, cleanNote(note));
         }
         // Momentary apps never persist an active state; non-sliders keep
         // the default 0/15 range so nothing extra persists.
         boolean cleanActive = !momentary && active;
         return new SignalApp(cleanName.strip(), cleanFreqs, cleanActive, momentary,
-                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false, 0, MAX_STRENGTH);
+                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false, 0, MAX_STRENGTH,
+                cleanNote(note));
     }
 }

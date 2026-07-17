@@ -253,6 +253,24 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: set (or clear, note == "") an app's free-text note
+    // ------------------------------------------------------------------
+    public record SetNotePayload(AppTarget target, int index, String note) implements CustomPacketPayload {
+        public static final Type<SetNotePayload> TYPE = new Type<>(id("set_note"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetNotePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SetNotePayload::target,
+                        ByteBufCodecs.VAR_INT, SetNotePayload::index,
+                        ByteBufCodecs.stringUtf8(SignalApp.MAX_NOTE_LENGTH), SetNotePayload::note,
+                        SetNotePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: open the app edit container menu (server-backed so the
     // editor gets real, vanilla-feeling inventory slots)
     // ------------------------------------------------------------------
@@ -278,7 +296,9 @@ public class ModNetworking {
         // SetThemePayload's ordinal domain, and SignalApp gained
         // sliderMin/sliderMax on the wire.
         // "9": 1.5.2 — ScreenTheme gained AVIONICS.
-        PayloadRegistrar registrar = event.registrar("9");
+        // "10": per-app notes — SignalApp gained the note string on the
+        // wire and SetNotePayload was added.
+        PayloadRegistrar registrar = event.registrar("10");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -288,6 +308,19 @@ public class ModNetworking {
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
         registrar.playToServer(OpenEditMenuPayload.TYPE, OpenEditMenuPayload.STREAM_CODEC, ModNetworking::handleOpenEditMenu);
         registrar.playToServer(SetSliderPayload.TYPE, SetSliderPayload.STREAM_CODEC, ModNetworking::handleSetSlider);
+        registrar.playToServer(SetNotePayload.TYPE, SetNotePayload.STREAM_CODEC, ModNetworking::handleSetNote);
+    }
+
+    private static void handleSetNote(SetNotePayload payload, IPayloadContext context) {
+        AppHost host = resolve(context.player(), payload.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        if (payload.index() < 0 || payload.index() >= apps.size()) return;
+        SignalApp app = apps.get(payload.index());
+        SignalApp updated = app.withNote(payload.note());
+        if (updated.note().equals(app.note())) return;
+        apps.set(payload.index(), updated);
+        host.save(apps);
     }
 
     private static void handleSetSlider(SetSliderPayload payload, IPayloadContext context) {

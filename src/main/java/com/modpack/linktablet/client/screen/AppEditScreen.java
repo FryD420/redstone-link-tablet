@@ -97,6 +97,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private int strength = SignalApp.MAX_STRENGTH;
     private int sliderMin = 0;
     private int sliderMax = SignalApp.MAX_STRENGTH;
+    /** Carried through unchanged — notes are edited from the home screen. */
+    private String note = "";
     private boolean draggingStrength = false;
     /** Range-row knob being dragged: -1 none, 0 min, 1 max. */
     private int draggingKnob = -1;
@@ -122,6 +124,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             this.strength = existing.strength();
             this.sliderMin = existing.sliderMin();
             this.sliderMax = existing.sliderMax();
+            this.note = existing.note();
         } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
             // Half-set link prefill: commit the lone-item frequency directly
             this.frequencies.add(Frequency.of(menu.contentHolder.prefill1(), menu.contentHolder.prefill2()));
@@ -246,7 +249,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
         SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength,
-                color, icon, slider, sliderMin, sliderMax);
+                color, icon, slider, sliderMin, sliderMax, note);
         UISounds.confirm();
         PacketDistributor.sendToServer(
                 new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));

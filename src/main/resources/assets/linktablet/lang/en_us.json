@@ -14,6 +14,8 @@
   "gui.linktablet.view.reorder": "Rearrange apps",
   "gui.linktablet.reorder.title": "Drag to rearrange",
   "gui.linktablet.no_apps": "No apps yet. Tap + to add one.",
+  "gui.linktablet.note": "Note",
+  "gui.linktablet.note.hint": "Write a note...",
   "gui.linktablet.edit_app.title.new": "New App",
   "gui.linktablet.edit_app.title.edit": "Edit App",
   "gui.linktablet.edit_app.name": "App name",
