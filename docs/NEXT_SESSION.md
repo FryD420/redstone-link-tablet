@@ -36,25 +36,73 @@ at the repo root (auto-loaded every Claude session).
   project is "Under review" (first-approval queue) and therefore
   invisible to public search/API until a moderator approves — then
   everything goes live at once. CurseForge presumably in the same boat.
-  **First thing next session: verify both listings went public.**
+  Still 404 publicly as of 2026-07-17; the user is watching the
+  dashboards personally (off Claude's list).
 - Minor known issue spotted in a FAMILYPACK log: Distant Horizons can't
   resolve the tablet's WALL blockstate (it omits the `landscape`
   property and falls back to the default state) — harmless LOD-only
   fallback, low priority.
 
-## Next session (priority order)
-1. **Verify platform approvals** (Modrinth + CurseForge listings public;
-   1.5.2 uploaded 2026-07-17 morning, was still processing at session end).
-2. **Refresh listing screenshots** in docs/images/ + docs/DESCRIPTION.md —
+## Active list (vetted 2026-07-17; ordered smallest → largest effort)
+1. **Creative-mode tab** for the mod's items (tester suggestion,
+   explicitly approved by the user 2026-07-17). Trivial — registration +
+   lang key; good session warm-up.
+2. **Listing icon restyle** — iconTool's flat-GUI icon updated to match
+   the themed chrome look (user's standing preference: all chrome
+   follows the theme). Small: tool pipeline exists, no game code.
+3. **Refresh listing screenshots** in docs/images/ + docs/DESCRIPTION.md —
    every current shot predates the whole 1.5.x visual line. Reshoot on
-   1.5.2 (new grid chip look + 8 themes incl. Avionics make a better
-   gallery). Decide at the same time whether iconTool's flat-GUI listing
-   icon gets restyled to match (user's standing preference: all chrome
-   follows the theme).
-3. Multiblock screens: designed, not scheduled — see
-   `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the bottom).
-4. Still parked: open-tablet keybind; far-future interactive GUI on the
-   held tablet (first-person); the DH landscape-blockstate LOD nit above.
+   the current build (grid chip look + 8 themes incl. Avionics make a
+   better gallery). Low difficulty but time-heavy and needs the user;
+   do right after the icon so both listing assets land together —
+   ideally with items 1–2 already in the jar being photographed.
+4. **Icon-friendly defaults** — better rendering for items that look poor
+   as app icons (tester suggestion, explicitly approved 2026-07-17).
+   Likely small code, but needs a scoping chat first: which items look
+   bad, and is the fix a curated default set, a render tweak, or both?
+5. **Per-app notes** (tester request relayed by the user 2026-07-17):
+   each app gets an optional free-text note the player can open, type
+   into, and close from the GUI. Requested UX: the note POPS OUT as a
+   floating, draggable window (title bar + close button, like a Windows
+   window) rather than an inline panel — which sidesteps the 240-unit
+   GUI budget since it floats over the screen. Small-medium: new string
+   field on SignalApp (extend the hand-rolled stream codec,
+   optionalFieldOf so old NBT is untouched, registrar bump), a
+   drag-anywhere window widget in chrome styling (new widget type — the
+   chrome atlas nine-slices should cover the frame), multiline editing
+   (vanilla MultiLineEditBox as the base). GUI-only for now;
+   placed-screen display (tooltip? hover?) is a design question.
+6. **Timed button mode** (requested by migdzy, relayed by the user
+   2026-07-17): per-app activation
+   option that behaves like a customizable button — tapping emits a
+   timed pulse instead of latching, with a slider setting the hold
+   duration. Relative of the existing momentary mode (held-while-pressed);
+   this one is fixed-length after a single tap. Design TBD (duration
+   units/range, interaction with slider apps and min/max ranges).
+   Medium — a full release's worth: SignalApp codec + registrar bump,
+   edit-screen UI, server pulse timing, both renderers, NBT compat.
+7. **Pinned tablet overlay** (tester request relayed by the user
+   2026-07-17): keep the tablet usable while playing — a floating,
+   moveable mini-tablet window (same windowing idea as the notes popout)
+   that stays on screen while mining/moving. Medium-large and the hard
+   part is NOT the window: a normal Screen grabs the mouse and pauses
+   input, so this needs a HUD-layer overlay plus an interaction story
+   (e.g. keybind toggles between "pinned/passive" and "focused/
+   clickable" — the parked open-tablet keybind is the natural
+   companion/prerequisite). Renders the app grid read-only at minimum;
+   click-through toggling is the stretch goal. Shares the draggable
+   window widget with item 5 — build notes first, reuse the widget.
+8. **Multiblock screens**: designed, not scheduled — see
+   `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the
+   bottom). Large, multi-session.
+
+Platform approvals (Modrinth first review + CurseForge): the user is
+watching the dashboards personally — off Claude's list; both listings
+still 404 publicly as of 2026-07-17.
+
+Still parked (kept parked at the 2026-07-17 vetting): open-tablet
+keybind; far-future interactive GUI on the held tablet (first-person);
+the DH landscape-blockstate LOD nit above.
 
 ## Release history (compressed)
 - 1.4.0: ItemStack frequencies (frequency-card mod compat), container-menu
@@ -70,15 +118,15 @@ at the repo root (auto-loaded every Claude session).
   --args="docs/icon.png"` (listing icon), `./gradlew chromeTool` (GUI
   chrome atlas). Relative, space-free args — Gradle splits on spaces.
 
-## Unconfirmed tester suggestions (need the user's explicit go-ahead)
-These arrived via a message the user later disavowed (someone else at the
-keyboard / a stray paste — see local Claude memory). Reasonable ideas, but
-do NOT build them until the user asks:
-- Creative-mode item tab for the mod (like Create's).
-- More app-icon-friendly defaults (some items render poorly as icons).
-- A "blank white tablet in the ponder scene" report — the user says the
-  scene works for them, but the claim is plausible: ponder's virtual level
-  may skip block color handlers, which would leave the case untinted
-  (bright white). If anyone reproduces it, check tinting in the ponder
-  renderer first.
-- A PurpleFox easter egg (the suspect requested it themselves).
+## Former "unconfirmed tester suggestions" — resolved 2026-07-17
+The batch arrived via a message the user later disavowed (someone else at
+the keyboard / a stray paste — see local Claude memory). The user vetted
+them personally on 2026-07-17:
+- APPROVED → moved to the active list above: creative-mode item tab;
+  app-icon-friendly defaults.
+- DECLINED — do not build/investigate unless the user re-raises them:
+  - The "blank white tablet in the ponder scene" report. (If a second
+    person ever reproduces it, the plausible cause is ponder's virtual
+    level skipping block color handlers, leaving the case untinted —
+    check tinting in the ponder renderer first.)
+  - A PurpleFox easter egg (the suspect requested it themselves).
