@@ -43,12 +43,14 @@ at the repo root (auto-loaded every Claude session).
   fallback, low priority.
 
 ## Next session (priority order)
-1. **Verify platform approvals** (Modrinth + CurseForge listings public).
+1. **Verify platform approvals** (Modrinth + CurseForge listings public;
+   1.5.2 uploaded 2026-07-17 morning, was still processing at session end).
 2. **Refresh listing screenshots** in docs/images/ + docs/DESCRIPTION.md —
-   every current shot predates BOTH the 1.5.0 GUI overhaul and the 1.5.1
-   in-world chrome. Reshoot on 1.5.1. Decide at the same time whether
-   iconTool's flat-GUI listing icon gets restyled to match (user's
-   standing preference: all chrome follows the theme).
+   every current shot predates the whole 1.5.x visual line. Reshoot on
+   1.5.2 (new grid chip look + 8 themes incl. Avionics make a better
+   gallery). Decide at the same time whether iconTool's flat-GUI listing
+   icon gets restyled to match (user's standing preference: all chrome
+   follows the theme).
 3. Multiblock screens: designed, not scheduled — see
    `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the bottom).
 4. Still parked: open-tablet keybind; far-future interactive GUI on the
