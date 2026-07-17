@@ -23,8 +23,13 @@ at the repo root (auto-loaded every Claude session).
   Follow-ups queued: **refresh every listing screenshot** in
   docs/images/ + docs/DESCRIPTION.md (the overhaul obsoletes them all),
   and decide whether iconTool's flat-GUI listing icon should be
-  restyled to match. Also: couldn't verify the platform listings are
-  publicly visible via Modrinth API/search — user to check dashboards.
+  restyled to match. Platform-visibility mystery SOLVED: the Modrinth
+  project is "Under review" (created 2 days ago) — invisible to
+  search/API until first moderator approval, then everything goes live
+  at once. All versions 1.0.0–1.5.1 are uploaded and queued (user's
+  dashboard screenshot, 2026-07-16 late). Check next session that the
+  review cleared; presumably CurseForge is in the same
+  first-approval boat.
 - **v1.4.0 SHIPPED**: tagged and pushed; the user is uploading to
   CurseForge/Modrinth (near-instant after first approval — verify next
   session that both went live). Contents: ItemStack frequencies (Create
