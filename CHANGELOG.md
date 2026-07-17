@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.3 — 2026-07-17
+
+- The tablet is now also listed in the vanilla Redstone creative tab —
+  the mod's own single-item tab was easy to miss.
+
 ## 1.5.2 — 2026-07-17
 
 - Grid tiles now match the list rows' look on both the GUI and the

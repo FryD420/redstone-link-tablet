@@ -15,8 +15,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import net.minecraft.world.item.CreativeModeTabs;
 
 /**
  * Link Tablet — a handheld tablet whose "apps" transmit on Create's
@@ -43,6 +45,15 @@ public class LinkTabletMod {
         modEventBus.addListener(this::registerPayloads);
         modEventBus.addListener(this::onRegister);
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::addToVanillaTabs);
+    }
+
+    // The mod's own tab is easy to miss with one item in it; list the
+    // tablet where redstone players actually browse.
+    private void addToVanillaTabs(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
+            event.accept(ModItems.TABLET.get());
+        }
     }
 
     private void registerPayloads(RegisterPayloadHandlersEvent event) {
