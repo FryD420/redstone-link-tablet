@@ -382,7 +382,10 @@ public final class TabletScreenRenderer {
             fillRect(pose, vc, tu0, tv0, su1, tv1, LAYER * 2, theme.switchOff, packedLight);
             float knob = tu0 + (su1 - tu0 - KNOB_W) * app.fillFraction();
             if (app.strength() > 0) {
-                fillRect(pose, vc, tu0, tv0, knob + KNOB_W / 2f, tv1, LAYER * 2, theme.accentDim, stateLight);
+                // Above the track, below the knob — coplanar quads z-fight
+                // at glancing angles (latent since 1.4.0, exposed by
+                // higher-contrast themes)
+                fillRect(pose, vc, tu0, tv0, knob + KNOB_W / 2f, tv1, LAYER * 2.5f, theme.accentDim, stateLight);
             }
             fillRect(pose, vc, knob, sv0, knob + KNOB_W, sv1, LAYER * 3,
                     on ? theme.accent : theme.textMuted, stateLight);
