@@ -68,8 +68,8 @@ public enum ScreenTheme implements StringRepresentable {
             0xFF3B2A18, 0xFF6E5B40, 0xFF9C8A68, 0xFF4F3A22,
             0xFF2E9DD8, 0xFF1F6E9C, 0xFFC9B98F),
 
-    /** 1.5.2 "Avionics": flight-computer terminal look requested by the
-     * testers — deep navy panels, steel-blue frames, cyan accent. */
+    /** 1.5.2 "Avionics": flight-computer terminal look requested by
+     * PurpleFox — deep navy panels, steel-blue frames, cyan accent. */
     AVIONICS("avionics",
             0xFF16294A, 0xFF090E1A, 0xFF20335A,
             0xFF44618F, 0xFF0D1526,

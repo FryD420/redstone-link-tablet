@@ -13,7 +13,7 @@
   chip's corner, and it now always draws on top — block icons could
   previously cover it on both the GUI and the placed screen.
 - New theme: "Avionics" — deep navy panels, steel-blue frames, and a
-  cyan accent, styled after a flight computer (tester request).
+  cyan accent, styled after a flight computer (requested by PurpleFox).
 - Frequencies can now use just one item: stage a single item in either
   slot and hit Add — matching Create's own links, where the second slot
   may stay empty (requested by migdzy). One-item frequencies render
