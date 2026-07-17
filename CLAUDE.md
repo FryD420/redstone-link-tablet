@@ -36,7 +36,12 @@ transmit on Create's Redstone Link network.
   `compat/VirtualTransmitter.java`.
 - Live-screen rendering (1.2.0): `client/render/` holds the BER + BEWLR;
   shared geometry/click math in `block/TabletScreenMath.java` (one source of
-  truth for renderer AND server hit-test — keep them together). Screen quads
+  truth for renderer AND server hit-test — keep them together). Placed-screen
+  chrome (1.5.1) is quad bevel EMULATION of the GUI look — NEVER sample the
+  chrome atlas in the world pass (second RenderType kills the shared batch;
+  the art aliases at 2-texel tiles). Hairline layers are reserved: frame
+  0.5x, plaque bevels 1.5x, list groove 2.75x, grid groove 3.25x (icons
+  3.5x, text 4x); bevels auto-skip cells under 1.2 texels. Screen quads
   must bleed ~0.5 texel under the bezel ring or the baked art shimmers
   through the seam. The chunk mesh bakes the case tint, so the BE forces a
   client re-render in `onDataPacket` (tint arrives after the placement

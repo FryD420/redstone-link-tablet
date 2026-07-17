@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- The placed tablet's screen now matches the 1.5.0 GUI look: app tiles
+  and list rows render as beveled plaques, a theme-colored frame runs
+  around the glass, and slider bars sit in recessed grooves. Held
+  tablets get the same treatment. On the densest grids the accents
+  step aside automatically (tiles that small would just shimmer).
+- Pure visual change — no network protocol change, so 1.5.1 clients and
+  servers pair freely with 1.5.0.
+
 ## 1.5.0 — 2026-07-16
 
 - Create-style UI overhaul: the tablet home screen, app editor, and item

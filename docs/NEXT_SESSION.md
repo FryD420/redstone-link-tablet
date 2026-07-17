@@ -4,6 +4,10 @@ Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-16, late)
+- **1.5.1 IN TEST on `feature/world-chrome`**: placed/held screens match
+  the GUI chrome via quad bevel emulation in `TabletScreenRenderer`
+  (see the new live-screen gotcha in CLAUDE.md). No wire change —
+  registrar stays "8". Awaiting the user's pass, then release process.
 - **v1.5.0 SHIPPED** (FAMILYPACK-tested by the user, tagged, pushed;
   user uploads to CurseForge/Modrinth): Create-style UI overhaul of all
   three GUI screens (chrome atlas via `./gradlew chromeTool`,

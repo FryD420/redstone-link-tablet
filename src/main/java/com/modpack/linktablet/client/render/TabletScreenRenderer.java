@@ -147,10 +147,24 @@ public final class TabletScreenRenderer {
         // otherwise the baked screen art shimmers through the seam.
         float bleed = 0.5f;
         int bgLight = backlit ? LightTexture.FULL_BRIGHT : packedLight;
+        int bg = backlit ? theme.screenBgLit : theme.screenBgOff;
         fillRect(pose, vc,
                 TabletScreenMath.GLASS_U0 - bleed, TabletScreenMath.GLASS_V0 - bleed,
                 u1 + bleed, v1 + bleed,
-                0f, backlit ? theme.screenBgLit : theme.screenBgOff, bgLight);
+                0f, bg, bgLight);
+
+        // Theme frame hugging the glass edge — the GUI panel's rail
+        // brought in-world (1.5.1). Lives in the existing margins, so
+        // layout and hit-tests are untouched: outer bodyOuter rail with a
+        // highlight ridge, then the canvas's under-rail shadow.
+        float frameW = 0.4f;
+        int frame = theme.bodyOuter;
+        ring(pose, vc, TabletScreenMath.GLASS_U0, TabletScreenMath.GLASS_V0, u1, v1,
+                LAYER * 0.5f, frame, bgLight, frameW);
+        ring(pose, vc, TabletScreenMath.GLASS_U0 + frameW, TabletScreenMath.GLASS_V0 + frameW,
+                u1 - frameW, v1 - frameW, LAYER * 0.5f, brighten(frame), bgLight, 0.12f);
+        ring(pose, vc, TabletScreenMath.GLASS_U0 + frameW + 0.12f, TabletScreenMath.GLASS_V0 + frameW + 0.12f,
+                u1 - frameW - 0.12f, v1 - frameW - 0.12f, LAYER * 0.5f, shade(bg, 0.85f), bgLight, 0.3f);
 
         int count = TabletScreenMath.visibleApps(apps.size(), list);
         GridLayout grid = TabletScreenMath.gridLayout(apps.size(), rot);
@@ -321,8 +335,10 @@ public final class TabletScreenRenderer {
         if (app.slider()) {
             // Plate lights with any output; a top strip shows the value
             boolean on = app.strength() > 0;
-            fillRect(pose, vc, u0, v0, u1, v1, LAYER,
-                    on ? color : dim(color), on ? LightTexture.FULL_BRIGHT : packedLight);
+            int plate = on ? color : dim(color);
+            int plateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
+            fillRect(pose, vc, u0, v0, u1, v1, LAYER, plate, plateLight);
+            raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, plate, plateLight);
             float inset = TabletScreenMath.sliderInset(u1 - u0);
             float barH = sliderBarH(v1 - v0);
             float bu0 = u0 + inset;
@@ -334,19 +350,25 @@ public final class TabletScreenRenderer {
                 fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
                         brighten(color), LightTexture.FULL_BRIGHT);
             }
+            // Groove hairlines above the fill (3x), below the icons (3.5x)
+            insetGroove(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 3.25f,
+                    SLIDER_TRACK, packedLight);
             return;
         }
         if (app.momentary()) {
             if (held) {
                 // Pressed: fills solid and glows, like an active toggle
                 fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
+                raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, brighten(color), LightTexture.FULL_BRIGHT);
             } else {
-                ring(pose, vc, u0, v0, u1, v1, dim(color), packedLight, ringW);
+                ring(pose, vc, u0, v0, u1, v1, LAYER, dim(color), packedLight, ringW);
             }
         } else if (app.active()) {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
+            raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, brighten(color), LightTexture.FULL_BRIGHT);
         } else {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, dim(color), packedLight);
+            raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, dim(color), packedLight);
         }
     }
 
@@ -363,8 +385,10 @@ public final class TabletScreenRenderer {
         int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
 
         fillRect(pose, vc, u0, v0, u1, v1, LAYER, theme.screenTrack, packedLight);
+        // Rows read as raised plaques, like the GUI's list rows
+        raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
 
-        // Icon chip in the app's color, left end
+        // Icon chip in the app's color, left end (flat — color IS the content)
         fillRect(pose, vc, u0, v0, u0 + rowH, v1, LAYER * 2,
                 on ? brighten(color) : dim(color), stateLight);
 
@@ -387,6 +411,9 @@ public final class TabletScreenRenderer {
                 // higher-contrast themes)
                 fillRect(pose, vc, tu0, tv0, knob + KNOB_W / 2f, tv1, LAYER * 2.5f, theme.accentDim, stateLight);
             }
+            // Groove hairlines above the fill (2.5x), below the knob (3x)
+            insetGroove(pose, vc, tu0, tv0, su1, tv1, LAYER * 2.75f,
+                    theme.switchOff, packedLight);
             fillRect(pose, vc, knob, sv0, knob + KNOB_W, sv1, LAYER * 3,
                     on ? theme.accent : theme.textMuted, stateLight);
             return;
@@ -430,13 +457,60 @@ public final class TabletScreenRenderer {
         poseStack.popPose();
     }
 
-    /** Hollow ring — the momentary marker, matching the GUI's language. */
+    /** Hollow ring — momentary marker, bevel outlines, the glass frame. */
     private static void ring(PoseStack.Pose pose, VertexConsumer vc,
-                             float u0, float v0, float u1, float v1, int color, int light, float w) {
-        fillRect(pose, vc, u0, v0, u1, v0 + w, LAYER, color, light);
-        fillRect(pose, vc, u0, v1 - w, u1, v1, LAYER, color, light);
-        fillRect(pose, vc, u0, v0 + w, u0 + w, v1 - w, LAYER, color, light);
-        fillRect(pose, vc, u1 - w, v0 + w, u1, v1 - w, LAYER, color, light);
+                             float u0, float v0, float u1, float v1,
+                             float layer, int color, int light, float w) {
+        fillRect(pose, vc, u0, v0, u1, v0 + w, layer, color, light);
+        fillRect(pose, vc, u0, v1 - w, u1, v1, layer, color, light);
+        fillRect(pose, vc, u0, v0 + w, u0 + w, v1 - w, layer, color, light);
+        fillRect(pose, vc, u1 - w, v0 + w, u1, v1 - w, layer, color, light);
+    }
+
+    // ---- World chrome (1.5.1) ----------------------------------------
+    // Quad EMULATION of the GUI chrome — never sample the atlas here (a
+    // second RenderType mid-pass ends the shared batch; art bevels alias
+    // at 2-texel tiles). Hairline layers: frame 0.5x, plaque bevels 1.5x,
+    // list groove 2.75x, grid groove 3.25x — between the existing quads,
+    // below icons (3.5x) and text (4x).
+
+    /** Bevel/groove hairlines skip cells this small — they'd shimmer. */
+    private static final float MIN_BEVEL_CELL = 1.2f;
+
+    /**
+     * Raised-plaque hairlines over a plate drawn at {@code LAYER}: thin
+     * outline ring, highlight along top+left, shadow along bottom+right —
+     * the GUI tile/plaque look, colors derived from the plate's own color
+     * so every state (active glow, dim, momentary held) and theme matches.
+     */
+    private static void raisedBevel(PoseStack.Pose pose, VertexConsumer vc,
+                                    float u0, float v0, float u1, float v1,
+                                    float layer, int base, int light) {
+        float size = Math.min(u1 - u0, v1 - v0);
+        if (size < MIN_BEVEL_CELL) return;
+        float bw = Mth.clamp(size * 0.09f, 0.12f, 0.35f);
+        float ow = bw * 0.5f;
+        int hi = brighten(base);
+        int lo = shade(base, 0.55f);
+        ring(pose, vc, u0, v0, u1, v1, layer, shade(base, 0.35f), light, ow);
+        fillRect(pose, vc, u0 + ow, v0 + ow, u1 - ow, v0 + ow + bw, layer, hi, light);
+        fillRect(pose, vc, u0 + ow, v0 + ow + bw, u0 + ow + bw, v1 - ow, layer, hi, light);
+        fillRect(pose, vc, u0 + ow + bw, v1 - ow - bw, u1 - ow, v1 - ow, layer, lo, light);
+        fillRect(pose, vc, u1 - ow - bw, v0 + ow + bw, u1 - ow, v1 - ow - bw, layer, lo, light);
+    }
+
+    /**
+     * Inset-groove hairlines over a slider track (and its fill): shadow
+     * along the top, light lip along the bottom — the GUI's recessed
+     * slider groove. Spans the full track so the groove reads even where
+     * the fill covers it, like the GUI's tinted-art fill does.
+     */
+    private static void insetGroove(PoseStack.Pose pose, VertexConsumer vc,
+                                    float u0, float v0, float u1, float v1,
+                                    float layer, int base, int light) {
+        float gh = Mth.clamp((v1 - v0) * 0.22f, 0.08f, 0.18f);
+        fillRect(pose, vc, u0, v0, u1, v0 + gh, layer, shade(base, 0.45f), light);
+        fillRect(pose, vc, u0, v1 - gh, u1, v1, layer, brighten(base), light);
     }
 
     /** One texel-space rect as a quad at the given layer height. */
@@ -475,6 +549,14 @@ public final class TabletScreenRenderer {
         int r = ((argb >> 16) & 0xFF) * 2 / 5;
         int g = ((argb >> 8) & 0xFF) * 2 / 5;
         int b = (argb & 0xFF) * 2 / 5;
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    /** Scale RGB by an arbitrary factor — bevel shadow/outline shades. */
+    private static int shade(int argb, float f) {
+        int r = (int) (((argb >> 16) & 0xFF) * f);
+        int g = (int) (((argb >> 8) & 0xFF) * f);
+        int b = (int) ((argb & 0xFF) * f);
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 }
