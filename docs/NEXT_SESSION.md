@@ -3,9 +3,23 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-16, end of night)
-- **v1.5.1 is the current release** (tagged, pushed, uploaded). The two
-  releases of the evening:
+## Status (2026-07-17, morning)
+- **v1.5.2 is the current release** — tester-feedback batch, dev-tested
+  by the user in a live session:
+  - Grid tiles restyled to the list rows' plaque+chip structure on BOTH
+    surfaces (GUI + placed screen; dense placed grids under 2.6 texels
+    per cell keep classic full-color pips). Slider numerals are corner
+    badges drawn in a raised layer (GUI z+200 / world y=0.011 — 3D block
+    icons have real depth and buried them at the old layers). Faint
+    accent outline on powered placed tiles.
+  - New AVIONICS theme ("Avionics" — navy/steel-blue/cyan flight-computer
+    look from a tester screenshot). Registrar "8"→"9".
+  - One-item frequencies (requested by migdzy): the editor now accepts a
+    single staged item in either slot; `Frequency.anyIcon()`/`isPair()`
+    cover the icon fallbacks. Wire/NBT needed no changes.
+- Earlier releases:
+- **v1.5.1** (tagged, pushed, uploaded). The two
+  releases of that evening:
   - **1.5.0** — Create-style UI overhaul of all three GUI screens
     (chrome atlas via `./gradlew chromeTool`, `client/screen/chrome/`
     layer; ALL chrome theme-tinted — borders tint with `bodyOuter`, the

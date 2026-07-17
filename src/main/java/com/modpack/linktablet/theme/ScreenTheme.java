@@ -66,7 +66,16 @@ public enum ScreenTheme implements StringRepresentable {
             0xFF54402C, 0xFFF2E8C9,
             0xFFEADFBE, 0xFFF7EFD6, 0xFFDECFA8, 0xFFF7EFD6,
             0xFF3B2A18, 0xFF6E5B40, 0xFF9C8A68, 0xFF4F3A22,
-            0xFF2E9DD8, 0xFF1F6E9C, 0xFFC9B98F);
+            0xFF2E9DD8, 0xFF1F6E9C, 0xFFC9B98F),
+
+    /** 1.5.2 "Avionics": flight-computer terminal look requested by the
+     * testers — deep navy panels, steel-blue frames, cyan accent. */
+    AVIONICS("avionics",
+            0xFF16294A, 0xFF090E1A, 0xFF20335A,
+            0xFF44618F, 0xFF0D1526,
+            0xFF16243E, 0xFF20345A, 0xFF101B30, 0xFF28406B,
+            0xFFC5D7F2, 0xFF7E95BC, 0xFF48587A, 0xFFA6C1E8,
+            0xFF3EC6E8, 0xFF1E6E96, 0xFF24355A);
 
     public static final Codec<ScreenTheme> CODEC = StringRepresentable.fromEnum(ScreenTheme::values);
     /** ByteBuf-based, so it slots into both component sync and payload composites.

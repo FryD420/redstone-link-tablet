@@ -20,7 +20,7 @@
   "gui.linktablet.edit_app.frequency": "Frequency",
   "gui.linktablet.edit_app.frequencies": "Frequencies",
   "gui.linktablet.edit_app.add_frequency": "Add",
-  "gui.linktablet.edit_app.no_frequencies": "Pick two items, then hit Add.",
+  "gui.linktablet.edit_app.no_frequencies": "Pick one or two items, then hit Add.",
   "gui.linktablet.edit_app.chip_remove": "Click to remove this frequency",
   "gui.linktablet.edit_app.momentary": "Momentary",
   "gui.linktablet.edit_app.momentary.tooltip": "Transmits only while the button is held down. Click to change the app type.",
@@ -59,5 +59,6 @@
   "gui.linktablet.theme.brass": "Brass",
   "gui.linktablet.theme.terminal": "Terminal",
   "gui.linktablet.theme.purple": "PurpleFox",
-  "gui.linktablet.theme.create": "Parchment"
+  "gui.linktablet.theme.create": "Parchment",
+  "gui.linktablet.theme.avionics": "Avionics"
 }

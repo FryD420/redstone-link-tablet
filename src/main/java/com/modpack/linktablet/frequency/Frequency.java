@@ -77,6 +77,16 @@ public record Frequency(ItemStack stack1, ItemStack stack2) {
         return stack2.copy();
     }
 
+    /** First non-empty item — icon fallback for one-item frequencies. */
+    public ItemStack anyIcon() {
+        return stack1.isEmpty() ? icon2() : icon1();
+    }
+
+    /** Whether both slots are set (single-item frequencies are valid). */
+    public boolean isPair() {
+        return !stack1.isEmpty() && !stack2.isEmpty();
+    }
+
     public boolean isEmpty() {
         return stack1.isEmpty() && stack2.isEmpty();
     }

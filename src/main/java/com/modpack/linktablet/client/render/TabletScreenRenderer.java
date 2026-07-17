@@ -191,7 +191,8 @@ public final class TabletScreenRenderer {
             } else {
                 float u0 = tileU0(i % grid.cols(), tileW);
                 float v0 = tileV0(i / grid.cols(), tileH);
-                renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, app, color, packedLight, ringW, held);
+                renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, app, color, theme,
+                        packedLight, ringW, held, labelZone);
             }
         }
         for (int i = 0; i < count; i++) {
@@ -207,7 +208,13 @@ public final class TabletScreenRenderer {
             } else {
                 cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
                 cv = tileV0(i / grid.cols(), tileH) + (tileH - labelZone) / 2f;
-                size = Mth.clamp(Math.min(tileW, tileH - labelZone) * ICON_FRAC, ICON_MIN, ICON_MAX);
+                float cell = Math.min(tileW, tileH - labelZone);
+                if (cell >= CHIP_MIN_CELL) {
+                    // Icon fills the inset chip exactly, like the list rows
+                    size = Math.min(cell - 2 * chipInset(cell), ICON_MAX);
+                } else {
+                    size = Mth.clamp(cell * ICON_FRAC, ICON_MIN, ICON_MAX);
+                }
                 if (app.momentary()) size *= MOMENTARY_ICON_FRAC;
             }
             renderIcon(poseStack, buffers, app.iconStack(), cu, cv, size, light);
@@ -258,19 +265,30 @@ public final class TabletScreenRenderer {
             }
         }
         if (!list) {
-            // Slider level numerals, right-aligned under the value strip
-            // (outlined: they sit on the app's own tile color)
+            // Slider level numerals, stack-count style on the chip's
+            // bottom-right corner (outlined, drawn in the raised text
+            // layer so block icons can't cover them); dense classic pips
+            // keep the old under-the-strip badge
             for (int i = 0; i < count; i++) {
                 SignalApp app = apps.get(i);
                 if (!app.slider()) continue;
                 String level = String.valueOf(app.strength());
                 float u0 = tileU0(i % grid.cols(), tileW);
                 float v0 = tileV0(i / grid.cols(), tileH);
-                float inset = TabletScreenMath.sliderInset(tileW);
                 float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
                 float levelW = font.width(level) * numH / FONT_LINE;
-                drawLabel(poseStack, buffers, font, level,
-                        u0 + tileW - inset - levelW, v0 + inset + sliderBarH(tileH) + 0.25f,
+                float cell = Math.min(tileW, tileH - labelZone);
+                float u, v;
+                if (cell >= CHIP_MIN_CELL) {
+                    float half = (cell - 2 * chipInset(cell)) / 2f;
+                    u = u0 + tileW / 2f + half - levelW;
+                    v = v0 + (tileH - labelZone) / 2f + half - numH;
+                } else {
+                    float inset = TabletScreenMath.sliderInset(tileW);
+                    u = u0 + tileW - inset - levelW;
+                    v = v0 + inset + sliderBarH(tileH) + 0.25f;
+                }
+                drawLabel(poseStack, buffers, font, level, u, v,
                         numH / 16f / FONT_LINE, false, true, 0xFFFFFFFF, bgLight);
             }
         }
@@ -311,7 +329,11 @@ public final class TabletScreenRenderer {
                                   String name, float u, float topV, float scale,
                                   boolean centered, boolean outline, int color, int light) {
         poseStack.pushPose();
-        poseStack.translate(u / 16f, 0.004f, topV / 16f);
+        // Text rides well above the icon pass: GUI-transformed block
+        // models keep real depth even squashed (front faces reach ~0.009
+        // at the 6-texel icon cap), so anything lower gets buried under
+        // block icons — the world-side twin of the GUI's z-200 lift.
+        poseStack.translate(u / 16f, 0.011f, topV / 16f);
         poseStack.mulPose(Axis.XP.rotationDegrees(90));
         poseStack.scale(scale, scale, scale);
         float x = centered ? -font.width(name) / 2f : 0f;
@@ -328,11 +350,33 @@ public final class TabletScreenRenderer {
     /** Neutral dark track behind slider value bars (no theme in this path). */
     private static final int SLIDER_TRACK = 0xFF14161C;
 
-    /** Grid entry: colored plate, glow border = state (icon drawn later). */
+    /** Minimum tile cell (texels) for the plaque+chip tile look; smaller
+     * cells keep the classic full-color pip — a chip inset would crowd
+     * the icon below readability on dense grids. */
+    private static final float CHIP_MIN_CELL = 2.6f;
+
+    /** Chip inset from its cell — the list chip's 1/6 proportion. */
+    private static float chipInset(float cell) {
+        return Mth.clamp(cell / 6f, 0.3f, 1.2f);
+    }
+
+    /**
+     * Grid entry (icon drawn later). Big-enough tiles get the list rows'
+     * structure — themed plaque with an inset app-color chip
+     * ({@link #renderChipTile}); dense grids keep the classic pip where
+     * the whole cell is the app color.
+     */
     private static void renderPip(PoseStack.Pose pose, VertexConsumer vc,
                                   float u0, float v0, float u1, float v1,
-                                  SignalApp app, int color, int packedLight, float ringW,
-                                  boolean held) {
+                                  SignalApp app, int color, ScreenTheme theme,
+                                  int packedLight, float ringW, boolean held,
+                                  float labelZone) {
+        float cell = Math.min(u1 - u0, v1 - v0 - labelZone);
+        if (cell >= CHIP_MIN_CELL) {
+            renderChipTile(pose, vc, u0, v0, u1, v1, app, color, theme,
+                    packedLight, ringW, held, labelZone, cell);
+            return;
+        }
         if (app.slider()) {
             // Plate lights with any output; a top strip shows the value
             boolean on = app.strength() > 0;
@@ -370,6 +414,60 @@ public final class TabletScreenRenderer {
         } else {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, dim(color), packedLight);
             raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, dim(color), packedLight);
+        }
+    }
+
+    /**
+     * Grid tile as a themed plaque with an inset app-color chip — the
+     * list rows' look (and the GUI grid's). The chip centers on the icon
+     * center (labels reserve the tile bottom) and carries the state:
+     * bright + full-bright when on, dim otherwise, hollow ring while a
+     * momentary app is unheld. Slider value strips keep their exact
+     * pre-chip geometry — {@code TabletScreenMath.sliderBarU} maps drags
+     * against it — so the chip sits at LAYER*1.75, under the strip (2x)
+     * it can graze on small tiles.
+     */
+    private static void renderChipTile(PoseStack.Pose pose, VertexConsumer vc,
+                                       float u0, float v0, float u1, float v1,
+                                       SignalApp app, int color, ScreenTheme theme,
+                                       int packedLight, float ringW, boolean held,
+                                       float labelZone, float cell) {
+        boolean on = (app.active() && !app.momentary()) || held;
+        int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
+        fillRect(pose, vc, u0, v0, u1, v1, LAYER, theme.screenTrack, packedLight);
+        raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
+        if (on) {
+            // Faint powered outline hugging the tile edge — the GUI's
+            // accent glow border brought in-world (hairline, full-bright)
+            ring(pose, vc, u0, v0, u1, v1, LAYER * 1.75f, theme.accent,
+                    LightTexture.FULL_BRIGHT, 0.12f);
+        }
+
+        float half = (cell - 2 * chipInset(cell)) / 2f;
+        float cu = (u0 + u1) / 2f;
+        float cv = v0 + (v1 - v0 - labelZone) / 2f;
+        if (app.momentary() && !held) {
+            ring(pose, vc, cu - half, cv - half, cu + half, cv + half, LAYER * 1.75f,
+                    dim(color), packedLight, ringW);
+        } else {
+            fillRect(pose, vc, cu - half, cv - half, cu + half, cv + half, LAYER * 1.75f,
+                    on ? brighten(color) : dim(color), stateLight);
+        }
+
+        if (app.slider()) {
+            float inset = TabletScreenMath.sliderInset(u1 - u0);
+            float barH = sliderBarH(v1 - v0);
+            float bu0 = u0 + inset;
+            float bu1 = u1 - inset;
+            float bv0 = v0 + inset;
+            fillRect(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 2, SLIDER_TRACK, packedLight);
+            if (app.strength() > 0) {
+                float fill = bu0 + (bu1 - bu0) * app.fillFraction();
+                fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
+                        brighten(color), LightTexture.FULL_BRIGHT);
+            }
+            insetGroove(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 3.25f,
+                    SLIDER_TRACK, packedLight);
         }
     }
 
@@ -475,8 +573,8 @@ public final class TabletScreenRenderer {
     // Quad EMULATION of the GUI chrome — never sample the atlas here (a
     // second RenderType mid-pass ends the shared batch; art bevels alias
     // at 2-texel tiles). Hairline layers: frame 0.5x, plaque bevels 1.5x,
-    // list groove 2.75x, grid groove 3.25x — between the existing quads,
-    // below icons (3.5x) and text (4x).
+    // grid chip 1.75x, list groove 2.75x, grid groove 3.25x — between the
+    // existing quads, below icons (3.5x) and text (4x).
 
     /** Bevel/groove hairlines skip cells this small — they'd shimmer. */
     private static final float MIN_BEVEL_CELL = 1.2f;

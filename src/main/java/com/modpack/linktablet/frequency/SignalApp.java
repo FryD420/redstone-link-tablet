@@ -137,11 +137,12 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
         return frequencies.isEmpty() ? Frequency.EMPTY : frequencies.getFirst();
     }
 
-    /** Icon stack to render; falls back to the first frequency item. */
+    /** Icon stack to render; falls back to the first frequency's first
+     * non-empty item (single-item frequencies may only fill slot 2). */
     public ItemStack iconStack() {
         return icon.map(id -> new ItemStack(BuiltInRegistries.ITEM.get(id)))
                 .filter(s -> !s.isEmpty())
-                .orElseGet(() -> primaryFrequency().icon1());
+                .orElseGet(() -> primaryFrequency().anyIcon());
     }
 
     public boolean hasCustomIcon() {

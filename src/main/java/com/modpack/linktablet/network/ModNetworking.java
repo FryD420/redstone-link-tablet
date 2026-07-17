@@ -277,7 +277,8 @@ public class ModNetworking {
         // "8": 1.5.0 — ScreenTheme gained CREATE ("Parchment"), growing
         // SetThemePayload's ordinal domain, and SignalApp gained
         // sliderMin/sliderMax on the wire.
-        PayloadRegistrar registrar = event.registrar("8");
+        // "9": 1.5.2 — ScreenTheme gained AVIONICS.
+        PayloadRegistrar registrar = event.registrar("9");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);

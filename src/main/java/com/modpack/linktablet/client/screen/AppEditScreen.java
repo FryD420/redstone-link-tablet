@@ -222,12 +222,14 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         UISounds.tick(1.3F);
     }
 
-    private boolean stagedComplete() {
-        return !staged(0).isEmpty() && !staged(1).isEmpty();
+    /** A frequency needs at least ONE staged item — like Create's own
+     * links, the second slot may stay empty (tester request, 1.5.2). */
+    private boolean stagedValid() {
+        return !staged(0).isEmpty() || !staged(1).isEmpty();
     }
 
     private void commitStagedFrequency() {
-        if (!stagedComplete() || frequencies.size() >= SignalApp.MAX_FREQUENCIES) return;
+        if (!stagedValid() || frequencies.size() >= SignalApp.MAX_FREQUENCIES) return;
         Frequency freq = Frequency.of(staged(0), staged(1));
         if (!frequencies.contains(freq)) {
             frequencies.add(freq);
@@ -238,7 +240,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     }
 
     private void save() {
-        // Classic flow: a completed staged pair counts without pressing Add
+        // Classic flow: staged items count without pressing Add
         commitStagedFrequency();
         if (frequencies.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
@@ -260,9 +262,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
     @Override
     protected void containerTick() {
-        // Need at least one committed or fully staged frequency to save
-        saveButton.active = !frequencies.isEmpty() || stagedComplete();
-        addFreqButton.active = stagedComplete() && frequencies.size() < SignalApp.MAX_FREQUENCIES;
+        // Need at least one committed or staged frequency to save
+        saveButton.active = !frequencies.isEmpty() || stagedValid();
+        addFreqButton.active = stagedValid() && frequencies.size() < SignalApp.MAX_FREQUENCIES;
     }
 
     private int chipX(int i) {
@@ -505,7 +507,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         }
 
         // Icon slot content (default = show first frequency's item dimmed)
-        ItemStack defaultIcon = frequencies.isEmpty() ? staged(0) : frequencies.getFirst().icon1();
+        ItemStack defaultIcon = frequencies.isEmpty()
+                ? (staged(0).isEmpty() ? staged(1) : staged(0))
+                : frequencies.getFirst().anyIcon();
         if (iconItem.isPresent()) {
             graphics.renderItem(new ItemStack(iconItem.get()), rightX + 4, top + 30);
         } else if (!defaultIcon.isEmpty()) {

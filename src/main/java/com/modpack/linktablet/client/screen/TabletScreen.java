@@ -47,6 +47,15 @@ public class TabletScreen extends Screen {
     static final int TILE_GAP = 8;
     static final int MAX_COLUMNS = 4;
 
+    /** App-color chip inset inside a grid tile — the list rows'
+     * chip-in-plaque structure at tile scale (1/6 of the span, like the
+     * list chip's 4px-in-24 margin). */
+    private static final int CHIP_INSET = 7;
+
+    /** Grid slider bar inset from the tile edge (bar runs along the chip
+     * bottom); {@link #sliderSpan} maps drags against this exact span. */
+    private static final int GRID_BAR_INSET = 9;
+
     /** Grid row height: tile + name label + gap. */
     static final int ROW_STRIDE = TILE_SIZE + TILE_GAP + 12;
 
@@ -541,42 +550,58 @@ public class TabletScreen extends Screen {
             graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
         }
 
+        // Themed tile with the app color as an inset chip — the list rows'
+        // plaque+chip structure (the color is the content, not the button)
+        Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, hovered ? theme.rowBgHover : theme.rowBg);
         int color = app.color() | 0xFF000000;
-        Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, color);
-        if (hovered) {
-            graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, 0x22FFFFFF);
-        }
+        int chipX0 = x + CHIP_INSET;
+        int chipY0 = y + CHIP_INSET;
+        int chipX1 = x + TILE_SIZE - CHIP_INSET;
+        int chipY1 = y + TILE_SIZE - CHIP_INSET;
+        graphics.fill(chipX0, chipY0, chipX1, chipY1, color);
 
-        // Icon: custom item, or the first frequency pair drawn overlapping
-        if (app.hasCustomIcon()) {
-            graphics.renderItem(app.iconStack(), x + (TILE_SIZE - 16) / 2, y + (TILE_SIZE - 16) / 2 - 2);
+        // Icon centered on the chip: custom item, or the first frequency
+        // pair drawn overlapping (a one-item frequency renders centered
+        // like a custom icon). Sliders sit higher — the value bar runs
+        // along the chip bottom.
+        int iy = app.slider() ? y + 10 : y + (TILE_SIZE - 16) / 2;
+        if (app.hasCustomIcon() || !app.primaryFrequency().isPair()) {
+            graphics.renderItem(app.iconStack(), x + (TILE_SIZE - 16) / 2, iy);
         } else {
             int cx = x + TILE_SIZE / 2;
-            int iy = y + (TILE_SIZE - 16) / 2 - 2;
             graphics.renderItem(app.primaryFrequency().icon1(), cx - 14, iy);
             graphics.renderItem(app.primaryFrequency().icon2(), cx - 2, iy);
             drawFreqPairMarkers(graphics, cx, iy);
         }
 
         if (app.slider()) {
-            // Value bar along the tile bottom; the value replaces the pip
-            int tx0 = x + 4;
-            int tx1 = x + TILE_SIZE - 4;
-            int ty = y + TILE_SIZE - 9;
-            graphics.fill(tx0, ty, tx1, ty + 5, theme.switchOff);
+            // Value bar along the chip bottom; the value replaces the pip
+            int tx0 = x + GRID_BAR_INSET;
+            int tx1 = x + TILE_SIZE - GRID_BAR_INSET;
+            int ty = chipY1 - 6;
+            graphics.fill(tx0, ty, tx1, ty + 4, theme.switchOff);
             if (app.strength() > 0) {
                 int fill = tx0 + Math.round((tx1 - tx0) * app.fillFraction());
-                graphics.fill(tx0, ty, fill, ty + 5, theme.accent);
+                graphics.fill(tx0, ty, fill, ty + 4, theme.accent);
             }
-            graphics.drawString(font, String.valueOf(app.strength()),
-                    x + TILE_SIZE - 4 - font.width(String.valueOf(app.strength())), y + 4,
+            // Level readout stack-count style: chip bottom-right, above the
+            // bar. Z-lifted like vanilla stack counts so the 3D block icon
+            // can't cover it.
+            String level = String.valueOf(app.strength());
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 200);
+            graphics.drawString(font, level, chipX1 - 2 - font.width(level), ty - 9,
                     0xFFE2E5EB, true);
+            graphics.pose().popPose();
         } else {
-            // ON/OFF pip; momentary apps get a hollow ring (solid while held)
+            // ON/OFF pip on the chip corner; momentary apps get a hollow
+            // ring (solid while held)
+            int px = chipX1 - 6;
+            int py = chipY0 + 2;
             int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
-            graphics.fill(x + TILE_SIZE - 8, y + 4, x + TILE_SIZE - 4, y + 8, pipColor);
+            graphics.fill(px, py, px + 4, py + 4, pipColor);
             if (app.momentary() && !held) {
-                graphics.fill(x + TILE_SIZE - 7, y + 5, x + TILE_SIZE - 5, y + 7, app.color() | 0xFF000000);
+                graphics.fill(px + 1, py + 1, px + 3, py + 3, color);
             }
         }
 
@@ -827,7 +852,7 @@ public class TabletScreen extends Screen {
             return new int[]{right - LIST_SLIDER_W, right};
         }
         int x = entryX(index);
-        return new int[]{x + 4, x + TILE_SIZE - 4};
+        return new int[]{x + GRID_BAR_INSET, x + TILE_SIZE - GRID_BAR_INSET};
     }
 
     private int sliderValueFromMouse(int index, double mouseX) {

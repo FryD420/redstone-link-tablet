@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.5.2 — 2026-07-17
+
+- Grid tiles now match the list rows' look on both the GUI and the
+  placed screen: a themed plaque button with the app color inset as a
+  chip behind the icon, instead of the color flooding the whole tile.
+  The densest placed-screen grids (13+ apps portrait) keep the classic
+  full-color pips — chips that small would crowd out the icons.
+- Powered apps on placed tablets get a faint glowing outline around
+  their tile, echoing the GUI's accent border.
+- Slider tiles show their level as a stack-count style number on the
+  chip's corner, and it now always draws on top — block icons could
+  previously cover it on both the GUI and the placed screen.
+- New theme: "Avionics" — deep navy panels, steel-blue frames, and a
+  cyan accent, styled after a flight computer (tester request).
+- Frequencies can now use just one item: stage a single item in either
+  slot and hit Add — matching Create's own links, where the second slot
+  may stay empty (requested by migdzy). One-item frequencies render
+  their lone item centered on the app tile.
+- Note for servers: the network protocol version changed — 1.5.2
+  clients and servers don't pair with 1.5.1 or older.
+
 ## 1.5.1 — 2026-07-16
 
 - The placed tablet's screen now matches the 1.5.0 GUI look: app tiles
