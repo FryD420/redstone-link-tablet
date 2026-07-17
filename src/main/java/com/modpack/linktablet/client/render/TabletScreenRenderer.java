@@ -198,16 +198,28 @@ public final class TabletScreenRenderer {
             renderIcon(poseStack, buffers, app.iconStack(), cu, cv, size, light);
         }
         // Text pass (third): big-tile labels in grid mode, row names in
-        // list mode.
+        // list mode, slider level numerals in both.
         Font font = Minecraft.getInstance().font;
         if (list) {
             float scale = LIST_TEXT_H / 16f / FONT_LINE;
-            // Between the icon chip and the switch
+            // Between the icon chip and the switch; slider rows have a
+            // wider track plus the level numeral, so budget per row
             float textU0 = TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
-            float textU1 = u1 - SPACE - SWITCH_MARGIN - SWITCH_W - 0.4f;
-            int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
             for (int i = 0; i < count; i++) {
-                FittedLabel label = fitLabel(font, apps.get(i).name(), maxPx);
+                SignalApp app = apps.get(i);
+                float controlU0 = u1 - SPACE - SWITCH_MARGIN
+                        - (app.slider() ? SWITCH_W * 1.6f : SWITCH_W);
+                float textU1 = controlU0 - 0.4f;
+                if (app.slider()) {
+                    String level = String.valueOf(app.strength());
+                    float levelW = font.width(level) * LIST_TEXT_H / FONT_LINE;
+                    float levelTop = listV0(i, rowH) + (rowH - LIST_TEXT_H) / 2f;
+                    drawLabel(poseStack, buffers, font, level, controlU0 - 0.3f - levelW,
+                            levelTop, scale, false, false, theme.textPrimary, bgLight);
+                    textU1 = controlU0 - 0.6f - levelW;
+                }
+                int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
+                FittedLabel label = fitLabel(font, app.name(), maxPx);
                 if (label.text().isBlank()) continue;
                 float top = listV0(i, rowH) + (rowH - LIST_TEXT_H * label.fit()) / 2f;
                 // Plain text: rows sit on the themed track, no outline needed
@@ -230,7 +242,29 @@ public final class TabletScreenRenderer {
                         true, true, 0xFFFFFFFF, bgLight);
             }
         }
+        if (!list) {
+            // Slider level numerals, right-aligned under the value strip
+            // (outlined: they sit on the app's own tile color)
+            for (int i = 0; i < count; i++) {
+                SignalApp app = apps.get(i);
+                if (!app.slider()) continue;
+                String level = String.valueOf(app.strength());
+                float u0 = tileU0(i % grid.cols(), tileW);
+                float v0 = tileV0(i / grid.cols(), tileH);
+                float inset = TabletScreenMath.sliderInset(tileW);
+                float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
+                float levelW = font.width(level) * numH / FONT_LINE;
+                drawLabel(poseStack, buffers, font, level,
+                        u0 + tileW - inset - levelW, v0 + inset + sliderBarH(tileH) + 0.25f,
+                        numH / 16f / FONT_LINE, false, true, 0xFFFFFFFF, bgLight);
+            }
+        }
         poseStack.popPose();
+    }
+
+    /** Slider value-strip height — shared by the quad pass and the numeral pass. */
+    private static float sliderBarH(float tileH) {
+        return Mth.clamp(tileH * 0.18f, 0.25f, 0.6f);
     }
 
     /** Label after fitting: possibly ellipsized text + the scale multiplier applied. */
@@ -290,13 +324,13 @@ public final class TabletScreenRenderer {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER,
                     on ? color : dim(color), on ? LightTexture.FULL_BRIGHT : packedLight);
             float inset = TabletScreenMath.sliderInset(u1 - u0);
-            float barH = Mth.clamp((v1 - v0) * 0.18f, 0.25f, 0.6f);
+            float barH = sliderBarH(v1 - v0);
             float bu0 = u0 + inset;
             float bu1 = u1 - inset;
             float bv0 = v0 + inset;
             fillRect(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 2, SLIDER_TRACK, packedLight);
             if (on) {
-                float fill = bu0 + (bu1 - bu0) * app.strength() / SignalApp.MAX_STRENGTH;
+                float fill = bu0 + (bu1 - bu0) * app.fillFraction();
                 fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
                         brighten(color), LightTexture.FULL_BRIGHT);
             }
@@ -346,7 +380,7 @@ public final class TabletScreenRenderer {
             float tv0 = v0 + (rowH - SWITCH_H * 0.5f) / 2f;
             float tv1 = tv0 + SWITCH_H * 0.5f;
             fillRect(pose, vc, tu0, tv0, su1, tv1, LAYER * 2, theme.switchOff, packedLight);
-            float knob = tu0 + (su1 - tu0 - KNOB_W) * app.strength() / SignalApp.MAX_STRENGTH;
+            float knob = tu0 + (su1 - tu0 - KNOB_W) * app.fillFraction();
             if (app.strength() > 0) {
                 fillRect(pose, vc, tu0, tv0, knob + KNOB_W / 2f, tv1, LAYER * 2, theme.accentDim, stateLight);
             }

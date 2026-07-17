@@ -274,7 +274,10 @@ public class ModNetworking {
         // two full ItemStacks (component-bearing frequency items).
         // "7": slider apps — SignalApp gained the slider flag and
         // SetSliderPayload was added.
-        PayloadRegistrar registrar = event.registrar("7");
+        // "8": 1.5.0 — ScreenTheme gained CREATE ("Parchment"), growing
+        // SetThemePayload's ordinal domain, and SignalApp gained
+        // sliderMin/sliderMax on the wire.
+        PayloadRegistrar registrar = event.registrar("8");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- Create-style UI overhaul: the tablet home screen, app editor, and item
+  picker are rebuilt in the Stock Keeper's visual language — themed
+  canvas inside wooden rail frames, parchment plaques for tiles, rows,
+  and titles, chamfered banner buttons, and inset ink-well text fields.
+  Every layout, click target, and drag works exactly as before; the
+  placed tablet's in-world screen is untouched.
+- New theme: "Parchment" — cream surfaces, dark-brown text, and a
+  Create-blue accent, made for the new chrome.
+- Sliders now show their numeric signal level everywhere they render:
+  GUI list rows and both placed-screen layouts join the grid tile's
+  readout (bars and knobs track the slider's range; the number is always
+  the absolute 0–15 level).
+- Sliders can be limited to a min/max range: in the app editor, the
+  slider type's strength row becomes a "Range" row with two draggable
+  knobs. The slider then travels only between those levels — a minimum
+  above 0 means the signal never fully turns off (set the minimum to 0
+  to keep an off position). Existing sliders keep the full 0–15 range.
+- Note for servers: the network protocol version changed — 1.5.0 clients
+  and servers don't pair with 1.4.0.
+
 ## 1.4.0 — 2026-07-16
 
 - Frequencies now carry the full item — including its data components —

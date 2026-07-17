@@ -2,6 +2,9 @@ package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.UISounds;
+import com.modpack.linktablet.client.screen.chrome.Chrome;
+import com.modpack.linktablet.client.screen.chrome.ChromeButton;
+import com.modpack.linktablet.client.screen.chrome.ChromeEditBox;
 import com.modpack.linktablet.frequency.Frequency;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.menu.AppEditMenu;
@@ -37,6 +40,10 @@ import java.util.Optional;
  * Committed frequencies show as chips; clicking a chip removes it. The
  * all-items search picker lives in a {@link PickerOverlay} (a separate
  * Screen would kill the container session).
+ * <p>
+ * 1.5.0 chrome note: surfaces (panel, plaques, slots, banner buttons,
+ * tracks) blit the chrome atlas; mechanisms and the color swatches stay
+ * procedural fill() — see {@link Chrome}. Hit-test geometry unchanged.
  */
 public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
@@ -88,7 +95,11 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private boolean momentary = false;
     private boolean slider = false;
     private int strength = SignalApp.MAX_STRENGTH;
+    private int sliderMin = 0;
+    private int sliderMax = SignalApp.MAX_STRENGTH;
     private boolean draggingStrength = false;
+    /** Range-row knob being dragged: -1 none, 0 min, 1 max. */
+    private int draggingKnob = -1;
     private boolean colorPopupOpen = false;
 
     private Button saveButton;
@@ -109,6 +120,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             this.momentary = existing.momentary();
             this.slider = existing.slider();
             this.strength = existing.strength();
+            this.sliderMin = existing.sliderMin();
+            this.sliderMax = existing.sliderMax();
         } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
             // Half-set link prefill: commit the lone-item frequency directly
             this.frequencies.add(Frequency.of(menu.contentHolder.prefill1(), menu.contentHolder.prefill2()));
@@ -134,7 +147,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         picker = new PickerOverlay(font);
 
         String previousName = nameBox != null ? nameBox.getValue() : null;
-        nameBox = new EditBox(font, left + 8, top + 26, 150, 18,
+        // Inset by (4,5)/(w-8,h-10): painted ink-well footprint = the old
+        // bordered box's (left+8, top+26, 150, 18) rect (ChromeEditBox rule)
+        nameBox = new ChromeEditBox(font, left + 12, top + 31, 142, 8,
                 Component.translatable("gui.linktablet.edit_app.name"));
         nameBox.setMaxLength(SignalApp.MAX_NAME_LENGTH);
         if (previousName != null) {
@@ -149,43 +164,41 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         setInitialFocus(nameBox);
 
         // Commit the staged ghost pair to the frequency list
-        addFreqButton = Button.builder(
-                        Component.translatable("gui.linktablet.edit_app.add_frequency"),
-                        b -> commitStagedFrequency())
-                .bounds(left + 60, top + 58, 40, 20).build();
+        addFreqButton = new ChromeButton(left + 60, top + 58, 40, 20,
+                Component.translatable("gui.linktablet.edit_app.add_frequency"),
+                b -> commitStagedFrequency(), this::theme);
         addRenderableWidget(addFreqButton);
 
         // All-items search (for frequency items you don't carry)
-        Button searchButton = Button.builder(Component.literal("..."), b ->
-                        picker.open(width, height, this::stageFromPicker, false))
-                .bounds(left + 104, top + 58, 24, 20).build();
+        Button searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
+                Component.literal("..."), b ->
+                picker.open(width, height, this::stageFromPicker, false), this::theme);
         searchButton.setTooltip(Tooltip.create(Component.translatable("gui.linktablet.picker.search")));
         addRenderableWidget(searchButton);
 
         // Icon slot button (picker with a "use default" option)
-        addRenderableWidget(Button.builder(Component.literal(""), b ->
-                        picker.open(width, height, stack ->
-                                        iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
-                                true))
-                .bounds(left + RIGHT_COL, top + 26, 24, 24).build());
+        addRenderableWidget(new ChromeButton(left + RIGHT_COL, top + 26, 24, 24,
+                Component.literal(""), b ->
+                picker.open(width, height, stack ->
+                                iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
+                        true), this::theme));
 
         // Save / Cancel / Remove, right of the inventory block
-        saveButton = Button.builder(Component.translatable("gui.linktablet.edit_app.save"), b -> save())
-                .bounds(left + BTN_X, top + 146, BTN_W, 20).build();
+        saveButton = new ChromeButton(left + BTN_X, top + 146, BTN_W, 20,
+                Component.translatable("gui.linktablet.edit_app.save"), b -> save(), this::theme);
         addRenderableWidget(saveButton);
 
-        addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.cancel"),
-                        b -> onClose())
-                .bounds(left + BTN_X, top + 170, BTN_W, 20).build());
+        addRenderableWidget(new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
+                Component.translatable("gui.linktablet.edit_app.cancel"), b -> onClose(), this::theme));
 
         if (index != -1) {
-            addRenderableWidget(Button.builder(Component.translatable("gui.linktablet.edit_app.remove"), b -> {
-                        UISounds.delete();
-                        PacketDistributor.sendToServer(
-                                new ModNetworking.RemoveAppPayload(menu.contentHolder.target(), index));
-                        onClose();
-                    })
-                    .bounds(left + BTN_X, top + 194, BTN_W, 20).build());
+            addRenderableWidget(new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
+                    Component.translatable("gui.linktablet.edit_app.remove"), b -> {
+                UISounds.delete();
+                PacketDistributor.sendToServer(
+                        new ModNetworking.RemoveAppPayload(menu.contentHolder.target(), index));
+                onClose();
+            }, this::theme));
         }
     }
 
@@ -230,7 +243,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         if (frequencies.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
-        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength, color, icon, slider);
+        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength,
+                color, icon, slider, sliderMin, sliderMax);
         UISounds.confirm();
         PacketDistributor.sendToServer(
                 new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));
@@ -308,7 +322,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             } else if (momentary) {
                 momentary = false;
                 slider = true;
-                if (strength < 0) strength = 0;
+                strength = net.minecraft.util.Mth.clamp(strength, sliderMin, sliderMax);
             } else {
                 slider = false;
                 if (strength < 1) strength = 1;
@@ -317,11 +331,18 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             return true;
         }
 
-        // Strength slider
+        // Strength slider (toggle/hold) or min/max range row (slider apps)
         if (mouseX >= rightX - 2 && mouseX < rightX + TRACK_W + 4
                 && mouseY >= topPos + TRACK_Y - 6 && mouseY < topPos + TRACK_Y + 12) {
-            draggingStrength = true;
-            setStrengthFromMouse(mouseX);
+            if (slider) {
+                // Grab whichever range knob is nearer to the click
+                int v = trackValueFromMouse(mouseX);
+                draggingKnob = Math.abs(v - sliderMin) <= Math.abs(v - sliderMax) ? 0 : 1;
+                setRangeFromMouse(mouseX);
+            } else {
+                draggingStrength = true;
+                setStrengthFromMouse(mouseX);
+            }
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -330,6 +351,10 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (picker.isOpen()) return true;
+        if (draggingKnob != -1) {
+            setRangeFromMouse(mouseX);
+            return true;
+        }
         if (draggingStrength) {
             setStrengthFromMouse(mouseX);
             return true;
@@ -340,6 +365,12 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (picker.isOpen()) return true;
+        if (draggingKnob != -1) {
+            int landed = draggingKnob == 0 ? sliderMin : sliderMax;
+            draggingKnob = -1;
+            UISounds.tick(1.0F + landed / 15.0F);
+            return true;
+        }
         if (draggingStrength) {
             draggingStrength = false;
             UISounds.tick(1.0F + strength / 15.0F);
@@ -376,79 +407,56 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         return super.charTyped(codePoint, modifiers);
     }
 
-    /** Sliders may rest at 0 (off); the other types keep the 1..15 range. */
-    private int minStrength() {
-        return slider ? 0 : 1;
+    /** Toggle/hold strength: 1..15 along the track. */
+    private void setStrengthFromMouse(double mouseX) {
+        double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
+        strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
+                1, SignalApp.MAX_STRENGTH);
     }
 
-    private void setStrengthFromMouse(double mouseX) {
-        int min = minStrength();
+    /** Track position → absolute level 0..15 (the range row spans the full scale). */
+    private int trackValueFromMouse(double mouseX) {
         double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
-        strength = net.minecraft.util.Mth.clamp((int) Math.round(min + rel * (SignalApp.MAX_STRENGTH - min)),
-                min, SignalApp.MAX_STRENGTH);
+        return net.minecraft.util.Mth.clamp((int) Math.round(rel * SignalApp.MAX_STRENGTH),
+                0, SignalApp.MAX_STRENGTH);
+    }
+
+    /** Drags the grabbed range knob; min stays below max, live value stays inside. */
+    private void setRangeFromMouse(double mouseX) {
+        int v = trackValueFromMouse(mouseX);
+        if (draggingKnob == 0) {
+            sliderMin = Math.min(v, sliderMax - 1);
+        } else {
+            sliderMax = Math.max(v, sliderMin + 1);
+        }
+        strength = net.minecraft.util.Mth.clamp(strength, sliderMin, sliderMax);
+    }
+
+    /** Range-knob left edge on the track for an absolute level. */
+    private int rangeKnobX(int value) {
+        return leftPos + RIGHT_COL + value * (TRACK_W - 4) / SignalApp.MAX_STRENGTH;
     }
 
     // ---- Rendering -------------------------------------------------------
 
-    /** Slot cells + the red/blue staging frames, under the slot items. */
+    /** Panel + title plaque + slot cells + staging frames, under the slot items. */
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         ScreenTheme theme = theme();
+        // Body panel: y spans 1..239 in the 240-unit dev window (topPos=5)
+        Chrome.panel(graphics, leftPos - 5, topPos - 4, imageWidth + 10, imageHeight + 8, theme);
+        // Title plaque hung over the top rail (text drawn in renderLabels)
+        int titleW = font.width(title);
+        Chrome.plaque(graphics, leftPos + imageWidth / 2 - titleW / 2 - 6, topPos, titleW + 12, 16,
+                theme.rowBg);
         for (Slot slot : menu.slots) {
-            drawSlotCell(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, theme);
+            Chrome.slot(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, theme.rowBg);
         }
         // Staging slot accents (red/blue, like the Redstone Link's slots)
-        drawGhostFrame(graphics, leftPos + AppEditMenu.GHOST1_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+        Chrome.ghostRing(graphics, leftPos + AppEditMenu.GHOST1_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
                 TabletScreen.FREQ1_COLOR);
-        drawGhostFrame(graphics, leftPos + AppEditMenu.GHOST2_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+        Chrome.ghostRing(graphics, leftPos + AppEditMenu.GHOST2_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
                 TabletScreen.FREQ2_COLOR);
-    }
-
-    /**
-     * One 18px slot cell in the vanilla chest style: dark edge top+left,
-     * light edge bottom+right, mid interior — theme-tinted so every
-     * palette keeps the familiar inset grid.
-     */
-    private static void drawSlotCell(GuiGraphics graphics, int x, int y, ScreenTheme theme) {
-        int mid = theme.rowBg;
-        int dark = scale(mid, 50);
-        int light = towardWhite(mid, 35);
-        graphics.fill(x, y, x + 17, y + 1, dark);            // top
-        graphics.fill(x, y + 1, x + 1, y + 17, dark);        // left
-        graphics.fill(x + 17, y + 1, x + 18, y + 18, light); // right
-        graphics.fill(x + 1, y + 17, x + 17, y + 18, light); // bottom
-        graphics.fill(x + 1, y + 1, x + 17, y + 17, mid);    // interior
-        graphics.fill(x + 17, y, x + 18, y + 1, mid);        // corners
-        graphics.fill(x, y + 17, x + 1, y + 18, mid);
-    }
-
-    /** Scale RGB channels to the given percentage. */
-    private static int scale(int argb, int pct) {
-        int r = ((argb >> 16) & 0xFF) * pct / 100;
-        int g = ((argb >> 8) & 0xFF) * pct / 100;
-        int b = (argb & 0xFF) * pct / 100;
-        return (argb & 0xFF000000) | (r << 16) | (g << 8) | b;
-    }
-
-    /** Mix RGB channels the given percentage toward white. */
-    private static int towardWhite(int argb, int pct) {
-        int r = ((argb >> 16) & 0xFF);
-        int g = ((argb >> 8) & 0xFF);
-        int b = (argb & 0xFF);
-        r += (255 - r) * pct / 100;
-        g += (255 - g) * pct / 100;
-        b += (255 - b) * pct / 100;
-        return (argb & 0xFF000000) | (r << 16) | (g << 8) | b;
-    }
-
-    /** Slim 1px red/blue ring hugging a staging slot cell, faint tint inside. */
-    private static void drawGhostFrame(GuiGraphics graphics, int x, int y, int color) {
-        int size = 20;
-        graphics.fill(x, y, x + size, y + 1, color);
-        graphics.fill(x, y + size - 1, x + size, y + size, color);
-        graphics.fill(x, y + 1, x + 1, y + size - 1, color);
-        graphics.fill(x + size - 1, y + 1, x + size, y + size - 1, color);
-        graphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, (color & 0x00FFFFFF) | 0x18000000);
     }
 
     /** All static text, in image-local coordinates (labels sit a uniform 11px above their control). */
@@ -488,7 +496,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             boolean hovered = mouseX >= x && mouseX < x + CHIP_W && mouseY >= y && mouseY < y + CHIP_H;
             hoveredChip |= hovered;
 
-            graphics.fill(x, y, x + CHIP_W, y + CHIP_H, hovered ? 0xFF5A3038 : theme.rowBg);
+            Chrome.plaque(graphics, x, y, CHIP_W, CHIP_H, hovered ? 0xFF5A3038 : theme.rowBg);
             graphics.renderItem(freq.icon1(), x + 2, y + 1);
             graphics.renderItem(freq.icon2(), x + 18, y + 1);
             // Red/blue pair markers along the chip's bottom edge
@@ -515,39 +523,50 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
 
-        // App type row (click cycles): small accent square + current type
+        // App type row (click cycles): inset checkbox + current type
         int momY = top + MOMENTARY_Y;
-        graphics.fill(rightX, momY, rightX + CHECKBOX_SIZE, momY + CHECKBOX_SIZE, theme.switchOff);
-        graphics.fill(rightX + 1, momY + 1, rightX + CHECKBOX_SIZE - 1, momY + CHECKBOX_SIZE - 1, theme.bodyInner);
-        if (momentary || slider) {
-            graphics.fill(rightX + 3, momY + 3, rightX + CHECKBOX_SIZE - 3, momY + CHECKBOX_SIZE - 3, theme.accent);
-        }
+        Chrome.checkbox(graphics, rightX, momY, momentary || slider, theme);
         String typeKey = slider ? "gui.linktablet.edit_app.type.slider"
                 : momentary ? "gui.linktablet.edit_app.type.momentary"
                 : "gui.linktablet.edit_app.type.toggle";
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
 
-        // Strength slider ("initial value" for slider apps, which allow 0)
+        // Strength slider (toggle/hold) or the min/max range row (slider
+        // apps: two knobs on the full 0..15 scale, fill between them).
+        // Chrome track is 6px tall centered on the old 4px fill's rect;
+        // the hit-test rect is untouched.
         int trackY = top + TRACK_Y;
-        int min = minStrength();
-        graphics.drawString(font, Component.translatable(slider
-                        ? "gui.linktablet.edit_app.initial_value"
-                        : "gui.linktablet.edit_app.strength"),
-                rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
-        graphics.fill(rightX, trackY, rightX + TRACK_W, trackY + 4, theme.switchOff);
-        int handleX = rightX + (int) ((strength - min) / (float) (SignalApp.MAX_STRENGTH - min) * (TRACK_W - 4));
-        graphics.fill(rightX, trackY, handleX + 2, trackY + 4, theme.accentDim);
-        graphics.fill(handleX, trackY - 4, handleX + 4, trackY + 8, theme.textPrimary);
-        graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, trackY - 2,
-                theme.textPrimary, shadow);
+        if (slider) {
+            Component rangeLabel = Component.translatable("gui.linktablet.edit_app.range");
+            graphics.drawString(font, rangeLabel, rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
+            // Readout beside the label — right of the track there is no room
+            graphics.drawString(font, sliderMin + "-" + sliderMax,
+                    rightX + font.width(rangeLabel) + 6, top + STRENGTH_LABEL_Y,
+                    theme.textPrimary, shadow);
+            int minX = rangeKnobX(sliderMin);
+            int maxX = rangeKnobX(sliderMax);
+            Chrome.sliderTrack(graphics, rightX, trackY - 1, TRACK_W, theme.switchOff);
+            Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, minX + 2, maxX - minX, theme.accentDim);
+            Chrome.sliderKnob(graphics, minX - 2, trackY - 4, theme.textPrimary);
+            Chrome.sliderKnob(graphics, maxX - 2, trackY - 4, theme.accent);
+        } else {
+            graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
+                    rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
+            int handleX = rightX + (strength - 1) * (TRACK_W - 4) / (SignalApp.MAX_STRENGTH - 1);
+            Chrome.sliderTrack(graphics, rightX, trackY - 1, TRACK_W, theme.switchOff);
+            Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, rightX, handleX + 2 - rightX, theme.accentDim);
+            Chrome.sliderKnob(graphics, handleX - 2, trackY - 4, theme.textPrimary);
+            graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, trackY - 2,
+                    theme.textPrimary, shadow);
+        }
 
         // Color popup, z-lifted above the batched text/items so nothing
         // bleeds through it
         if (colorPopupOpen) {
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 300);
-            graphics.fill(rightX - 4, top + POPUP_Y - 4, rightX + POPUP_SIZE + 4, top + POPUP_Y + POPUP_SIZE + 4, theme.bodyOuter);
+            Chrome.panel(graphics, rightX - 8, top + POPUP_Y - 8, POPUP_SIZE + 16, POPUP_SIZE + 16, theme);
             for (int i = 0; i < COLORS.length; i++) {
                 int x = rightX + (i % 4) * POPUP_STRIDE;
                 int y = top + POPUP_Y + (i / 4) * POPUP_STRIDE;

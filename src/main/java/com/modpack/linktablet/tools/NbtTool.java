@@ -94,7 +94,8 @@ public final class NbtTool {
         tag.putString("id", "linktablet:tablet");
         SignalApp app = new SignalApp("Lamp",
                 List.of(Frequency.of(Items.REDSTONE_TORCH, Items.REDSTONE_TORCH)),
-                false, false, SignalApp.MAX_STRENGTH, 0xFFF9801D, Optional.empty(), false);
+                false, false, SignalApp.MAX_STRENGTH, 0xFFF9801D, Optional.empty(), false,
+                0, SignalApp.MAX_STRENGTH);
         SignalApp.CODEC.listOf().encodeStart(NbtOps.INSTANCE, List.of(app))
                 .result().ifPresent(t -> tag.put("apps", t));
         return tag;

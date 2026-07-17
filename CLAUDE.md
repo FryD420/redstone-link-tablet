@@ -54,7 +54,20 @@ transmit on Create's Redstone Link network.
   never duplicate the breakpoints.
 - Themes (1.3.0): `theme/ScreenTheme` — DARK must stay byte-identical to the
   pre-1.3.0 hardcoded colors and is never persisted (no component, no NBT),
-  so 1.2.x tablets stay untouched.
+  so 1.2.x tablets stay untouched. The theme STREAM_CODEC is ordinal-based:
+  append-only, and every appended constant needs a registrar bump (CREATE/
+  "Parchment" drove "7"→"8"). `textShadow` is derived from the id — light
+  surfaces (LIGHT, CREATE) opt out in the ctor.
+- GUI chrome (1.5.0): all screen SURFACES blit `textures/gui/chrome.png`
+  through `client/screen/chrome/Chrome`; region coords live ONLY in
+  `ChromeAtlas` (shared with the generator — regen the atlas with
+  `./gradlew chromeTool`, F3+T reloads it in a running client). Tinting is
+  shader-color multiply (`GuiGraphics.setColor`): surfaces are authored
+  near-white so theme/app colors multiply in; wood rails are full-color and
+  NEVER tinted. Mechanisms (switches, pips, glyphs, value bars, swatches)
+  stay procedural `fill()` on purpose. NineSlice TILES edges/centers (never
+  stretches). ChromeEditBox callers construct inset by (4,5)/(w-8,h-10) so
+  the painted ink-well matches the old bordered-EditBox rect.
 - Ponder 1.0.82 API is builder-style: `overlay().showControls(vec, Pointing,
   ticks).rightClick()` (no InputWindowElement); `Pointing` lives in
   `net.createmod.catnip.math`. Plugin registered via `PonderIndex.addPlugin`
@@ -89,6 +102,14 @@ transmit on Create's Redstone Link network.
 - Slider apps (1.4.0): `active` is DERIVED from `strength > 0` and never
   user-toggled — that's what keeps the transmitter collectors'
   `active && !momentary` rule working unchanged. `sanitized()` enforces it.
+  1.5.0 adds `sliderMin`/`sliderMax` (defaults 0/15, optionalFieldOf so old
+  NBT and untouched sliders serialize unchanged): `SignalApp.
+  valueFromFraction`/`fillFraction` are the ONLY drag→value and
+  value→bar-position mapping sites — every consumer (GUI drags,
+  BlockSliderDrag, TabletBlock click-to-set, both renderers) goes through
+  them. min > 0 means always transmitting (no off notch, user decision);
+  numerals always show ABSOLUTE strength while bars/knobs are
+  range-relative. `withSliderValue` clamps into the range server-side.
 - `TabletScreenMath` also owns the screen LAYOUT constants (SPACE, tile
   helpers, `sliderInset`, `sliderBarU`): the renderer draws through them and
   the slider drag maps the crosshair against them — three consumers, one

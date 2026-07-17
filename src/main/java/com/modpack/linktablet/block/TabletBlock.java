@@ -160,8 +160,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                             be.isScreenList(), be.getScreenRotation());
                     float frac = net.minecraft.util.Mth.clamp(
                             (pipHit.logicalU() - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
-                    SignalApp updated = app.withSliderValue(
-                            Math.round(frac * SignalApp.MAX_STRENGTH));
+                    SignalApp updated = app.withSliderValue(app.valueFromFraction(frac));
                     if (updated.strength() != app.strength()) {
                         boolean wasOn = app.strength() > 0;
                         List<SignalApp> updatedApps = new ArrayList<>(apps);

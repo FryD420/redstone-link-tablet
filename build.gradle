@@ -78,6 +78,13 @@ tasks.register('iconTool', JavaExec) {
     mainClass = 'com.modpack.linktablet.tools.IconTool'
 }
 
+// Dev-only GUI chrome-atlas generator, same rules as nbtTool. No args
+// needed — the output path defaults to textures/gui/chrome.png.
+tasks.register('chromeTool', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.modpack.linktablet.tools.ChromeTool'
+}
+
 tasks.named('jar', Jar) {
     exclude('com/modpack/linktablet/tools/**')
 }

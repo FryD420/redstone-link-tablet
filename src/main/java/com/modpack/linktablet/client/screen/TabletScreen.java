@@ -4,6 +4,7 @@ import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.UISounds;
+import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.menu.AppEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
@@ -32,6 +33,12 @@ import java.util.List;
  * </ul>
  * The tablet body sizes itself to its content (scrolling once it would
  * exceed the screen).
+ */
+/*
+ * 1.5.0 chrome note: SURFACES (body panel, plaques, tiles, rows, popup
+ * frames) blit the chrome atlas; MECHANISMS (switches, pips, glyphs,
+ * value bars, swatches, glow borders) stay procedural fill() — see
+ * Chrome's class javadoc. No hit-test geometry changed.
  */
 public class TabletScreen extends Screen {
 
@@ -350,15 +357,19 @@ public class TabletScreen extends Screen {
         int top = bodyTop();
         int bottom = top + bodyHeight();
 
-        // Tablet body
-        graphics.fill(left - 6, top - 2, left + pw + 6, bottom + 2, theme.bodyOuter);
-        graphics.fill(left - 4, top, left + pw + 4, bottom, theme.bodyInner);
+        // Tablet body: themed canvas inside an untinted wood rail frame
+        Chrome.panel(graphics, left - 6, top - 2, pw + 12, bodyHeight() + 4, theme);
 
         Component titleText = reorderMode
                 ? Component.translatable("gui.linktablet.reorder.title")
                 : title;
-        drawThemedCentered(graphics, titleText, width / 2, top + 12, theme.textPrimary);
+        // Title on a parchment plaque hung over the top rail, Stock-Keeper style
+        int titleW = font.width(titleText);
+        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
+        drawThemedCentered(graphics, titleText, width / 2, top + 7, theme.textPrimary);
         renderModeButtons(graphics, mouseX, mouseY);
+        // Wood crossbar between the header and the scrolling content
+        Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8);
 
         List<SignalApp> apps = apps();
 
@@ -416,8 +427,8 @@ public class TabletScreen extends Screen {
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 300);
-        graphics.fill(px - 4, py - 4, px + THEME_POPUP_W + 4, py + themes.length * THEME_ROW_H + 4,
-                current.bodyOuter);
+        Chrome.panel(graphics, px - 8, py - 8, THEME_POPUP_W + 16, themes.length * THEME_ROW_H + 16,
+                current);
         for (int i = 0; i < themes.length; i++) {
             ScreenTheme t = themes[i];
             int y = py + i * THEME_ROW_H;
@@ -518,7 +529,7 @@ public class TabletScreen extends Screen {
     /** Empty slot the dragged app was lifted out of. */
     private void renderPlaceholderTile(GuiGraphics graphics, int x, int y) {
         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
-        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, theme().surfaceLo);
+        Chrome.plaque(graphics, x, y, TILE_SIZE, TILE_SIZE, theme().surfaceLo);
     }
 
     private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered, boolean held) {
@@ -531,7 +542,7 @@ public class TabletScreen extends Screen {
         }
 
         int color = app.color() | 0xFF000000;
-        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, color);
+        Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, color);
         if (hovered) {
             graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, 0x22FFFFFF);
         }
@@ -554,7 +565,7 @@ public class TabletScreen extends Screen {
             int ty = y + TILE_SIZE - 9;
             graphics.fill(tx0, ty, tx1, ty + 5, theme.switchOff);
             if (app.strength() > 0) {
-                int fill = tx0 + (tx1 - tx0) * app.strength() / SignalApp.MAX_STRENGTH;
+                int fill = tx0 + Math.round((tx1 - tx0) * app.fillFraction());
                 graphics.fill(tx0, ty, fill, ty + 5, theme.accent);
             }
             graphics.drawString(font, String.valueOf(app.strength()),
@@ -594,7 +605,7 @@ public class TabletScreen extends Screen {
     private void renderAddTile(GuiGraphics graphics, int x, int y, boolean hovered) {
         ScreenTheme theme = theme();
         int bg = hovered ? theme.surfaceHi : theme.rowBg;
-        graphics.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, bg);
+        Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, bg);
         drawThemedCentered(graphics, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, theme.textMuted);
     }
 
@@ -641,14 +652,14 @@ public class TabletScreen extends Screen {
     /** Empty slot the dragged app was lifted out of. */
     private void renderPlaceholderRow(GuiGraphics graphics, int x, int y, int w) {
         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF5A6070);
-        graphics.fill(x, y, x + w, y + ROW_HEIGHT, theme().surfaceLo);
+        Chrome.plaque(graphics, x, y, w, ROW_HEIGHT, theme().surfaceLo);
     }
 
     private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
                               boolean hovered, boolean held) {
         ScreenTheme theme = theme();
         boolean lit = app.active() || held;
-        graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? theme.rowBgHover : theme.rowBg);
+        Chrome.plaque(graphics, x, y, w, ROW_HEIGHT, hovered ? theme.rowBgHover : theme.rowBg);
 
         // Colored icon chip
         graphics.fill(x + 4, y + 4, x + 20, y + 20, app.color() | 0xFF000000);
@@ -657,7 +668,8 @@ public class TabletScreen extends Screen {
         // Name (leave room for chip + switch/track + optional count tag)
         String countTag = app.frequencies().size() > 1 ? " x" + app.frequencies().size() : "";
         int tagWidth = countTag.isEmpty() ? 0 : font.width(countTag);
-        int controlW = app.slider() ? LIST_SLIDER_W : SWITCH_W;
+        // Sliders reserve extra room for the numeric level readout
+        int controlW = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
         String name = TextFit.ellipsize(font, app.name(), w - 24 - controlW - 12 - tagWidth);
         if (hovered && !name.equals(app.name())) {
             hoveredEllipsizedName = app.name();
@@ -671,12 +683,15 @@ public class TabletScreen extends Screen {
         }
 
         if (app.slider()) {
-            // Wide track with a knob at the current value
+            // Wide track with a knob at the current value, level readout beside it
             int tx1 = x + w - 4;
             int tx0 = tx1 - LIST_SLIDER_W;
             int ty = y + ROW_HEIGHT / 2 - 2;
+            String level = String.valueOf(app.strength());
+            graphics.drawString(font, level, tx0 - 4 - font.width(level), nameY,
+                    lit ? theme.textPrimary : theme.textMuted, theme.textShadow);
             graphics.fill(tx0, ty, tx1, ty + 4, theme.switchOff);
-            int knobX = tx0 + (tx1 - tx0 - 4) * app.strength() / SignalApp.MAX_STRENGTH;
+            int knobX = tx0 + Math.round((tx1 - tx0 - 4) * app.fillFraction());
             if (app.strength() > 0) {
                 graphics.fill(tx0, ty, knobX + 2, ty + 4, theme.accentDim);
             }
@@ -816,9 +831,11 @@ public class TabletScreen extends Screen {
     }
 
     private int sliderValueFromMouse(int index, double mouseX) {
+        List<SignalApp> apps = apps();
+        if (index >= apps.size()) return 0; // app vanished mid-drag; sendSliderValue bails too
         int[] span = sliderSpan(index);
-        double rel = (mouseX - span[0]) / (span[1] - span[0]);
-        return Mth.clamp((int) Math.round(rel * SignalApp.MAX_STRENGTH), 0, SignalApp.MAX_STRENGTH);
+        float rel = Mth.clamp((float) ((mouseX - span[0]) / (span[1] - span[0])), 0.0F, 1.0F);
+        return apps.get(index).valueFromFraction(rel);
     }
 
     /** Sends only actual changes — a drag emits at most 16 packets. */

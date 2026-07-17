@@ -3,7 +3,18 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-16, end of day)
+## Status (2026-07-16, late)
+- **1.5.0 IN TEST on `feature/ui-overhaul`**: Create-style (Stock Keeper)
+  UI overhaul of all three GUI screens (chrome atlas via
+  `./gradlew chromeTool`, `client/screen/chrome/` layer), new
+  CREATE/"Parchment" theme, slider level readouts everywhere, and
+  per-slider min/max range (dual-knob "Range" row in the editor;
+  min > 0 = never off, by user decision). Registrar "7"→"8". Awaiting
+  the user's FAMILYPACK pass, then merge to main + release process.
+  Follow-ups queued for after it ships: **refresh every listing
+  screenshot** in docs/images/ + docs/DESCRIPTION.md (the overhaul
+  obsoletes them all), and decide whether iconTool's flat-GUI listing
+  icon should be restyled to match.
 - **v1.4.0 SHIPPED**: tagged and pushed; the user is uploading to
   CurseForge/Modrinth (near-instant after first approval — verify next
   session that both went live). Contents: ItemStack frequencies (Create
@@ -29,15 +40,9 @@ at the repo root (auto-loaded every Claude session).
   listing icon (composites `docs/images/icon-bg.png` under the 3D tablet).
   Relative, space-free args only — Gradle splits on spaces.
 
-## After 1.4.0 (priority order)
-1. **1.5.0 — full Create-style (Stock Keeper) UI overhaul** + "Parchment"
-   theme (registrar "7"→"8"; DARK stays the never-persisted default with
-   byte-identical ints — the overhaul changes pixels, not persistence).
-   Plan sketch lives in the 2026-07-16 session plan: a `Chrome` nine-slice
-   helper layer over one `textures/gui/chrome.png` atlas, themes tint the
-   parchment, wood rails stay untinted; convert PickerOverlay-bearing
-   AppEditScreen last (it's tightest on space). Afterwards: refresh listing
-   screenshots in docs/images/ + docs/DESCRIPTION.md.
+## After 1.5.0 (priority order)
+1. Refresh listing screenshots (docs/images/ + DESCRIPTION.md) once 1.5.0
+   ships — every GUI screenshot shows the old flat style.
 2. Multiblock screens: designed, not scheduled — see
    `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the bottom).
 3. Still parked: open-tablet keybind; far-future interactive GUI on the held

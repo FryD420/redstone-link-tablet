@@ -1,5 +1,7 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.client.screen.chrome.Chrome;
+import com.modpack.linktablet.client.screen.chrome.ChromeEditBox;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -63,7 +65,9 @@ public class PickerOverlay {
         this.x = (screenWidth - w) / 2;
         this.y = (screenHeight - h) / 2;
         this.scroll = 0;
-        this.searchBox = new EditBox(font, x + 8, y + 8, w - 16, 16,
+        // Inset by (4,5)/(w-8,h-10): the painted ink-well footprint matches
+        // the old bordered box's (x+8, y+8, w-16) rect (ChromeEditBox rule)
+        this.searchBox = new ChromeEditBox(font, x + 12, y + 13, w - 24, 8,
                 Component.translatable("gui.linktablet.picker.search"));
         this.searchBox.setHint(Component.translatable("gui.linktablet.picker.search"));
         this.searchBox.setResponder(this::applyFilter);
@@ -121,8 +125,7 @@ public class PickerOverlay {
 
         // Dim everything behind, frame the panel
         graphics.fill(0, 0, screenWidth, screenHeight, 0xB0000000);
-        graphics.fill(x - 1, y - 1, x + w + 1, y + h + 1, theme.switchOff);
-        graphics.fill(x, y, x + w, y + h, theme.bodyOuter);
+        Chrome.panel(graphics, x - 2, y - 2, w + 4, h + 4, theme);
 
         searchBox.render(graphics, mouseX, mouseY, partialTick);
 
@@ -145,7 +148,8 @@ public class PickerOverlay {
 
         if (allowClear) {
             boolean hovered = overClearButton(mouseX, mouseY);
-            graphics.fill(x + 8, clearButtonY(), x + w - 8, clearButtonY() + 18,
+            Chrome.bannerButton(graphics, x + 8, clearButtonY(), w - 16, 18,
+                    hovered ? Chrome.ButtonState.HOVER : Chrome.ButtonState.NORMAL,
                     hovered ? theme.rowBgHover : theme.rowBg);
             Component label = Component.translatable("gui.linktablet.picker.clear_icon");
             graphics.drawString(font, label, x + w / 2 - font.width(label) / 2,

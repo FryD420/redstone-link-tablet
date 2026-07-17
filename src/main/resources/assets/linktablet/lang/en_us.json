@@ -30,7 +30,7 @@
   "gui.linktablet.edit_app.type.slider": "Slider",
   "gui.linktablet.edit_app.type.toggle.tooltip": "Classic on/off switch. Click to change the app type.",
   "gui.linktablet.edit_app.type.slider.tooltip": "Analog output: the signal follows the slider, 0 (off) to 15. Click to change the app type.",
-  "gui.linktablet.edit_app.initial_value": "Initial value",
+  "gui.linktablet.edit_app.range": "Range",
   "gui.linktablet.edit_app.strength": "Strength",
   "gui.linktablet.edit_app.icon": "Icon",
   "gui.linktablet.edit_app.icon.default": "Default (frequency items)",
@@ -58,5 +58,6 @@
   "gui.linktablet.theme.amoled": "AMOLED",
   "gui.linktablet.theme.brass": "Brass",
   "gui.linktablet.theme.terminal": "Terminal",
-  "gui.linktablet.theme.purple": "PurpleFox"
+  "gui.linktablet.theme.purple": "PurpleFox",
+  "gui.linktablet.theme.create": "Parchment"
 }

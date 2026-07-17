@@ -100,7 +100,7 @@ public final class BlockSliderDrag {
         // Map against the bar's exact span so its end tracks the crosshair
         float[] bar = TabletScreenMath.sliderBarU(index, apps.size(), be.isScreenList(), be.getScreenRotation());
         float frac = net.minecraft.util.Mth.clamp((logicalU - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
-        int value = Math.round(frac * SignalApp.MAX_STRENGTH);
+        int value = apps.get(index).valueFromFraction(frac);
         if (value == lastSent) return;
         lastSent = value;
         if (value != apps.get(index).strength()) {

@@ -57,10 +57,23 @@ public enum ScreenTheme implements StringRepresentable {
             0xFF1D1430, 0xFF2E2249,
             0xFF3C2E5E, 0xFF49386F, 0xFF352852, 0xFF554382,
             0xFFEDE4FF, 0xFFB3A3D6, 0xFF7A6BA0, 0xFFD5C8F0,
-            0xFFB07CFF, 0xFF7A4FC0, 0xFF463862);
+            0xFFB07CFF, 0xFF7A4FC0, 0xFF463862),
+
+    /** 1.5.0 "Parchment": the Stock-Keeper-styled flagship palette —
+     * cream surfaces, dark-brown text, Create-blue accent. */
+    CREATE("create",
+            0xFFF2E8C9, 0xFF57493A, 0xFFE3D5AE,
+            0xFF54402C, 0xFFF2E8C9,
+            0xFFEADFBE, 0xFFF7EFD6, 0xFFDECFA8, 0xFFF7EFD6,
+            0xFF3B2A18, 0xFF6E5B40, 0xFF9C8A68, 0xFF4F3A22,
+            0xFF2E9DD8, 0xFF1F6E9C, 0xFFC9B98F);
 
     public static final Codec<ScreenTheme> CODEC = StringRepresentable.fromEnum(ScreenTheme::values);
-    /** ByteBuf-based, so it slots into both component sync and payload composites. */
+    /** ByteBuf-based, so it slots into both component sync and payload composites.
+     * Ordinal-based: append-only, and appending a constant GROWS the wire
+     * domain — that is only safe because the network registrar version in
+     * ModNetworking fences client/server pairs. Bump the registrar every
+     * time a constant is added (see the "8" bump for CREATE). */
     public static final StreamCodec<io.netty.buffer.ByteBuf, ScreenTheme> STREAM_CODEC =
             ByteBufCodecs.VAR_INT.map(i -> values()[i], ScreenTheme::ordinal);
 
@@ -94,8 +107,9 @@ public enum ScreenTheme implements StringRepresentable {
 
     /**
      * Whether GUI text draws Minecraft's drop shadow. Dark themes keep it
-     * (the pre-1.3.0 look); light backgrounds turn it off — a dark shadow
-     * under dark text reads as a smeared double-print.
+     * (the pre-1.3.0 look); light backgrounds (LIGHT, CREATE's parchment)
+     * turn it off — a dark shadow under dark text reads as a smeared
+     * double-print.
      */
     public final boolean textShadow;
 
@@ -105,7 +119,7 @@ public enum ScreenTheme implements StringRepresentable {
                 int rowBg, int rowBgHover, int surfaceLo, int surfaceHi,
                 int textPrimary, int textMuted, int textFaint, int glyphHover,
                 int accent, int accentDim, int switchOff) {
-        this.textShadow = !"light".equals(id);
+        this.textShadow = !"light".equals(id) && !"create".equals(id);
         this.id = id;
         this.screenBgLit = screenBgLit;
         this.screenBgOff = screenBgOff;
