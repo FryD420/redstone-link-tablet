@@ -4,17 +4,20 @@ Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-16, late)
-- **1.5.0 IN TEST on `feature/ui-overhaul`**: Create-style (Stock Keeper)
-  UI overhaul of all three GUI screens (chrome atlas via
-  `./gradlew chromeTool`, `client/screen/chrome/` layer), new
-  CREATE/"Parchment" theme, slider level readouts everywhere, and
-  per-slider min/max range (dual-knob "Range" row in the editor;
-  min > 0 = never off, by user decision). Registrar "7"→"8". Awaiting
-  the user's FAMILYPACK pass, then merge to main + release process.
-  Follow-ups queued for after it ships: **refresh every listing
-  screenshot** in docs/images/ + docs/DESCRIPTION.md (the overhaul
-  obsoletes them all), and decide whether iconTool's flat-GUI listing
-  icon should be restyled to match.
+- **v1.5.0 SHIPPED** (FAMILYPACK-tested by the user, tagged, pushed;
+  user uploads to CurseForge/Modrinth): Create-style UI overhaul of all
+  three GUI screens (chrome atlas via `./gradlew chromeTool`,
+  `client/screen/chrome/` layer; ALL chrome theme-tinted — the wood-
+  stays-wood idea was rejected, borders tint with `bodyOuter`), new
+  CREATE/"Parchment" theme, slider level readouts everywhere,
+  per-slider min/max range (dual-knob "Range" row; min > 0 = never off,
+  by user decision). Registrar "7"→"8". Feedback-round fixes: ink-field
+  edge tiling, placed list-slider fill z-fight (latent since 1.4.0).
+  Follow-ups queued: **refresh every listing screenshot** in
+  docs/images/ + docs/DESCRIPTION.md (the overhaul obsoletes them all),
+  and decide whether iconTool's flat-GUI listing icon should be
+  restyled to match. Also: couldn't verify the platform listings are
+  publicly visible via Modrinth API/search — user to check dashboards.
 - **v1.4.0 SHIPPED**: tagged and pushed; the user is uploading to
   CurseForge/Modrinth (near-instant after first approval — verify next
   session that both went live). Contents: ItemStack frequencies (Create

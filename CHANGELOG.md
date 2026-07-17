@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 — 2026-07-16
 
 - Create-style UI overhaul: the tablet home screen, app editor, and item
   picker are rebuilt in the Stock Keeper's visual language — themed
