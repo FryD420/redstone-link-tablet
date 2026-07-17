@@ -17,19 +17,23 @@ import java.io.File;
  *
  * <p>Pixel-art rules: no antialiasing, integer rects only, per-pixel
  * hash noise (not sequential Random) so every region is byte-stable
- * and tile seams stay coherent. Tintable surfaces are near-white
- * grayscale; wood is full-color and never tinted at runtime.
+ * and tile seams stay coherent. Every tintable surface — rails
+ * included — is near-white grayscale; only the ink field ships its
+ * real colors (drawn untinted).
  */
 public final class ChromeTool {
 
     private static final String DEFAULT_OUT =
             "src/main/resources/assets/linktablet/textures/gui/chrome.png";
 
-    // Wood palette (the untinted Create identity)
-    private static final int WOOD_BASE = 0xFF6E5433;
-    private static final int WOOD_LIGHT = 0xFF8A6D44;
-    private static final int WOOD_DARK = 0xFF4A3722;
-    private static final int WOOD_OUTLINE = 0xFF2E2115;
+    // Rail palette — near-white grayscale like every other tintable
+    // surface: the runtime multiplies theme.bodyOuter in, so the frame
+    // matches each theme (user decision 2026-07-16; rails started out
+    // wood-colored and untinted).
+    private static final int RAIL_BASE = 0xFFE0E0E0;
+    private static final int RAIL_LIGHT = 0xFFFFFFFF;
+    private static final int RAIL_DARK = 0xFFA8A8A8;
+    private static final int RAIL_OUTLINE = 0xFF404040;
 
     private static BufferedImage img;
 
@@ -74,7 +78,7 @@ public final class ChromeTool {
     }
 
     /**
-     * Wood frame, 8px painted rail inside a 12px slice border, center
+     * Rail frame, 8px painted rail inside a 12px slice border, center
      * transparent so the tinted canvas shows through. Grain runs along
      * each rail (nearest-edge rule miters the corners automatically).
      */
@@ -85,10 +89,10 @@ public final class ChromeTool {
                 if (d >= 8) continue; // transparent center
                 boolean horizontal = Math.min(y, r.h() - 1 - y) <= Math.min(x, r.w() - 1 - x);
                 int color;
-                if (d == 0) color = WOOD_OUTLINE;
-                else if (d == 1) color = WOOD_LIGHT;
-                else if (d == 6) color = WOOD_DARK;
-                else if (d == 7) color = WOOD_OUTLINE;
+                if (d == 0) color = RAIL_OUTLINE;
+                else if (d == 1) color = RAIL_LIGHT;
+                else if (d == 6) color = RAIL_DARK;
+                else if (d == 7) color = RAIL_OUTLINE;
                 else color = grain(horizontal ? y : x);
                 set(r, x, y, color);
             }
@@ -114,7 +118,9 @@ public final class ChromeTool {
             for (int x = 0; x < r.w(); x++) {
                 if (isCorner(r, x, y, 1)) continue;
                 int d = edgeDist(r, x, y);
-                boolean lightSide = y <= x && y < r.h() - 1 - (r.w() - 1 - x); // top/left
+                // Explicit edge test — a diagonal-based side split leaks the
+                // wrong color into tiled edge bands (the 1.5.0 "gaps" bug)
+                boolean lightSide = y == d || x == d; // top or left edge of the ring
                 int color;
                 if (d == 0) color = gray(0xA0);
                 else if (d == 1) color = lightSide ? 0xFFFFFFFF : gray(0xC0);
@@ -156,9 +162,9 @@ public final class ChromeTool {
         for (int y = 0; y < r.h(); y++) {
             for (int x = 0; x < r.w(); x++) {
                 int color;
-                if (y == 0 || y == r.h() - 1 || x == 0 || x == r.w() - 1) color = WOOD_OUTLINE;
-                else if (y == 1) color = WOOD_LIGHT;
-                else if (y == r.h() - 2) color = WOOD_DARK;
+                if (y == 0 || y == r.h() - 1 || x == 0 || x == r.w() - 1) color = RAIL_OUTLINE;
+                else if (y == 1) color = RAIL_LIGHT;
+                else if (y == r.h() - 2) color = RAIL_DARK;
                 else color = grain(y);
                 set(r, x, y, color);
             }
@@ -169,9 +175,9 @@ public final class ChromeTool {
         for (int y = 0; y < r.h(); y++) {
             for (int x = 0; x < r.w(); x++) {
                 int color;
-                if (x == 0 || x == r.w() - 1 || y == 0 || y == r.h() - 1) color = WOOD_OUTLINE;
-                else if (x == 1) color = WOOD_LIGHT;
-                else if (x == r.w() - 2) color = WOOD_DARK;
+                if (x == 0 || x == r.w() - 1 || y == 0 || y == r.h() - 1) color = RAIL_OUTLINE;
+                else if (x == 1) color = RAIL_LIGHT;
+                else if (x == r.w() - 2) color = RAIL_DARK;
                 else color = grain(x);
                 set(r, x, y, color);
             }
@@ -241,10 +247,12 @@ public final class ChromeTool {
         for (int y = 0; y < r.h(); y++) {
             for (int x = 0; x < r.w(); x++) {
                 int d = edgeDist(r, x, y);
-                boolean lightSide = y <= x && y < r.h() - 1 - (r.w() - 1 - x);
+                // Inset: dark shadow on top/left, light lip on bottom/right
+                // (explicit edge test — see tile())
+                boolean darkSide = y == d || x == d;
                 int color;
                 if (d == 0) color = 0xFF25272C;
-                else if (d == 1) color = lightSide ? 0xFF07080A : 0xFF34383F;
+                else if (d == 1) color = darkSide ? 0xFF07080A : 0xFF34383F;
                 else color = 0xFF14161A;
                 set(r, x, y, color);
             }
@@ -287,10 +295,11 @@ public final class ChromeTool {
         for (int y = 0; y < r.h(); y++) {
             for (int x = 0; x < r.w(); x++) {
                 int d = edgeDist(r, x, y);
-                boolean lightSide = y <= x && y < r.h() - 1 - (r.w() - 1 - x);
+                // Inset like inkField: dark top/left, light bottom/right
+                boolean darkSide = y == d || x == d;
                 int color;
                 if (d == 0) color = gray(0x60);
-                else if (d == 1) color = lightSide ? gray(0x50) : 0xFFFFFFFF;
+                else if (d == 1) color = darkSide ? gray(0x50) : 0xFFFFFFFF;
                 else color = gray(0xC8);
                 set(r, x, y, color);
             }
@@ -327,13 +336,10 @@ public final class ChromeTool {
         return 0xFF000000 | (c << 16) | (c << 8) | c;
     }
 
-    /** Row/column wood grain: per-line jitter so tiled edges stay seamless. */
+    /** Row/column rail grain: per-line jitter so tiled edges stay seamless. */
     private static int grain(int line) {
         int j = hash(line, 0x9E37) % 11 - 5;
-        int rr = clamp8(((WOOD_BASE >> 16) & 0xFF) + j);
-        int gg = clamp8(((WOOD_BASE >> 8) & 0xFF) + j);
-        int bb = clamp8((WOOD_BASE & 0xFF) + j);
-        return 0xFF000000 | (rr << 16) | (gg << 8) | bb;
+        return gray(((RAIL_BASE >> 16) & 0xFF) + j);
     }
 
     /** Deterministic per-pixel noise in [-amp, amp]. */
@@ -347,10 +353,6 @@ public final class ChromeTool {
         h *= 0x85EBCA6B;
         h ^= h >>> 13;
         return h & 0x7FFFFFFF;
-    }
-
-    private static int clamp8(int v) {
-        return Math.max(0, Math.min(0xFF, v));
     }
 
     private ChromeTool() {

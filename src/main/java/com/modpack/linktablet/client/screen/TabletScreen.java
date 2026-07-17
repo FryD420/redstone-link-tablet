@@ -368,8 +368,8 @@ public class TabletScreen extends Screen {
         Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
         drawThemedCentered(graphics, titleText, width / 2, top + 7, theme.textPrimary);
         renderModeButtons(graphics, mouseX, mouseY);
-        // Wood crossbar between the header and the scrolling content
-        Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8);
+        // Rail crossbar between the header and the scrolling content
+        Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8, theme.bodyOuter);
 
         List<SignalApp> apps = apps();
 

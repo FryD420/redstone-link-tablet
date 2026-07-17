@@ -18,9 +18,9 @@ import net.minecraft.resources.ResourceLocation;
  * the atlas surfaces are authored near-white grayscale so a theme role
  * or app color multiplied in becomes the surface color. Multiplying can
  * only darken — "light" accents in the art are pure white so they take
- * the tint exactly. Wood (panel frames, rails) is authored in full
- * color and NEVER tinted: it is the constant Create identity every
- * theme shares.
+ * the tint exactly. Rail frames tint with {@code theme.bodyOuter} (the
+ * pre-1.5.0 border role), so borders match the theme like they always
+ * did; only the ink field draws untinted.
  *
  * <p>Mechanisms stay procedural {@code fill()} on purpose (switches,
  * pips, glyphs, value bars, swatches): the Stock-Keeper identity lives
@@ -40,10 +40,10 @@ public final class Chrome {
 
     public enum ButtonState {NORMAL, HOVER, PRESSED, DISABLED}
 
-    /** Dark canvas (tinted {@code theme.bodyInner}) under an untinted wood rail frame. */
+    /** Canvas (tinted {@code theme.bodyInner}) under a rail frame tinted {@code theme.bodyOuter}. */
     public static void panel(GuiGraphics g, int x, int y, int w, int h, ScreenTheme theme) {
         tinted(g, theme.bodyInner, () -> NineSlice.blit(g, ChromeAtlas.CANVAS, x + 4, y + 4, w - 8, h - 8));
-        untinted(g, () -> NineSlice.blit(g, ChromeAtlas.RAIL_FRAME, x, y, w, h));
+        tinted(g, theme.bodyOuter, () -> NineSlice.blit(g, ChromeAtlas.RAIL_FRAME, x, y, w, h));
     }
 
     /** Flat parchment plaque; tint = theme role or app color. */
@@ -56,14 +56,14 @@ public final class Chrome {
         tinted(g, argbTint, () -> NineSlice.blit(g, ChromeAtlas.TILE, x, y, w, h));
     }
 
-    /** Horizontal wood rail (divider); untinted, 6px tall. */
-    public static void railH(GuiGraphics g, int x, int y, int w) {
-        untinted(g, () -> NineSlice.blit(g, ChromeAtlas.RAIL_H, x, y, w, ChromeAtlas.RAIL_H.h()));
+    /** Horizontal rail (divider), 6px tall; tint = {@code theme.bodyOuter}. */
+    public static void railH(GuiGraphics g, int x, int y, int w, int argbTint) {
+        tinted(g, argbTint, () -> NineSlice.blit(g, ChromeAtlas.RAIL_H, x, y, w, ChromeAtlas.RAIL_H.h()));
     }
 
-    /** Vertical wood rail; untinted, 6px wide. */
-    public static void railV(GuiGraphics g, int x, int y, int h) {
-        untinted(g, () -> NineSlice.blit(g, ChromeAtlas.RAIL_V, x, y, ChromeAtlas.RAIL_V.w(), h));
+    /** Vertical rail, 6px wide; tint = {@code theme.bodyOuter}. */
+    public static void railV(GuiGraphics g, int x, int y, int h, int argbTint) {
+        tinted(g, argbTint, () -> NineSlice.blit(g, ChromeAtlas.RAIL_V, x, y, ChromeAtlas.RAIL_V.w(), h));
     }
 
     /** Chamfered banner button body; tint = {@code rowBg}/{@code rowBgHover}. */

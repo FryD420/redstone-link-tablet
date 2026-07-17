@@ -9,13 +9,12 @@ package com.modpack.linktablet.client.screen.chrome;
  *
  * <p>Authoring rules (enforced by ChromeTool):
  * <ul>
- *   <li>Tintable surfaces are near-white grayscale — the runtime
- *       multiplies theme/app colors in via shader color, which can only
- *       darken. "Light" accents are authored at full white so they take
- *       the tint color exactly.</li>
- *   <li>Wood (rails, panel frame) is authored in full color and is
- *       NEVER tinted — it is the constant Create identity across
- *       themes.</li>
+ *   <li>Tintable surfaces — rails included — are near-white grayscale;
+ *       the runtime multiplies theme/app colors in via shader color,
+ *       which can only darken. "Light" accents are authored at full
+ *       white so they take the tint color exactly.</li>
+ *   <li>Only the ink field ships real colors (drawn untinted — it is
+ *       deliberately dark on every theme).</li>
  *   <li>Space below v=120 is reserved for future regions.</li>
  * </ul>
  */
@@ -54,7 +53,7 @@ public final class ChromeAtlas {
 
     /** Panel background canvas; tinted with {@code theme.bodyInner}. */
     public static final Region CANVAS = Region.sliced(0, 0, 24, 24, 8);
-    /** Wood rail frame with a transparent center; untinted, drawn over CANVAS. */
+    /** Rail frame with a transparent center; tinted {@code theme.bodyOuter}, drawn over CANVAS. */
     public static final Region RAIL_FRAME = Region.sliced(32, 0, 48, 48, 12);
     /** Parchment plaque; tinted by a theme role or an app color. */
     public static final Region PLAQUE = Region.sliced(96, 0, 24, 24, 6);
@@ -64,9 +63,9 @@ public final class ChromeAtlas {
     public static final Region SLOT = Region.fixed(160, 0, 18, 18);
     /** Frequency ghost-slot ring; tinted with the red/blue staging colors. */
     public static final Region GHOST_RING = Region.fixed(184, 0, 20, 20);
-    /** Standalone horizontal wood rail (dividers); untinted. */
+    /** Standalone horizontal rail (dividers); tinted {@code theme.bodyOuter}. */
     public static final Region RAIL_H = Region.slicedX(208, 0, 24, 6, 6);
-    /** Standalone vertical wood rail; untinted. */
+    /** Standalone vertical rail; tinted {@code theme.bodyOuter}. */
     public static final Region RAIL_V = Region.slicedY(240, 0, 6, 24, 6);
 
     /** Banner button states; tinted with {@code theme.rowBg}/{@code rowBgHover}.
