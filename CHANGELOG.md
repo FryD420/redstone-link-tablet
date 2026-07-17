@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.1 — 2026-07-16
 
 - The placed tablet's screen now matches the 1.5.0 GUI look: app tiles
   and list rows render as beveled plaques, a theme-colored frame runs
