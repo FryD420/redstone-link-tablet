@@ -202,7 +202,8 @@ public final class TabletScreenRenderer {
             if (list) {
                 cu = TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
                 cv = listV0(i, rowH) + rowH / 2f;
-                size = Math.min(LIST_ICON, rowH - 0.35f);
+                // Icon fills the inset chip exactly, like the GUI's 16px-on-16px
+                size = Math.min(LIST_ICON, rowH * 2f / 3f);
             } else {
                 cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
                 cv = tileV0(i / grid.cols(), tileH) + (tileH - labelZone) / 2f;
@@ -388,9 +389,12 @@ public final class TabletScreenRenderer {
         // Rows read as raised plaques, like the GUI's list rows
         raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
 
-        // Icon chip in the app's color, left end (flat — color IS the content)
-        fillRect(pose, vc, u0, v0, u0 + rowH, v1, LAYER * 2,
-                on ? brighten(color) : dim(color), stateLight);
+        // Icon chip in the app's color, inset INSIDE the row plaque like
+        // the GUI's chip (its 4px-in-24 margin, scaled); flat — color IS
+        // the content
+        float chipInset = rowH / 6f;
+        fillRect(pose, vc, u0 + chipInset, v0 + chipInset, u0 + rowH - chipInset, v1 - chipInset,
+                LAYER * 2, on ? brighten(color) : dim(color), stateLight);
 
         // Track vertically centered in the row and inset from the row's
         // right edge, GUI-style
