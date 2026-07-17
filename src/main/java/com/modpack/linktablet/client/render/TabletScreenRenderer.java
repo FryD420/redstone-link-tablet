@@ -155,16 +155,16 @@ public final class TabletScreenRenderer {
 
         // Theme frame hugging the glass edge — the GUI panel's rail
         // brought in-world (1.5.1). Lives in the existing margins, so
-        // layout and hit-tests are untouched: outer bodyOuter rail with a
-        // highlight ridge, then the canvas's under-rail shadow.
+        // layout and hit-tests are untouched. A dark seam (not a bright
+        // ridge) separates rail from canvas: on themes whose border color
+        // sits near the unlit background a bright ridge reads as a stray
+        // glowing rectangle, while a shadow seam degrades to invisible.
         float frameW = 0.4f;
         int frame = theme.bodyOuter;
         ring(pose, vc, TabletScreenMath.GLASS_U0, TabletScreenMath.GLASS_V0, u1, v1,
                 LAYER * 0.5f, frame, bgLight, frameW);
         ring(pose, vc, TabletScreenMath.GLASS_U0 + frameW, TabletScreenMath.GLASS_V0 + frameW,
-                u1 - frameW, v1 - frameW, LAYER * 0.5f, brighten(frame), bgLight, 0.12f);
-        ring(pose, vc, TabletScreenMath.GLASS_U0 + frameW + 0.12f, TabletScreenMath.GLASS_V0 + frameW + 0.12f,
-                u1 - frameW - 0.12f, v1 - frameW - 0.12f, LAYER * 0.5f, shade(bg, 0.85f), bgLight, 0.3f);
+                u1 - frameW, v1 - frameW, LAYER * 0.5f, shade(frame, 0.5f), bgLight, 0.12f);
 
         int count = TabletScreenMath.visibleApps(apps.size(), list);
         GridLayout grid = TabletScreenMath.gridLayout(apps.size(), rot);
@@ -488,9 +488,11 @@ public final class TabletScreenRenderer {
                                     float layer, int base, int light) {
         float size = Math.min(u1 - u0, v1 - v0);
         if (size < MIN_BEVEL_CELL) return;
-        float bw = Mth.clamp(size * 0.09f, 0.12f, 0.35f);
+        // ~4.5% of the cell, the GUI tile art's bevel proportion; the
+        // gentle highlight keeps dark dimmed plates from flaring
+        float bw = Mth.clamp(size * 0.06f, 0.10f, 0.22f);
         float ow = bw * 0.5f;
-        int hi = brighten(base);
+        int hi = bevelHi(base);
         int lo = shade(base, 0.55f);
         ring(pose, vc, u0, v0, u1, v1, layer, shade(base, 0.35f), light, ow);
         fillRect(pose, vc, u0 + ow, v0 + ow, u1 - ow, v0 + ow + bw, layer, hi, light);
@@ -557,6 +559,15 @@ public final class TabletScreenRenderer {
         int r = (int) (((argb >> 16) & 0xFF) * f);
         int g = (int) (((argb >> 8) & 0xFF) * f);
         int b = (int) ((argb & 0xFF) * f);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    /** Mix 15% toward white — a bevel highlight gentler than brighten(). */
+    private static int bevelHi(int argb) {
+        int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+        r += (255 - r) * 3 / 20;
+        g += (255 - g) * 3 / 20;
+        b += (255 - b) * 3 / 20;
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 }
