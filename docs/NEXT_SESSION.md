@@ -3,45 +3,53 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-17, morning)
-- **v1.5.2 is the current release** — tester-feedback batch, dev-tested
-  by the user in a live session:
-  - Grid tiles restyled to the list rows' plaque+chip structure on BOTH
-    surfaces (GUI + placed screen; dense placed grids under 2.6 texels
-    per cell keep classic full-color pips). Slider numerals are corner
-    badges drawn in a raised layer (GUI z+200 / world y=0.011 — 3D block
-    icons have real depth and buried them at the old layers). Faint
-    accent outline on powered placed tiles.
-  - New AVIONICS theme ("Avionics" — navy/steel-blue/cyan flight-computer
-    look from a tester screenshot). Registrar "8"→"9".
-  - One-item frequencies (requested by migdzy): the editor now accepts a
-    single staged item in either slot; `Frequency.anyIcon()`/`isPair()`
-    cover the icon fallbacks. Wire/NBT needed no changes.
-- Earlier releases:
-- **v1.5.1** (tagged, pushed, uploaded). The two
-  releases of that evening:
-  - **1.5.0** — Create-style UI overhaul of all three GUI screens
-    (chrome atlas via `./gradlew chromeTool`, `client/screen/chrome/`
-    layer; ALL chrome theme-tinted — borders tint with `bodyOuter`, the
-    wood-stays-wood idea was rejected), new CREATE/"Parchment" theme,
-    slider level readouts everywhere, per-slider min/max range
-    (dual-knob "Range" row; min > 0 = never off, by user decision).
-    Registrar "7"→"8". Feedback fixes: ink-field edge tiling, placed
-    list-slider fill z-fight (latent since 1.4.0).
-  - **1.5.1** — placed/held screens match the GUI chrome via quad bevel
-    emulation in `TabletScreenRenderer` (see the live-screen gotcha in
-    CLAUDE.md; three visual iterations: shadow frame seam, softer
-    bevels, inset icon chips). No wire change — pairs with 1.5.0.
-- **Platforms**: ALL versions 1.0.0–1.5.1 are uploaded to Modrinth; the
-  project is "Under review" (first-approval queue) and therefore
-  invisible to public search/API until a moderator approves — then
-  everything goes live at once. CurseForge presumably in the same boat.
-  Still 404 publicly as of 2026-07-17; the user is watching the
-  dashboards personally (off Claude's list).
-- Minor known issue spotted in a FAMILYPACK log: Distant Horizons can't
-  resolve the tablet's WALL blockstate (it omits the `landscape`
-  property and falls back to the default state) — harmless LOD-only
-  fallback, low priority.
+## Status (2026-07-19, evening)
+- **v1.6.0 is the current release** (tagged, pushed, uploaded): per-app
+  NOTE WINDOWS (floating/draggable/multi-open; editable over ANY screen
+  incl. inventory via the event-driven `client/screen/NoteWindows`
+  manager; read-only on the HUD; a note closes only via its own X) and
+  the TIMER app type (4th type in the edit screen's cycler; tap
+  transmits for 2t–600t set on a quadratic seconds+ticks slider; re-tap
+  restarts; world taps swing the arm, GUI taps get a ~300ms press
+  flash; migdzy credited). Registrar "9"→"11" — 1.6.0 does not pair
+  with 1.5.x. Dev-tested live by the user across the whole session.
+- **🎉 MODRINTH IS APPROVED AND PUBLIC** (confirmed via the public API
+  2026-07-19 evening): first-approval review cleared, all versions
+  visible, first download logged. CurseForge also updated. ALL sites
+  carry 1.6.0 — the platform-watching chore is officially over.
+- Earlier this arc: 1.5.3 (vanilla Redstone creative-tab listing +
+  listing icon restyled to the 1.5.x plaque+chip chrome, all three app
+  kinds shown), 1.5.2 (grid chip tiles, Avionics theme, one-item
+  frequencies), 1.5.0/1.5.1 (Create-style chrome overhaul, both
+  surfaces). Full details per release in CHANGELOG.md.
+- Minor known issue: Distant Horizons can't resolve the tablet's WALL
+  blockstate (omits `landscape`, falls back to default) — harmless
+  LOD-only fallback, low priority.
+
+## Next session (priority order)
+1. **Listing refresh** — the user shoots gallery screenshots SOLO from
+   real 1.6.0 gameplay (their call). When they exist: refresh
+   docs/images/ + rewrite docs/DESCRIPTION.md (it predates 1.4.0 —
+   notes, timers, sliders, themes, chrome are all missing) and make
+   sure the restyled docs/icon.png is on both listings. Claude can do
+   the DESCRIPTION.md rewrite without the screenshots — good warm-up.
+2. **Pinned tablet overlay** — next feature. Much cheaper since 1.6.0:
+   `NoteWindows` already does event-driven windows over any screen,
+   HUD rendering, and input capture; a mini-tablet is "another window
+   type". Open design points: what the HUD (mouse-captured) state can
+   do, whether the parked open-tablet keybind ships with it, window
+   sizing vs. app count.
+3. **Icon-friendly defaults** — still ON HOLD until the user reports
+   what exactly renders poorly (analysis ready in
+   docs/ICON_DEFAULTS_SCOPING.md).
+4. **Multiblock screens** — gated on the user's answers in
+   docs/MULTIBLOCK_DESIGN.md.
+
+Parked: first-person interactive GUI on the held tablet; the DH
+blockstate nit; any 1.20.1 backport (assessed 2026-07-19: possible but
+a big lift — Forge loader, no DataComponents/StreamCodec, a second
+codebase to maintain; wait for real demand signals now that the
+listings are public).
 
 ## Active list (updated 2026-07-19 after the 1.6.0 cut)
 1. **Refresh listing screenshots** — the user shoots these SOLO from
