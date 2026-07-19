@@ -107,10 +107,6 @@ public class TabletScreen extends Screen {
     private List<SignalApp> workingApps = null;
     /** Theme dropdown open (swallows clicks like the edit screen's swatches). */
     private boolean themePopupOpen = false;
-    /** Floating note window, or null; modal for input while open. */
-    private NoteWindow noteWindow = null;
-    /** App index the open note window belongs to. */
-    private int noteIndex = -1;
     /** Frames the retired overlay has waited for server sync. */
     private int overlayFrames = 0;
     /** Current slot of the grabbed app while dragging, or -1. */
@@ -279,26 +275,9 @@ public class TabletScreen extends Screen {
     // Note window
     // ------------------------------------------------------------------
 
+    /** Note windows live in {@link NoteWindows} — they outlive this screen. */
     private void openNote(int index) {
-        List<SignalApp> apps = apps();
-        if (index < 0 || index >= apps.size()) return;
-        SignalApp app = apps.get(index);
-        noteWindow = new NoteWindow(font, this::theme, width, height,
-                Component.literal(app.name()), app.note());
-        noteIndex = index;
-        UISounds.page();
-    }
-
-    /** Closes the window, sending the note if it changed. */
-    private void closeNote() {
-        if (noteWindow == null) return;
-        if (noteWindow.changed() && noteIndex >= 0 && noteIndex < apps().size()) {
-            PacketDistributor.sendToServer(new ModNetworking.SetNotePayload(
-                    target(), noteIndex, noteWindow.value()));
-        }
-        noteWindow = null;
-        noteIndex = -1;
-        UISounds.tick(1.0F);
+        NoteWindows.open(view, index);
     }
 
     /**
@@ -481,19 +460,11 @@ public class TabletScreen extends Screen {
             renderThemePopup(graphics, mouseX, mouseY, theme);
         }
 
-        if (noteWindow != null) {
-            // Apps can vanish under an open window (another editor/player)
-            if (noteIndex >= apps.size()) {
-                noteWindow = null;
-                noteIndex = -1;
-            } else {
-                noteWindow.render(graphics, mouseX, mouseY, partialTick);
-            }
-        }
+        // Note windows render via NoteWindows' screen event, above us.
 
         // Tooltips last, on top of everything
-        if (noteWindow != null) {
-            return; // modal window: no tooltips underneath
+        if (NoteWindows.anyContains(mouseX, mouseY)) {
+            return; // no tooltips under the windows themselves
         }
         if (hoveredNoteGlyph) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.note"), mouseX, mouseY);
@@ -868,12 +839,8 @@ public class TabletScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Open note window is modal: clicks inside go to it, any click
         // on the close button or outside saves + closes.
-        if (noteWindow != null) {
-            if (!noteWindow.mouseClicked(mouseX, mouseY, button)) {
-                closeNote();
-            }
-            return true;
-        }
+        // Note-window clicks never reach here — NoteWindows cancels them
+        // at the screen-event layer before this method runs.
 
         // Open theme popup swallows every click until it closes
         if (themePopupOpen) {
@@ -951,10 +918,6 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (noteWindow != null) {
-            noteWindow.mouseDragged(mouseX, mouseY, button, dragX, dragY, width, height);
-            return true;
-        }
         if (button == 0 && dragging()) {
             updateDragHover(mouseX, mouseY);
             return true;
@@ -1069,10 +1032,6 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (noteWindow != null) {
-            noteWindow.mouseReleased(mouseX, mouseY, button);
-            return true;
-        }
         if (button == 0 && dragging()) {
             commitDrag();
             UISounds.tick(1.6F);
@@ -1103,8 +1062,7 @@ public class TabletScreen extends Screen {
 
     @Override
     public void removed() {
-        // Screen closed with the note window open: save, don't discard
-        closeNote();
+        // Note windows live in NoteWindows and survive this screen.
         // Screen closed mid-drag: commit the move at its previewed slot
         commitDrag();
         // Screen closed or replaced mid-press: never leave a held signal on
@@ -1114,35 +1072,8 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (noteWindow != null) {
-            noteWindow.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-            return true;
-        }
         scroll = Mth.clamp(scroll - scrollY * 16, 0, maxScroll());
         return true;
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (noteWindow != null) {
-            // ESC saves + closes the window, not the screen
-            if (keyCode == 256) {
-                closeNote();
-                return true;
-            }
-            noteWindow.keyPressed(keyCode, scanCode, modifiers);
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public boolean charTyped(char chr, int modifiers) {
-        if (noteWindow != null) {
-            noteWindow.charTyped(chr, modifiers);
-            return true;
-        }
-        return super.charTyped(chr, modifiers);
     }
 
     @Override

@@ -15,41 +15,55 @@ import java.util.function.Supplier;
 /**
  * Floating per-app note window (1.6.0): a small chrome-framed "OS
  * window" that hovers over the tablet home screen — draggable by its
- * title bar, closed with the corner button (or a click outside). Hosts
- * a vanilla {@link MultiLineEditBox} for wrapping/cursor/scrolling with
- * the vanilla frame suppressed — the themed panel + ink field underneath
+ * title bar, closed ONLY by the corner button or ESC. It is NOT modal:
+ * clicks outside it fall through to the tablet GUI (little-window
+ * behavior, user decision 2026-07-19), and the keyboard belongs to the
+ * window only while its text box is focused. Hosts a vanilla
+ * {@link MultiLineEditBox} for wrapping/cursor/scrolling with the
+ * vanilla frame suppressed — the themed panel + ink field underneath
  * are the visuals, following the ChromeEditBox recipe.
+ *
+ * <p>Closing the tablet GUI with a window open PINS it: {@link
+ * com.modpack.linktablet.client.PinnedNote} renders a read-only copy on
+ * the HUD ({@link #paintFrame} is the shared painter), and TabletScreen
+ * re-hydrates the editable window when the GUI reopens.
  *
  * <p>The owner ({@link TabletScreen}) forwards input while a window is
  * open and saves via {@link #value()} when it closes. The window never
  * sends packets itself.
  */
-class NoteWindow {
+public class NoteWindow {
 
-    static final int W = 176;
-    static final int H = 120;
-    private static final int TITLE_H = 20;
+    public static final int W = 176;
+    public static final int H = 120;
+    public static final int TITLE_H = 20;
     private static final int CLOSE_SIZE = 10;
 
     private final Font font;
     private final Supplier<ScreenTheme> theme;
     private final Component title;
-    private final String original;
     private final MultiLineEditBox box;
+    /** Tablet this window's app lives on (windows outlive any screen). */
+    final com.modpack.linktablet.client.AppView view;
+    /** App this window belongs to (several windows may be open at once). */
+    final int appIndex;
 
+    private String original;
     private int x;
     private int y;
     private boolean draggingTitle = false;
     private double dragDX, dragDY;
 
-    NoteWindow(Font font, Supplier<ScreenTheme> theme, int screenW, int screenH,
-               Component title, String note) {
+    NoteWindow(Font font, com.modpack.linktablet.client.AppView view, int appIndex,
+               Component title, String note, int x, int y) {
+        this.view = view;
+        this.appIndex = appIndex;
         this.font = font;
-        this.theme = theme;
+        this.theme = view::theme;
         this.title = title;
         this.original = note;
-        this.x = (screenW - W) / 2;
-        this.y = (screenH - H) / 2;
+        this.x = x;
+        this.y = y;
         this.box = new MultiLineEditBox(font, 0, 0, W - 20, H - TITLE_H - 16,
                 Component.translatable("gui.linktablet.note.hint"), title) {
             @Override
@@ -70,6 +84,27 @@ class NoteWindow {
         return !value().equals(original);
     }
 
+    /** Resets the dirty baseline after the manager sends a save. */
+    void markSaved() {
+        original = value();
+    }
+
+    int x() {
+        return x;
+    }
+
+    int y() {
+        return y;
+    }
+
+    boolean boxFocused() {
+        return box.isFocused();
+    }
+
+    void unfocus() {
+        box.setFocused(false);
+    }
+
     // ---- Geometry ----------------------------------------------------
 
     boolean contains(double mx, double my) {
@@ -80,7 +115,7 @@ class NoteWindow {
         return mx >= x && mx < x + W - TITLE_H && my >= y && my < y + TITLE_H;
     }
 
-    private boolean overClose(double mx, double my) {
+    boolean overCloseButton(double mx, double my) {
         int cx = x + W - CLOSE_SIZE - 7;
         int cy = y + 5;
         return mx >= cx - 2 && mx < cx + CLOSE_SIZE + 2 && my >= cy - 2 && my < cy + CLOSE_SIZE + 2;
@@ -91,6 +126,10 @@ class NoteWindow {
     void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         ScreenTheme t = theme.get();
 
+        // Keep the window reachable across screen resizes
+        x = Mth.clamp(x, 2, Math.max(2, graphics.guiWidth() - W - 2));
+        y = Mth.clamp(y, 2, Math.max(2, graphics.guiHeight() - H - 2));
+
         // Elevate the whole window above the home screen. GuiGraphics
         // flushes text AND items sorted by z, and renderItem self-lifts
         // to z~232 — at base z the grid's icons/labels bleed through the
@@ -98,27 +137,18 @@ class NoteWindow {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 350);
 
-        // Soft drop shadow so the window reads as floating over the body
-        graphics.fill(x + 3, y + 3, x + W + 3, y + H + 3, 0x50000000);
-
-        Chrome.panel(graphics, x, y, W, H, t);
-
-        // Title bar: app name + close button, rail divider underneath
-        String name = TextFit.ellipsize(font, title.getString(), W - TITLE_H - 24);
-        graphics.drawString(font, name, x + 10, y + 7, t.textPrimary, t.textShadow);
-        Chrome.railH(graphics, x + 4, y + TITLE_H - 3, W - 8, t.bodyOuter);
+        paintFrame(graphics, font, t, x, y, title);
 
         int cx = x + W - CLOSE_SIZE - 7;
         int cy = y + 5;
-        int closeColor = overClose(mouseX, mouseY) ? t.glyphHover : t.textFaint;
+        int closeColor = overCloseButton(mouseX, mouseY) ? t.glyphHover : t.textFaint;
         // X glyph: two 2px diagonals
         for (int i = 0; i < CLOSE_SIZE - 2; i++) {
             graphics.fill(cx + 1 + i, cy + 1 + i, cx + 3 + i, cy + 3 + i, closeColor);
             graphics.fill(cx + CLOSE_SIZE - 3 - i, cy + 1 + i, cx + CLOSE_SIZE - 1 - i, cy + 3 + i, closeColor);
         }
 
-        // Ink well + the edit box inset by the ChromeEditBox convention
-        Chrome.inkField(graphics, x + 6, y + TITLE_H + 2, W - 12, H - TITLE_H - 8);
+        // The edit box inset by the ChromeEditBox convention
         box.setX(x + 10);
         box.setY(y + TITLE_H + 7);
         box.render(graphics, mouseX, mouseY, partialTick);
@@ -126,23 +156,42 @@ class NoteWindow {
         graphics.pose().popPose();
     }
 
-    // ---- Input (returns true when the event stays inside the window) --
+    /**
+     * Frame shared by the live window and the pinned HUD copy: drop
+     * shadow, chrome panel, ellipsized title, rail divider, ink field.
+     */
+    public static void paintFrame(GuiGraphics graphics, Font font, ScreenTheme t,
+                                  int x, int y, Component title) {
+        graphics.fill(x + 3, y + 3, x + W + 3, y + H + 3, 0x50000000);
+        Chrome.panel(graphics, x, y, W, H, t);
+        String name = TextFit.ellipsize(font, title.getString(), W - TITLE_H - 24);
+        graphics.drawString(font, name, x + 10, y + 7, t.textPrimary, t.textShadow);
+        Chrome.railH(graphics, x + 4, y + TITLE_H - 3, W - 8, t.bodyOuter);
+        Chrome.inkField(graphics, x + 6, y + TITLE_H + 2, W - 12, H - TITLE_H - 8);
+    }
 
+    // ---- Input -------------------------------------------------------
+
+    /**
+     * Returns true when the click landed inside the window (and was
+     * consumed); false when it fell outside — the owner lets it through
+     * to the GUI. The close button is the OWNER's check, before this.
+     */
     boolean mouseClicked(double mx, double my, int button) {
-        if (overClose(mx, my)) {
-            return false; // owner closes + saves
-        }
         if (button == 0 && overTitleBar(mx, my)) {
             draggingTitle = true;
             dragDX = mx - x;
             dragDY = my - y;
+            box.setFocused(false);
             return true;
         }
         if (contains(mx, my)) {
+            box.setFocused(true);
             box.mouseClicked(mx, my, button);
             return true;
         }
-        return false; // outside — owner closes + saves
+        box.setFocused(false);
+        return false;
     }
 
     boolean mouseDragged(double mx, double my, int button, double dx, double dy,
@@ -152,7 +201,7 @@ class NoteWindow {
             y = Mth.clamp((int) (my - dragDY), 2, screenH - H - 2);
             return true;
         }
-        return box.mouseDragged(mx, my, button, dx, dy);
+        return box.isFocused() && box.mouseDragged(mx, my, button, dx, dy);
     }
 
     void mouseReleased(double mx, double my, int button) {
