@@ -40,15 +40,30 @@ import java.util.Optional;
  *                    means the slider can never rest at 0 — the app is
  *                    always transmitting, by design (no off notch)
  * @param sliderMax   top of a slider's travel (sliderMin+1..15)
+ * @param note        free-text player note, "" = none (the empty default
+ *                    is never persisted, so pre-notes NBT round-trips
+ *                    unchanged)
+ * @param timed       true = Timer button: a tap transmits for
+ *                    {@code pulseTicks} then stops on its own (a
+ *                    re-tap RESTARTS the clock — user decision
+ *                    2026-07-19). Like momentary, {@code active} is
+ *                    never persisted — the running pulse is transient
+ *                    server state
+ * @param pulseTicks  Timer pulse length in game ticks
+ *                    ({@link #MIN_PULSE_TICKS}..{@link #MAX_PULSE_TICKS})
  */
 public record SignalApp(String name, List<Frequency> frequencies, boolean active, boolean momentary,
                         int strength, int color, Optional<ResourceLocation> icon, boolean slider,
-                        int sliderMin, int sliderMax) {
+                        int sliderMin, int sliderMax, String note, boolean timed, int pulseTicks) {
 
     public static final int MAX_NAME_LENGTH = 24;
     public static final int MAX_FREQUENCIES = 8;
     public static final int MAX_STRENGTH = 15;
     public static final int DEFAULT_COLOR = 0xFF3A3F4B;
+    public static final int MAX_NOTE_LENGTH = 1024;
+    public static final int MIN_PULSE_TICKS = 2;
+    public static final int MAX_PULSE_TICKS = 600; // 30s
+    public static final int DEFAULT_PULSE_TICKS = 20; // 1s
 
     public static final Codec<SignalApp> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("name").forGetter(SignalApp::name),
@@ -60,7 +75,10 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(SignalApp::icon),
             Codec.BOOL.optionalFieldOf("slider", false).forGetter(SignalApp::slider),
             Codec.INT.optionalFieldOf("slider_min", 0).forGetter(SignalApp::sliderMin),
-            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(SignalApp::sliderMax)
+            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(SignalApp::sliderMax),
+            Codec.STRING.optionalFieldOf("note", "").forGetter(SignalApp::note),
+            Codec.BOOL.optionalFieldOf("timed", false).forGetter(SignalApp::timed),
+            Codec.INT.optionalFieldOf("pulse_ticks", DEFAULT_PULSE_TICKS).forGetter(SignalApp::pulseTicks)
     ).apply(instance, SignalApp::new));
 
     private static final StreamCodec<RegistryFriendlyByteBuf, List<Frequency>> FREQ_LIST_STREAM_CODEC =
@@ -81,8 +99,11 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             boolean slider = buf.readBoolean();
             int sliderMin = buf.readVarInt();
             int sliderMax = buf.readVarInt();
+            String note = ByteBufCodecs.STRING_UTF8.decode(buf);
+            boolean timed = buf.readBoolean();
+            int pulseTicks = buf.readVarInt();
             return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
-                    sliderMin, sliderMax);
+                    sliderMin, sliderMax, note, timed, pulseTicks);
         }
 
         @Override
@@ -97,12 +118,15 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             buf.writeBoolean(app.slider());
             buf.writeVarInt(app.sliderMin());
             buf.writeVarInt(app.sliderMax());
+            ByteBufCodecs.STRING_UTF8.encode(buf, app.note());
+            buf.writeBoolean(app.timed());
+            buf.writeVarInt(app.pulseTicks());
         }
     };
 
     public SignalApp withActive(boolean newActive) {
         return new SignalApp(name, frequencies, newActive, momentary, strength, color, icon, slider,
-                sliderMin, sliderMax);
+                sliderMin, sliderMax, note, timed, pulseTicks);
     }
 
     /** Slider apps: set the live value; {@code active} follows (value > 0).
@@ -111,7 +135,22 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
     public SignalApp withSliderValue(int value) {
         int clean = Mth.clamp(value, sliderMin, sliderMax);
         return new SignalApp(name, frequencies, clean > 0, false, clean, color, icon, true,
-                sliderMin, sliderMax);
+                sliderMin, sliderMax, note, false, pulseTicks);
+    }
+
+    /** Server-side note write; the caller sends the whole new text. */
+    public SignalApp withNote(String newNote) {
+        return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
+                sliderMin, sliderMax, cleanNote(newNote), timed, pulseTicks);
+    }
+
+    public boolean hasNote() {
+        return !note.isBlank();
+    }
+
+    private static String cleanNote(String raw) {
+        String clean = raw.length() > MAX_NOTE_LENGTH ? raw.substring(0, MAX_NOTE_LENGTH) : raw;
+        return clean.isBlank() ? "" : clean;
     }
 
     /**
@@ -157,19 +196,25 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
                 .distinct()
                 .limit(MAX_FREQUENCIES)
                 .toList();
+        int cleanPulse = Mth.clamp(pulseTicks, MIN_PULSE_TICKS, MAX_PULSE_TICKS);
         if (slider) {
             // Sliders can rest at their min (0 allowed); active is derived,
-            // momentary excluded. Range: 0 <= min < max <= 15.
+            // momentary/timed excluded. Range: 0 <= min < max <= 15.
             int cleanMin = Mth.clamp(sliderMin, 0, MAX_STRENGTH - 1);
             int cleanMax = Mth.clamp(sliderMax, cleanMin + 1, MAX_STRENGTH);
             int cleanValue = Mth.clamp(strength, cleanMin, cleanMax);
             return new SignalApp(cleanName.strip(), cleanFreqs, cleanValue > 0, false,
-                    cleanValue, color, icon, true, cleanMin, cleanMax);
+                    cleanValue, color, icon, true, cleanMin, cleanMax, cleanNote(note),
+                    false, cleanPulse);
         }
-        // Momentary apps never persist an active state; non-sliders keep
-        // the default 0/15 range so nothing extra persists.
-        boolean cleanActive = !momentary && active;
-        return new SignalApp(cleanName.strip(), cleanFreqs, cleanActive, momentary,
-                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false, 0, MAX_STRENGTH);
+        // Momentary and Timer apps never persist an active state (their
+        // signal is transient server state); non-sliders keep the default
+        // 0/15 range so nothing extra persists. Timed excludes momentary.
+        boolean cleanTimed = timed;
+        boolean cleanMomentary = momentary && !timed;
+        boolean cleanActive = !cleanMomentary && !cleanTimed && active;
+        return new SignalApp(cleanName.strip(), cleanFreqs, cleanActive, cleanMomentary,
+                Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false, 0, MAX_STRENGTH,
+                cleanNote(note), cleanTimed, cleanPulse);
     }
 }

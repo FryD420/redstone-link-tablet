@@ -253,6 +253,41 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: tap a Timer app — starts (or restarts) its timed pulse
+    // ------------------------------------------------------------------
+    public record TimedAppPayload(AppTarget target, int index) implements CustomPacketPayload {
+        public static final Type<TimedAppPayload> TYPE = new Type<>(id("timed_app"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, TimedAppPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, TimedAppPayload::target,
+                        ByteBufCodecs.VAR_INT, TimedAppPayload::index,
+                        TimedAppPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Payload: set (or clear, note == "") an app's free-text note
+    // ------------------------------------------------------------------
+    public record SetNotePayload(AppTarget target, int index, String note) implements CustomPacketPayload {
+        public static final Type<SetNotePayload> TYPE = new Type<>(id("set_note"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetNotePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SetNotePayload::target,
+                        ByteBufCodecs.VAR_INT, SetNotePayload::index,
+                        ByteBufCodecs.stringUtf8(SignalApp.MAX_NOTE_LENGTH), SetNotePayload::note,
+                        SetNotePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: open the app edit container menu (server-backed so the
     // editor gets real, vanilla-feeling inventory slots)
     // ------------------------------------------------------------------
@@ -278,7 +313,12 @@ public class ModNetworking {
         // SetThemePayload's ordinal domain, and SignalApp gained
         // sliderMin/sliderMax on the wire.
         // "9": 1.5.2 — ScreenTheme gained AVIONICS.
-        PayloadRegistrar registrar = event.registrar("9");
+        // "10": per-app notes — SignalApp gained the note string on the
+        // wire and SetNotePayload was added.
+        // "11": Timer apps — SignalApp gained timed/pulseTicks on the
+        // wire and TimedAppPayload was added ("10" never shipped; both
+        // land in 1.6.0, but each wire growth gets its own fence).
+        PayloadRegistrar registrar = event.registrar("11");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -288,6 +328,34 @@ public class ModNetworking {
         registrar.playToServer(RemoveAppPayload.TYPE, RemoveAppPayload.STREAM_CODEC, ModNetworking::handleRemove);
         registrar.playToServer(OpenEditMenuPayload.TYPE, OpenEditMenuPayload.STREAM_CODEC, ModNetworking::handleOpenEditMenu);
         registrar.playToServer(SetSliderPayload.TYPE, SetSliderPayload.STREAM_CODEC, ModNetworking::handleSetSlider);
+        registrar.playToServer(SetNotePayload.TYPE, SetNotePayload.STREAM_CODEC, ModNetworking::handleSetNote);
+        registrar.playToServer(TimedAppPayload.TYPE, TimedAppPayload.STREAM_CODEC, ModNetworking::handleTimed);
+    }
+
+    private static void handleTimed(TimedAppPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        AppHost host = resolve(player, payload.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        if (payload.index() < 0 || payload.index() >= apps.size()) return;
+        SignalApp app = apps.get(payload.index());
+        if (!app.timed()) return;
+        TabletTransmitterHandler.startTimed(player, payload.target().mainHand(),
+                payload.target().pos().orElse(null), payload.index(),
+                app.frequencies(), app.strength(), app.pulseTicks());
+        playClick(player, payload.target(), true);
+    }
+
+    private static void handleSetNote(SetNotePayload payload, IPayloadContext context) {
+        AppHost host = resolve(context.player(), payload.target());
+        if (host == null) return;
+        List<SignalApp> apps = host.apps();
+        if (payload.index() < 0 || payload.index() >= apps.size()) return;
+        SignalApp app = apps.get(payload.index());
+        SignalApp updated = app.withNote(payload.note());
+        if (updated.note().equals(app.note())) return;
+        apps.set(payload.index(), updated);
+        host.save(apps);
     }
 
     private static void handleSetSlider(SetSliderPayload payload, IPayloadContext context) {
@@ -351,6 +419,7 @@ public class ModNetworking {
         SignalApp app = apps.get(payload.index());
         if (app.momentary()) return; // momentary apps use MomentaryAppPayload
         if (app.slider()) return;    // sliders use SetSliderPayload
+        if (app.timed()) return;     // timers use TimedAppPayload
         boolean nowActive = !app.active();
         apps.set(payload.index(), app.withActive(nowActive));
         host.save(apps);

@@ -97,7 +97,12 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private int strength = SignalApp.MAX_STRENGTH;
     private int sliderMin = 0;
     private int sliderMax = SignalApp.MAX_STRENGTH;
+    private boolean timed = false;
+    private int pulseTicks = SignalApp.DEFAULT_PULSE_TICKS;
+    /** Carried through unchanged — notes are edited from the home screen. */
+    private String note = "";
     private boolean draggingStrength = false;
+    private boolean draggingPulse = false;
     /** Range-row knob being dragged: -1 none, 0 min, 1 max. */
     private int draggingKnob = -1;
     private boolean colorPopupOpen = false;
@@ -122,6 +127,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             this.strength = existing.strength();
             this.sliderMin = existing.sliderMin();
             this.sliderMax = existing.sliderMax();
+            this.timed = existing.timed();
+            this.pulseTicks = existing.pulseTicks();
+            this.note = existing.note();
         } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
             // Half-set link prefill: commit the lone-item frequency directly
             this.frequencies.add(Frequency.of(menu.contentHolder.prefill1(), menu.contentHolder.prefill2()));
@@ -246,7 +254,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
         SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength,
-                color, icon, slider, sliderMin, sliderMax);
+                color, icon, slider, sliderMin, sliderMax, note, timed, pulseTicks);
         UISounds.confirm();
         PacketDistributor.sendToServer(
                 new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));
@@ -319,10 +327,14 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         // App type row: click cycles Toggle → Hold → Slider
         if (mouseX >= rightX && mouseX < rightX + 90
                 && mouseY >= topPos + MOMENTARY_Y - 2 && mouseY < topPos + MOMENTARY_Y + CHECKBOX_SIZE + 2) {
-            if (!momentary && !slider) {
+            // Cycle: Toggle -> Hold -> Timer -> Slider -> Toggle
+            if (!momentary && !slider && !timed) {
                 momentary = true;
             } else if (momentary) {
                 momentary = false;
+                timed = true;
+            } else if (timed) {
+                timed = false;
                 slider = true;
                 strength = net.minecraft.util.Mth.clamp(strength, sliderMin, sliderMax);
             } else {
@@ -341,6 +353,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
                 int v = trackValueFromMouse(mouseX);
                 draggingKnob = Math.abs(v - sliderMin) <= Math.abs(v - sliderMax) ? 0 : 1;
                 setRangeFromMouse(mouseX);
+            } else if (timed) {
+                draggingPulse = true;
+                setPulseFromMouse(mouseX);
             } else {
                 draggingStrength = true;
                 setStrengthFromMouse(mouseX);
@@ -357,6 +372,10 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             setRangeFromMouse(mouseX);
             return true;
         }
+        if (draggingPulse) {
+            setPulseFromMouse(mouseX);
+            return true;
+        }
         if (draggingStrength) {
             setStrengthFromMouse(mouseX);
             return true;
@@ -371,6 +390,11 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             int landed = draggingKnob == 0 ? sliderMin : sliderMax;
             draggingKnob = -1;
             UISounds.tick(1.0F + landed / 15.0F);
+            return true;
+        }
+        if (draggingPulse) {
+            draggingPulse = false;
+            UISounds.tick(1.0F + pulseFraction());
             return true;
         }
         if (draggingStrength) {
@@ -414,6 +438,30 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
         strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
                 1, SignalApp.MAX_STRENGTH);
+    }
+
+    /** Track → pulse ticks, quadratic: half the track covers 0..7.5s. */
+    private void setPulseFromMouse(double mouseX) {
+        double rel = net.minecraft.util.Mth.clamp(
+                (mouseX - (leftPos + RIGHT_COL)) / TRACK_W, 0.0, 1.0);
+        int span = SignalApp.MAX_PULSE_TICKS - SignalApp.MIN_PULSE_TICKS;
+        pulseTicks = SignalApp.MIN_PULSE_TICKS + (int) Math.round(rel * rel * span);
+    }
+
+    /** Pulse ticks → track fraction (inverse of the quadratic map). */
+    private float pulseFraction() {
+        int span = SignalApp.MAX_PULSE_TICKS - SignalApp.MIN_PULSE_TICKS;
+        return (float) Math.sqrt(
+                (pulseTicks - SignalApp.MIN_PULSE_TICKS) / (double) span);
+    }
+
+    /** "1.5s (30t)" — seconds for everyone, ticks for redstone work. */
+    private String pulseReadout() {
+        double seconds = pulseTicks / 20.0;
+        String s = seconds == Math.floor(seconds)
+                ? String.valueOf((int) seconds)
+                : String.format("%.1f", seconds);
+        return s + "s (" + pulseTicks + "t)";
     }
 
     /** Track position → absolute level 0..15 (the range row spans the full scale). */
@@ -529,9 +577,10 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
         // App type row (click cycles): inset checkbox + current type
         int momY = top + MOMENTARY_Y;
-        Chrome.checkbox(graphics, rightX, momY, momentary || slider, theme);
+        Chrome.checkbox(graphics, rightX, momY, momentary || slider || timed, theme);
         String typeKey = slider ? "gui.linktablet.edit_app.type.slider"
                 : momentary ? "gui.linktablet.edit_app.type.momentary"
+                : timed ? "gui.linktablet.edit_app.type.timed"
                 : "gui.linktablet.edit_app.type.toggle";
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
@@ -554,6 +603,18 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, minX + 2, maxX - minX, theme.accentDim);
             Chrome.sliderKnob(graphics, minX - 2, trackY - 4, theme.textPrimary);
             Chrome.sliderKnob(graphics, maxX - 2, trackY - 4, theme.accent);
+        } else if (timed) {
+            // Timer: the track sets the pulse length (quadratic scale —
+            // fine control at short durations). Label reads both units.
+            Component timeLabel = Component.translatable("gui.linktablet.edit_app.pulse");
+            graphics.drawString(font, timeLabel, rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
+            graphics.drawString(font, pulseReadout(),
+                    rightX + font.width(timeLabel) + 6, top + STRENGTH_LABEL_Y,
+                    theme.textPrimary, shadow);
+            int handleX = rightX + Math.round(pulseFraction() * (TRACK_W - 4));
+            Chrome.sliderTrack(graphics, rightX, trackY - 1, TRACK_W, theme.switchOff);
+            Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, rightX, handleX + 2 - rightX, theme.accentDim);
+            Chrome.sliderKnob(graphics, handleX - 2, trackY - 4, theme.textPrimary);
         } else {
             graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
                     rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
@@ -592,6 +653,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
                         ? "gui.linktablet.edit_app.type.slider.tooltip"
                         : momentary
                         ? "gui.linktablet.edit_app.momentary.tooltip"
+                        : timed
+                        ? "gui.linktablet.edit_app.type.timed.tooltip"
                         : "gui.linktablet.edit_app.type.toggle.tooltip"), mouseX, mouseY);
             } else {
                 // Hovered inventory/ghost slot tooltip (vanilla)

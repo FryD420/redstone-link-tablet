@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.0 — 2026-07-19
+
+- Per-app notes (requested by the tester crew): every app can carry a
+  free-text note, opened from a small note glyph on its tile or row.
+  Notes open as floating windows — drag them by the title bar, open
+  several at once, and they stay with you: over the tablet, over your
+  inventory or any other screen (fully editable there), and as
+  read-only panels on your HUD while you play. A note closes only via
+  its own X; ESC just leaves whatever screen you're on.
+- New "Timer" app type (requested by migdzy): tap it and it transmits
+  for a set time — 0.1s to 30s, dialed in on a seconds+ticks slider —
+  then switches off by itself. Tapping again restarts the clock.
+  Timer taps on a placed tablet swing your arm like a real button,
+  and the tile glows for as long as the pulse runs.
+- Note for servers: the network protocol changed — 1.6.0 clients and
+  servers don't pair with 1.5.x or older.
+
 ## 1.5.3 — 2026-07-17
 
 - The tablet is now also listed in the vanilla Redstone creative tab —

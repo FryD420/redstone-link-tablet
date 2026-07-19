@@ -92,6 +92,23 @@ public class TabletScreen extends Screen {
     /** Index of the momentary app currently held down, or -1. */
     private int heldMomentary = -1;
 
+    /**
+     * Tap feedback for Timer apps: index → wall-clock millis until the
+     * tile renders "pressed". Client-only flash — the real pulse state
+     * lives on the server (placed screens show it via BE pips).
+     */
+    private final java.util.Map<Integer, Long> timerFlash = new java.util.HashMap<>();
+
+    private boolean timerFlashActive(int index) {
+        Long until = timerFlash.get(index);
+        if (until == null) return false;
+        if (net.minecraft.Util.getMillis() >= until) {
+            timerFlash.remove(index);
+            return false;
+        }
+        return true;
+    }
+
     /** Index of the slider app currently being dragged, or -1. */
     private int draggingSlider = -1;
 
@@ -272,6 +289,51 @@ public class TabletScreen extends Screen {
     }
 
     // ------------------------------------------------------------------
+    // Note window
+    // ------------------------------------------------------------------
+
+    /** Note windows live in {@link NoteWindows} — they outlive this screen. */
+    private void openNote(int index) {
+        NoteWindows.open(view, index);
+    }
+
+    /**
+     * Note glyph left edge inside a list row — right before the control,
+     * mirrored by the row renderer and the click hit-test.
+     */
+    private int noteGlyphListX(SignalApp app) {
+        int controlW = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+        return rowX() + rowWidth() - 4 - controlW - 12;
+    }
+
+    /** True when the mouse is over an entry's note glyph (both layouts). */
+    private boolean overNoteGlyph(int index, double mouseX, double mouseY) {
+        List<SignalApp> apps = apps();
+        if (index < 0 || index >= apps.size()) return false;
+        int y = entryY(index);
+        if (listView()) {
+            int gx = noteGlyphListX(apps.get(index));
+            return mouseX >= gx - 2 && mouseX < gx + 10
+                    && mouseY >= y + (ROW_HEIGHT - 9) / 2 - 2 && mouseY < y + (ROW_HEIGHT + 9) / 2 + 2;
+        }
+        int x = entryX(index);
+        // Top-left tile corner (below the frequency badge when present)
+        int gy = y + (apps.get(index).frequencies().size() > 1 ? 13 : 3);
+        return mouseX >= x + 1 && mouseX < x + 13 && mouseY >= gy - 2 && mouseY < gy + 11;
+    }
+
+    /** Tiny note-page glyph (7x9): outline, page, two text lines. */
+    private void drawNoteGlyph(GuiGraphics graphics, int gx, int gy, int frame, int page) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200); // above 3D block icons
+        graphics.fill(gx, gy, gx + 7, gy + 9, frame);
+        graphics.fill(gx + 1, gy + 1, gx + 6, gy + 8, page);
+        graphics.fill(gx + 2, gy + 3, gx + 5, gy + 4, frame);
+        graphics.fill(gx + 2, gy + 5, gx + 5, gy + 6, frame);
+        graphics.pose().popPose();
+    }
+
+    // ------------------------------------------------------------------
     // Rearrange mode
     // ------------------------------------------------------------------
 
@@ -328,12 +390,14 @@ public class TabletScreen extends Screen {
 
     /** Full name of a hovered entry whose label got ellipsized this frame. */
     private String hoveredEllipsizedName;
+    private boolean hoveredNoteGlyph;
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         hoveredEllipsizedName = null;
+        hoveredNoteGlyph = false;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
         if (reorderMode) {
@@ -395,10 +459,10 @@ public class TabletScreen extends Screen {
             int fx = (int) (mouseX - dragOffsetX);
             int fy = (int) (mouseY - dragOffsetY);
             if (listView()) {
-                renderAppRow(graphics, apps.get(dragIndex), fx, fy, rowWidth(), false, false);
+                renderAppRow(graphics, apps.get(dragIndex), fx, fy, rowWidth(), false, false, false);
                 graphics.fill(fx, fy, fx + rowWidth(), fy + ROW_HEIGHT, 0x28FFFFFF);
             } else {
-                renderAppTile(graphics, apps.get(dragIndex), fx, fy, false, false);
+                renderAppTile(graphics, apps.get(dragIndex), fx, fy, false, false, false);
                 graphics.fill(fx, fy, fx + TILE_SIZE, fy + TILE_SIZE, 0x28FFFFFF);
             }
         }
@@ -413,8 +477,15 @@ public class TabletScreen extends Screen {
             renderThemePopup(graphics, mouseX, mouseY, theme);
         }
 
+        // Note windows render via NoteWindows' screen event, above us.
+
         // Tooltips last, on top of everything
-        if (overModeBtn(mouseX, mouseY, gridBtnX())) {
+        if (NoteWindows.anyContains(mouseX, mouseY)) {
+            return; // no tooltips under the windows themselves
+        }
+        if (hoveredNoteGlyph) {
+            graphics.renderTooltip(font, Component.translatable("gui.linktablet.note"), mouseX, mouseY);
+        } else if (overModeBtn(mouseX, mouseY, gridBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
         } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
@@ -524,7 +595,9 @@ public class TabletScreen extends Screen {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF8A93A6);
                     }
-                    renderAppTile(graphics, apps.get(i), x, y, hovered, i == heldMomentary);
+                    renderAppTile(graphics, apps.get(i), x, y, hovered,
+                            i == heldMomentary || timerFlashActive(i),
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
             } else {
                 renderAddTile(graphics, x, y, hovered && !reorderMode);
@@ -541,7 +614,8 @@ public class TabletScreen extends Screen {
         Chrome.plaque(graphics, x, y, TILE_SIZE, TILE_SIZE, theme().surfaceLo);
     }
 
-    private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered, boolean held) {
+    private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered,
+                               boolean held, boolean noteHovered) {
         ScreenTheme theme = theme();
         // Active glow border (momentary apps glow while held)
         if (app.active() || held) {
@@ -600,7 +674,8 @@ public class TabletScreen extends Screen {
             int py = chipY0 + 2;
             int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
             graphics.fill(px, py, px + 4, py + 4, pipColor);
-            if (app.momentary() && !held) {
+            // Momentary AND Timer pips read as a hollow ring while idle
+            if ((app.momentary() || app.timed()) && !held) {
                 graphics.fill(px + 1, py + 1, px + 3, py + 3, color);
             }
         }
@@ -608,6 +683,18 @@ public class TabletScreen extends Screen {
         // Frequency count badge for scene apps
         if (app.frequencies().size() > 1) {
             graphics.drawString(font, "x" + app.frequencies().size(), x + 3, y + 3, 0xFFE2E5EB, true);
+        }
+
+        // Note glyph, tile top-left (below the badge when both show):
+        // always visible when a note exists, on hover as the affordance
+        if (app.hasNote() || hovered || noteHovered) {
+            int gy = y + (app.frequencies().size() > 1 ? 13 : 3);
+            int frame = noteHovered ? theme.glyphHover
+                    : app.hasNote() ? theme.textMuted : theme.textFaint;
+            drawNoteGlyph(graphics, x + 3, gy, frame, theme.surfaceLo);
+            if (noteHovered) {
+                hoveredNoteGlyph = true;
+            }
         }
 
         // Name (ellipsized to tile width; full name via hover tooltip)
@@ -663,7 +750,9 @@ public class TabletScreen extends Screen {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF8A93A6);
                     }
-                    renderAppRow(graphics, apps.get(i), x, y, w, hovered, i == heldMomentary);
+                    renderAppRow(graphics, apps.get(i), x, y, w, hovered,
+                            i == heldMomentary || timerFlashActive(i),
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
             } else {
                 renderAddRow(graphics, x, y, w, hovered && !reorderMode);
@@ -681,7 +770,7 @@ public class TabletScreen extends Screen {
     }
 
     private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
-                              boolean hovered, boolean held) {
+                              boolean hovered, boolean held, boolean noteHovered) {
         ScreenTheme theme = theme();
         boolean lit = app.active() || held;
         Chrome.plaque(graphics, x, y, w, ROW_HEIGHT, hovered ? theme.rowBgHover : theme.rowBg);
@@ -690,12 +779,24 @@ public class TabletScreen extends Screen {
         graphics.fill(x + 4, y + 4, x + 20, y + 20, app.color() | 0xFF000000);
         graphics.renderItem(app.iconStack(), x + 4, y + 4);
 
-        // Name (leave room for chip + switch/track + optional count tag)
+        // Note glyph, right before the control (mirrors noteGlyphListX)
+        if (app.hasNote() || hovered || noteHovered) {
+            int controlReserve = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+            int gx = x + w - 4 - controlReserve - 12;
+            int frame = noteHovered ? theme.glyphHover
+                    : app.hasNote() ? theme.textMuted : theme.textFaint;
+            drawNoteGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, frame, theme.surfaceLo);
+            if (noteHovered) {
+                hoveredNoteGlyph = true;
+            }
+        }
+
+        // Name (leave room for chip + glyph + switch/track + count tag)
         String countTag = app.frequencies().size() > 1 ? " x" + app.frequencies().size() : "";
         int tagWidth = countTag.isEmpty() ? 0 : font.width(countTag);
         // Sliders reserve extra room for the numeric level readout
         int controlW = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
-        String name = TextFit.ellipsize(font, app.name(), w - 24 - controlW - 12 - tagWidth);
+        String name = TextFit.ellipsize(font, app.name(), w - 24 - controlW - 24 - tagWidth);
         if (hovered && !name.equals(app.name())) {
             hoveredEllipsizedName = app.name();
         }
@@ -726,7 +827,18 @@ public class TabletScreen extends Screen {
 
         int sx = x + w - SWITCH_W - 4;
         int sy = y + (ROW_HEIGHT - SWITCH_H) / 2;
-        if (app.momentary()) {
+        if (app.timed()) {
+            // Timer button: a tiny clock face (dot + 12 and 3 o'clock
+            // hands) instead of the momentary center dot; lights while
+            // the tap flash runs
+            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? theme.accentDim : theme.switchOff);
+            int cx = sx + SWITCH_W / 2;
+            int cy = sy + SWITCH_H / 2;
+            int hand = held ? theme.accent : theme.textMuted;
+            graphics.fill(cx - 1, cy - 1, cx + 1, cy + 1, hand);
+            graphics.fill(cx - 1, cy - 4, cx, cy - 1, hand);
+            graphics.fill(cx + 1, cy - 1, cx + 3, cy, hand);
+        } else if (app.momentary()) {
             // Push button: center dot lights while held
             graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? theme.accentDim : theme.switchOff);
             int cx = sx + SWITCH_W / 2;
@@ -756,6 +868,11 @@ public class TabletScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Open note window is modal: clicks inside go to it, any click
+        // on the close button or outside saves + closes.
+        // Note-window clicks never reach here — NoteWindows cancels them
+        // at the screen-event layer before this method runs.
+
         // Open theme popup swallows every click until it closes
         if (themePopupOpen) {
             int px = themePopupX();
@@ -824,7 +941,7 @@ public class TabletScreen extends Screen {
 
         int index = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
         if (index != -1) {
-            handleEntryClick(index, button, mouseX);
+            handleEntryClick(index, button, mouseX, mouseY);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -901,7 +1018,7 @@ public class TabletScreen extends Screen {
         return -1;
     }
 
-    private void handleEntryClick(int index, int button, double mouseX) {
+    private void handleEntryClick(int index, int button, double mouseX, double mouseY) {
         List<SignalApp> apps = apps();
         if (index < apps.size()) {
             if (button == 1) {
@@ -911,11 +1028,24 @@ public class TabletScreen extends Screen {
                         AppEditMenu.EditContext.plain(target(), index)));
             } else if (button == 0) {
                 SignalApp app = apps.get(index);
+                if (overNoteGlyph(index, mouseX, mouseY)) {
+                    openNote(index);
+                    return;
+                }
                 if (app.slider()) {
                     // Click sets the value from position; keep dragging to sweep
                     draggingSlider = index;
                     UISounds.tick(1.2F);
                     sendSliderValue(index, sliderValueFromMouse(index, mouseX));
+                    return;
+                }
+                if (app.timed()) {
+                    // Tap: the server runs (or restarts) the timed pulse;
+                    // a short client-side pressed flash sells the tap
+                    UISounds.toggle(true);
+                    timerFlash.put(index, net.minecraft.Util.getMillis() + 300);
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.TimedAppPayload(target(), index));
                     return;
                 }
                 if (app.momentary()) {
@@ -972,6 +1102,7 @@ public class TabletScreen extends Screen {
 
     @Override
     public void removed() {
+        // Note windows live in NoteWindows and survive this screen.
         // Screen closed mid-drag: commit the move at its previewed slot
         commitDrag();
         // Screen closed or replaced mid-press: never leave a held signal on
