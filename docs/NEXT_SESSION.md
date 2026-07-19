@@ -43,58 +43,34 @@ at the repo root (auto-loaded every Claude session).
   property and falls back to the default state) — harmless LOD-only
   fallback, low priority.
 
-## Active list (vetted 2026-07-17; ordered smallest → largest effort)
-1. **Creative-mode tab** for the mod's items (tester suggestion,
-   explicitly approved by the user 2026-07-17). Trivial — registration +
-   lang key; good session warm-up.
-2. **Listing icon restyle** — iconTool's flat-GUI icon updated to match
-   the themed chrome look (user's standing preference: all chrome
-   follows the theme). Small: tool pipeline exists, no game code.
-3. **Refresh listing screenshots** in docs/images/ + docs/DESCRIPTION.md —
-   every current shot predates the whole 1.5.x visual line. Reshoot on
-   the current build (grid chip look + 8 themes incl. Avionics make a
-   better gallery). Low difficulty but time-heavy and needs the user;
-   do right after the icon so both listing assets land together —
-   ideally with items 1–2 already in the jar being photographed.
-4. **Icon-friendly defaults** — better rendering for items that look poor
-   as app icons (tester suggestion, explicitly approved 2026-07-17).
-   Likely small code, but needs a scoping chat first: which items look
-   bad, and is the fix a curated default set, a render tweak, or both?
-5. **Per-app notes** (tester request relayed by the user 2026-07-17):
-   each app gets an optional free-text note the player can open, type
-   into, and close from the GUI. Requested UX: the note POPS OUT as a
-   floating, draggable window (title bar + close button, like a Windows
-   window) rather than an inline panel — which sidesteps the 240-unit
-   GUI budget since it floats over the screen. Small-medium: new string
-   field on SignalApp (extend the hand-rolled stream codec,
-   optionalFieldOf so old NBT is untouched, registrar bump), a
-   drag-anywhere window widget in chrome styling (new widget type — the
-   chrome atlas nine-slices should cover the frame), multiline editing
-   (vanilla MultiLineEditBox as the base). GUI-only for now;
-   placed-screen display (tooltip? hover?) is a design question.
-6. **Timed button mode** (requested by migdzy, relayed by the user
-   2026-07-17): per-app activation
-   option that behaves like a customizable button — tapping emits a
-   timed pulse instead of latching, with a slider setting the hold
-   duration. Relative of the existing momentary mode (held-while-pressed);
-   this one is fixed-length after a single tap. Design TBD (duration
-   units/range, interaction with slider apps and min/max ranges).
-   Medium — a full release's worth: SignalApp codec + registrar bump,
-   edit-screen UI, server pulse timing, both renderers, NBT compat.
-7. **Pinned tablet overlay** (tester request relayed by the user
-   2026-07-17): keep the tablet usable while playing — a floating,
-   moveable mini-tablet window (same windowing idea as the notes popout)
-   that stays on screen while mining/moving. Medium-large and the hard
-   part is NOT the window: a normal Screen grabs the mouse and pauses
-   input, so this needs a HUD-layer overlay plus an interaction story
-   (e.g. keybind toggles between "pinned/passive" and "focused/
-   clickable" — the parked open-tablet keybind is the natural
-   companion/prerequisite). Renders the app grid read-only at minimum;
-   click-through toggling is the stretch goal. Shares the draggable
-   window widget with item 5 — build notes first, reuse the widget.
-8. **Multiblock screens**: designed, not scheduled — see
+## Active list (updated 2026-07-19 after the 1.6.0 cut)
+1. **Refresh listing screenshots** — the user shoots these SOLO from
+   real gameplay now that 1.6.0 is out (their call 2026-07-19); update
+   docs/images/ + docs/DESCRIPTION.md + re-upload the restyled
+   docs/icon.png to both platforms when they land.
+2. **Icon-friendly defaults** — ON HOLD (2026-07-19): the user is
+   pinning down with testers what exactly renders poorly before picking
+   a direction. Options + analysis ready in
+   `docs/ICON_DEFAULTS_SCOPING.md`; don't build until the user reports
+   back.
+3. **Pinned tablet overlay** (tester request relayed 2026-07-17): keep
+   the tablet usable while playing — a floating mini-tablet window on
+   screen while mining/moving. Got much cheaper in 1.6.0: the
+   `NoteWindows` manager (event-driven windows over any screen + HUD
+   render + input capture) is exactly the infrastructure it needs; a
+   mini-tablet is "another window type", plus an interaction story for
+   the bare HUD (the parked open-tablet keybind is the natural
+   companion).
+4. **Multiblock screens**: designed, not scheduled — see
    `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the
    bottom). Large, multi-session.
+
+Shipped in 1.6.0 (2026-07-19): per-app note windows (persistent,
+multi-open, editable over any screen incl. inventory, read-only HUD
+pins; tester request) and the Timer app type (tap-for-a-set-time,
+2t–600t quadratic slider, restart-on-retap, arm swing + press flash;
+migdzy's request, credited in the changelog). Protocol "9"→"11".
+Shipped in 1.5.3: creative Redstone-tab listing; restyled listing icon.
 
 Platform approvals (Modrinth first review + CurseForge): the user is
 watching the dashboards personally — off Claude's list; both listings
