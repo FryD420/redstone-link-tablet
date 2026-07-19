@@ -177,6 +177,20 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             if (pipHit != null) {
                 int index = pipHit.index();
                 SignalApp app = apps.get(index);
+                if (app.timed()) {
+                    // Tap starts (or restarts) the timed pulse; the
+                    // expiry loop ends it and plays the off-click.
+                    // SUCCESS (unlike momentary's CONSUME) so the tap
+                    // swings the arm like pressing a real button —
+                    // holding merely re-taps, which for a timer just
+                    // keeps the clock topped up.
+                    if (!level.isClientSide) {
+                        TabletTransmitterHandler.startTimed(player, true, pos, index,
+                                app.frequencies(), app.strength(), app.pulseTicks());
+                        ModNetworking.playToggleClick(level, null, pos, true);
+                    }
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
                 if (app.momentary()) {
                     // Tap-and-hold: holding right-click repeats the use
                     // action, refreshing a self-expiring hold — the

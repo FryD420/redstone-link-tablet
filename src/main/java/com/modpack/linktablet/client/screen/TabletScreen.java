@@ -92,6 +92,23 @@ public class TabletScreen extends Screen {
     /** Index of the momentary app currently held down, or -1. */
     private int heldMomentary = -1;
 
+    /**
+     * Tap feedback for Timer apps: index → wall-clock millis until the
+     * tile renders "pressed". Client-only flash — the real pulse state
+     * lives on the server (placed screens show it via BE pips).
+     */
+    private final java.util.Map<Integer, Long> timerFlash = new java.util.HashMap<>();
+
+    private boolean timerFlashActive(int index) {
+        Long until = timerFlash.get(index);
+        if (until == null) return false;
+        if (net.minecraft.Util.getMillis() >= until) {
+            timerFlash.remove(index);
+            return false;
+        }
+        return true;
+    }
+
     /** Index of the slider app currently being dragged, or -1. */
     private int draggingSlider = -1;
 
@@ -578,7 +595,8 @@ public class TabletScreen extends Screen {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF8A93A6);
                     }
-                    renderAppTile(graphics, apps.get(i), x, y, hovered, i == heldMomentary,
+                    renderAppTile(graphics, apps.get(i), x, y, hovered,
+                            i == heldMomentary || timerFlashActive(i),
                             !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
             } else {
@@ -656,7 +674,8 @@ public class TabletScreen extends Screen {
             int py = chipY0 + 2;
             int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
             graphics.fill(px, py, px + 4, py + 4, pipColor);
-            if (app.momentary() && !held) {
+            // Momentary AND Timer pips read as a hollow ring while idle
+            if ((app.momentary() || app.timed()) && !held) {
                 graphics.fill(px + 1, py + 1, px + 3, py + 3, color);
             }
         }
@@ -731,7 +750,8 @@ public class TabletScreen extends Screen {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF8A93A6);
                     }
-                    renderAppRow(graphics, apps.get(i), x, y, w, hovered, i == heldMomentary,
+                    renderAppRow(graphics, apps.get(i), x, y, w, hovered,
+                            i == heldMomentary || timerFlashActive(i),
                             !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
             } else {
@@ -807,7 +827,18 @@ public class TabletScreen extends Screen {
 
         int sx = x + w - SWITCH_W - 4;
         int sy = y + (ROW_HEIGHT - SWITCH_H) / 2;
-        if (app.momentary()) {
+        if (app.timed()) {
+            // Timer button: a tiny clock face (dot + 12 and 3 o'clock
+            // hands) instead of the momentary center dot; lights while
+            // the tap flash runs
+            graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? theme.accentDim : theme.switchOff);
+            int cx = sx + SWITCH_W / 2;
+            int cy = sy + SWITCH_H / 2;
+            int hand = held ? theme.accent : theme.textMuted;
+            graphics.fill(cx - 1, cy - 1, cx + 1, cy + 1, hand);
+            graphics.fill(cx - 1, cy - 4, cx, cy - 1, hand);
+            graphics.fill(cx + 1, cy - 1, cx + 3, cy, hand);
+        } else if (app.momentary()) {
             // Push button: center dot lights while held
             graphics.fill(sx, sy, sx + SWITCH_W, sy + SWITCH_H, held ? theme.accentDim : theme.switchOff);
             int cx = sx + SWITCH_W / 2;
@@ -1006,6 +1037,15 @@ public class TabletScreen extends Screen {
                     draggingSlider = index;
                     UISounds.tick(1.2F);
                     sendSliderValue(index, sliderValueFromMouse(index, mouseX));
+                    return;
+                }
+                if (app.timed()) {
+                    // Tap: the server runs (or restarts) the timed pulse;
+                    // a short client-side pressed flash sells the tap
+                    UISounds.toggle(true);
+                    timerFlash.put(index, net.minecraft.Util.getMillis() + 300);
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.TimedAppPayload(target(), index));
                     return;
                 }
                 if (app.momentary()) {

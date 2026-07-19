@@ -215,7 +215,7 @@ public final class TabletScreenRenderer {
                 } else {
                     size = Mth.clamp(cell * ICON_FRAC, ICON_MIN, ICON_MAX);
                 }
-                if (app.momentary()) size *= MOMENTARY_ICON_FRAC;
+                if (app.momentary() || app.timed()) size *= MOMENTARY_ICON_FRAC;
             }
             renderIcon(poseStack, buffers, app.iconStack(), cu, cv, size, light);
         }
@@ -400,9 +400,9 @@ public final class TabletScreenRenderer {
                     SLIDER_TRACK, packedLight);
             return;
         }
-        if (app.momentary()) {
+        if (app.momentary() || app.timed()) {
             if (held) {
-                // Pressed: fills solid and glows, like an active toggle
+                // Pressed / pulse running: fills solid and glows
                 fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
                 raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, brighten(color), LightTexture.FULL_BRIGHT);
             } else {
@@ -446,7 +446,7 @@ public final class TabletScreenRenderer {
         float half = (cell - 2 * chipInset(cell)) / 2f;
         float cu = (u0 + u1) / 2f;
         float cv = v0 + (v1 - v0 - labelZone) / 2f;
-        if (app.momentary() && !held) {
+        if ((app.momentary() || app.timed()) && !held) {
             ring(pose, vc, cu - half, cv - half, cu + half, cv + half, LAYER * 1.75f,
                     dim(color), packedLight, ringW);
         } else {

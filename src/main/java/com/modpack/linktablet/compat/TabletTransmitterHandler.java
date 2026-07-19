@@ -90,6 +90,21 @@ public class TabletTransmitterHandler {
     }
 
     /**
+     * Starts (or RESTARTS — a re-tap tops the clock back up, user
+     * decision 2026-07-19) a Timer app's pulse: a self-expiring hold
+     * that the normal expiry loop finishes, off-click and pip included.
+     * No release packet exists for timers; the clock is the release.
+     */
+    public static void startTimed(Player player, boolean mainHand, @Nullable BlockPos pos, int index,
+                                  List<Frequency> frequencies, int strength, int pulseTicks) {
+        long expireAt = player.level().getGameTime() + pulseTicks;
+        HELD.computeIfAbsent(player.getUUID(), uuid -> new HashMap<>())
+                .put(new HoldKey(mainHand, pos, index),
+                        new Hold(frequencies, strength, pos, expireAt, expireAt));
+        setBePip(player, pos, index, true);
+    }
+
+    /**
      * Registers or refreshes a tap-and-hold press on a placed tablet's
      * screen; it expires on its own unless the (repeating) block use
      * refreshes it. Returns true when this started a new press.
@@ -168,7 +183,9 @@ public class TabletTransmitterHandler {
             if (!(stack.getItem() instanceof TabletItem)) continue;
             List<SignalApp> apps = stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
             for (SignalApp app : apps) {
-                if (!app.active() || app.momentary()) continue;
+                // Momentary and Timer apps broadcast via holds, never
+                // via a persisted active flag
+                if (!app.active() || app.momentary() || app.timed()) continue;
                 for (Frequency freq : app.frequencies()) {
                     if (!freq.isEmpty()) {
                         wanted.merge(freq, app.strength(), Math::max);
