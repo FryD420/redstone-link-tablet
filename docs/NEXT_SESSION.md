@@ -35,10 +35,10 @@ at the repo root (auto-loaded every Claude session).
    of Dark/Light/Parchment/Avionics from theme1–4.png raws; crop
    705,325 510×440), dyed-cases2.png, reused recipe.png. The
    click-and-slide slider action shot was SKIPPED on purpose (text
-   covers it). Remaining: commit + push (raw URLs need main), paste to
-   both listings, gallery upload (hero4 first = social preview),
-   re-upload restyled docs/icon.png, prune superseded images (list in
-   DESCRIPTION.md footer).
+   covers it). Description LIVE ON BOTH LISTINGS, galleries + restyled
+   icon uploaded, superseded images pruned — item 1 is FULLY DONE
+   (2026-07-19 evening). Next priority: the pinned tablet overlay
+   (item 2 below).
 2. **Pinned tablet overlay** — next feature. Much cheaper since 1.6.0:
    `NoteWindows` already does event-driven windows over any screen,
    HUD rendering, and input capture; a mini-tablet is "another window
@@ -58,10 +58,9 @@ codebase to maintain; wait for real demand signals now that the
 listings are public).
 
 ## Active list (updated 2026-07-19 after the 1.6.0 cut)
-1. **Refresh listing screenshots — DONE 2026-07-19** (user + wife
-   shoot, all embeds live in DESCRIPTION.md). Left: commit/push, paste
-   description to both platforms, gallery upload, restyled
-   docs/icon.png re-upload, prune old images.
+1. **Refresh listing screenshots — FULLY DONE 2026-07-19** (user +
+   wife shoot; description, galleries, and restyled icon live on both
+   platforms; superseded images pruned from docs/images/).
 2. **Icon-friendly defaults** — ON HOLD (2026-07-19): the user is
    pinning down with testers what exactly renders poorly before picking
    a direction. Options + analysis ready in

@@ -171,11 +171,11 @@ Shot 2026-07-19 by FryD42 + wife. Done and embedded above:
 - ✅ **recipe.png** — unchanged since 1.1.1, reused (3× upscale crop of
   `recipe-full.png`).
 
-Shoot complete — every image slot is filled (a click-and-slide action shot was
-considered and skipped; the text covers it). Remaining steps: commit + push so
-the raw URLs resolve, paste the description into both listings, upload hero4 +
-the factory shot to each site's Gallery tab (hero first — it becomes the
-social preview), and re-upload the restyled `docs/icon.png`. Old images
-(`hero.png`, `hero2.png`, `hero3.png`, `mounted-factory.png`,
-`dyed-cases.png`, and the `theme1–4.png` raws) can be pruned once the listings
-are updated.
+Refresh COMPLETE (2026-07-19): every slot filled (a click-and-slide action
+shot was considered and skipped; the text covers it), description pasted to
+both listings, galleries + restyled icon uploaded, superseded images pruned.
+`recipe-full.png` and `icon-bg.png` stay — they're sources for `recipe.png`
+and the iconTool. For the next refresh: shoot, drop files in `docs/images/`,
+embed at
+`https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/<file>.png`,
+push, then paste everything below the divider into both listing editors.
