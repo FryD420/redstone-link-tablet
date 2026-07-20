@@ -1029,7 +1029,7 @@ public class TabletScreen extends Screen {
                 }
             }
         } else if (button == 0) {
-            if (apps.size() < ModNetworking.MAX_APPS) {
+            if (apps.size() < view.maxApps()) {
                 UISounds.page();
                 PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
                         AppEditMenu.EditContext.plain(target(), -1)));

@@ -48,6 +48,14 @@ public class TabletBlockEntity extends BlockEntity {
     /** Screen content rotation, quarter turns CW; 0 is never persisted. */
     private int screenRotation;
 
+    // Multiblock surface role (1.7.0). Offsets run along screenRight/
+    // screenDown to the controller; (0,0) = controller or standalone.
+    // Dims live on the controller; (1,1) = standalone. Roles are
+    // assigned by TabletSurfaceScanner, synced via the update tag, and
+    // NEVER travel on the item (toItemStack/loadFromItem ignore them).
+    private byte surfaceDx, surfaceDy;
+    private byte surfaceW = 1, surfaceH = 1;
+
     /** Server-side transmitters keyed by frequency (max strength wins). */
     private final Map<Frequency, VirtualTransmitter> transmitters = new HashMap<>();
 
@@ -175,11 +183,125 @@ public class TabletBlockEntity extends BlockEntity {
     }
 
     // ------------------------------------------------------------------
+    // Multiblock surface role (1.7.0)
+    // ------------------------------------------------------------------
+
+    /** Whether this tablet is a non-controller member of a merged surface. */
+    public boolean isSurfacePart() {
+        return surfaceDx != 0 || surfaceDy != 0;
+    }
+
+    /** Whether this tablet is the controller of a multi-member surface. */
+    public boolean isSurfaceController() {
+        return !isSurfacePart() && (surfaceW > 1 || surfaceH > 1);
+    }
+
+    public boolean isMerged() {
+        return isSurfacePart() || isSurfaceController();
+    }
+
+    public int getSurfaceDx() {
+        return surfaceDx;
+    }
+
+    public int getSurfaceDy() {
+        return surfaceDy;
+    }
+
+    public int getSurfaceW() {
+        return surfaceW;
+    }
+
+    public int getSurfaceH() {
+        return surfaceH;
+    }
+
+    public int memberCount() {
+        return surfaceW * surfaceH;
+    }
+
+    /** App cap: every merged member adds a full tablet's worth. */
+    public int maxApps() {
+        return com.modpack.linktablet.network.ModNetworking.MAX_APPS * memberCount();
+    }
+
+    /**
+     * Content rotation the surface actually renders/hit-tests with:
+     * merged surfaces clamp to 0 (whole-pose rotation is geometrically
+     * impossible across fixed glass rects); the stored rotation stays
+     * dormant and comes back on split.
+     */
+    public int effectiveRotation() {
+        return isMerged() ? 0 : screenRotation;
+    }
+
+    /** Controller position derived from this member's own offset + state. */
+    public BlockPos getControllerPos() {
+        if (!isSurfacePart()) return worldPosition;
+        BlockState state = getBlockState();
+        return worldPosition
+                .relative(TabletScreenMath.screenRight(state), -surfaceDx)
+                .relative(TabletScreenMath.screenDown(state), -surfaceDy);
+    }
+
+    /**
+     * The controller BE this part belongs to, or null when it can't be
+     * resolved (unloaded chunk, stale roles). Validates that the target
+     * actually claims a surface covering this member's offset.
+     */
+    @Nullable
+    public TabletBlockEntity getController() {
+        if (!isSurfacePart()) return this;
+        if (level == null) return null;
+        BlockPos pos = getControllerPos();
+        if (!level.isLoaded(pos)) return null;
+        if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity controller)) return null;
+        if (controller.isSurfacePart()) return null;
+        if (surfaceDx >= controller.surfaceW || surfaceDy >= controller.surfaceH) return null;
+        return controller;
+    }
+
+    /**
+     * Where clicks/edits on this tablet actually land: itself when
+     * standalone or controller, the controller when a part — null when
+     * the part is orphaned (treat as inert).
+     */
+    @Nullable
+    public TabletBlockEntity resolveController() {
+        return isSurfacePart() ? getController() : this;
+    }
+
+    /** Scanner entry point: assigns (or clears) this member's role. */
+    public void setSurfaceRole(int dx, int dy, int w, int h) {
+        if (surfaceDx == dx && surfaceDy == dy && surfaceW == w && surfaceH == h) return;
+        surfaceDx = (byte) dx;
+        surfaceDy = (byte) dy;
+        surfaceW = (byte) w;
+        surfaceH = (byte) h;
+        clearHeldPips();
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+        if (isSurfacePart()) {
+            clearTransmitters();
+        } else {
+            refreshTransmitters();
+            updateLit();
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Transmitters
     // ------------------------------------------------------------------
 
     private void refreshTransmitters() {
         if (!(level instanceof ServerLevel serverLevel)) return;
+        // Parts are dormant: the controller broadcasts for the surface
+        if (isSurfacePart()) {
+            clearTransmitters();
+            return;
+        }
 
         Map<Frequency, Integer> wanted = new HashMap<>();
         for (SignalApp app : apps) {
@@ -218,18 +340,53 @@ public class TabletBlockEntity extends BlockEntity {
 
     private void updateLit() {
         if (level == null) return;
-        BlockState state = getBlockState();
-        if (!state.hasProperty(TabletBlock.LIT)) return;
+        // Parts never own the lit computation; the controller lights
+        // the whole surface at once.
+        if (isSurfacePart()) return;
         boolean lit = apps.stream().anyMatch(a -> a.active() && !a.momentary());
-        if (state.getValue(TabletBlock.LIT) != lit) {
-            level.setBlock(worldPosition, state.setValue(TabletBlock.LIT, lit), 3);
+        if (isSurfaceController()) {
+            BlockState state = getBlockState();
+            for (int dx = 0; dx < surfaceW; dx++) {
+                for (int dy = 0; dy < surfaceH; dy++) {
+                    BlockPos member = worldPosition
+                            .relative(TabletScreenMath.screenRight(state), dx)
+                            .relative(TabletScreenMath.screenDown(state), dy);
+                    setLitAt(member, lit);
+                }
+            }
+        } else {
+            setLitAt(worldPosition, lit);
         }
+    }
+
+    /** Sets LIT on one member pos (LIT-only diffs skip the merge scanner). */
+    private void setLitAt(BlockPos pos, boolean lit) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.hasProperty(TabletBlock.LIT)) return;
+        if (state.getValue(TabletBlock.LIT) != lit) {
+            level.setBlock(pos, state.setValue(TabletBlock.LIT, lit), 3);
+        }
+    }
+
+    /** Recomputes surface lighting after a role change (scanner hook). */
+    public void updateSurfaceLit() {
+        updateLit();
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
         refreshTransmitters();
+        // Chunk-edge self-heal: a part whose controller chunk is loaded
+        // but no longer claims it (broken while we were unloaded) gets a
+        // rescan; a part whose controller is UNLOADED stays inert until
+        // that chunk loads (its own onLoad will re-check).
+        if (level instanceof ServerLevel serverLevel
+                && isSurfacePart()
+                && serverLevel.isLoaded(getControllerPos())
+                && getController() == null) {
+            serverLevel.scheduleTick(worldPosition, getBlockState().getBlock(), 1);
+        }
     }
 
     @Override
@@ -267,6 +424,14 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenRotation != 0) {
             tag.putInt("screen_rotation", screenRotation);
         }
+        if (surfaceDx != 0 || surfaceDy != 0) {
+            tag.putByte("surface_dx", surfaceDx);
+            tag.putByte("surface_dy", surfaceDy);
+        }
+        if (surfaceW != 1 || surfaceH != 1) {
+            tag.putByte("surface_w", surfaceW);
+            tag.putByte("surface_h", surfaceH);
+        }
     }
 
     @Override
@@ -279,6 +444,10 @@ public class TabletBlockEntity extends BlockEntity {
         this.screenList = tag.getBoolean("screen_list");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
+        this.surfaceDx = tag.getByte("surface_dx");
+        this.surfaceDy = tag.getByte("surface_dy");
+        this.surfaceW = tag.contains("surface_w") ? tag.getByte("surface_w") : 1;
+        this.surfaceH = tag.contains("surface_h") ? tag.getByte("surface_h") : 1;
         // Only ever present in sync tags (see getUpdateTag) — a disk load
         // always clears the transient held-pip visuals.
         heldPips.clear();

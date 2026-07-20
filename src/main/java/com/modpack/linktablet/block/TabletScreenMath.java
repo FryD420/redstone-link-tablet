@@ -75,21 +75,17 @@ public final class TabletScreenMath {
      * renderer's slider art (which draws through these same helpers).
      */
     public static float[] sliderBarU(int index, int appCount, boolean list, int rot) {
-        float w = glassW(rot);
-        if (list) {
-            float su1 = GLASS_U0 + w - SPACE - LIST_SWITCH_MARGIN;
-            return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
-        }
-        GridLayout grid = gridLayout(appCount, rot);
-        float tileW = tileSize(w, grid.cols());
-        float u0 = tileU0(index % grid.cols(), tileW);
-        float inset = sliderInset(tileW);
-        return new float[]{u0 + inset, u0 + tileW - inset};
+        return surfaceSliderBarU(index, appCount, list, rot, 1, 1);
     }
 
     /** Apps visible on the physical screen in the given layout. */
     public static int visibleApps(int appCount, boolean list) {
-        return Math.min(appCount, list ? LIST_ROWS : MAX_PIPS);
+        return visibleApps(appCount, list, 1);
+    }
+
+    /** Visible cap for a merged surface: every member adds a full screen. */
+    public static int visibleApps(int appCount, boolean list, int members) {
+        return Math.min(appCount, (list ? LIST_ROWS : MAX_PIPS) * members);
     }
 
     /** Grid dimensions for a given app count. */
@@ -100,20 +96,121 @@ public final class TabletScreenMath {
     }
 
     /**
+     * Density ladder for the per-block sub-grid — the ONE table both the
+     * single-block grid and merged surfaces walk (in order, first entry
+     * whose cell count covers the visible apps).
+     */
+    private static final int[][] DENSITY_LADDER = {
+            {1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 4}, {4, 4}, {COLS, ROWS}};
+
+    /**
+     * A w×h-block merged surface tiled with a k×m sub-grid PER MEMBER
+     * (tiles never straddle the bezel seams — video-wall layout). The
+     * surface grid is (k·w)×(m·h), app indices row-major across the
+     * WHOLE surface, so a member shows a strided subset, never a
+     * contiguous slice. These mapping methods are the ONLY converter
+     * between surface indices and member cells: renderer and hit-test
+     * both call them — never duplicate the arithmetic.
+     */
+    public record SurfaceLayout(int blocksW, int blocksH, int k, int m) {
+        public int cols() {
+            return k * blocksW;
+        }
+
+        public int rows() {
+            return m * blocksH;
+        }
+
+        public int cells() {
+            return cols() * rows();
+        }
+
+        /** Member block column (0..blocksW-1) showing surface index i. */
+        public int blockX(int i) {
+            return (i % cols()) / k;
+        }
+
+        /** Member block row (0..blocksH-1) showing surface index i. */
+        public int blockY(int i) {
+            return (i / cols()) / m;
+        }
+
+        /** Column inside the member's own k×m sub-grid. */
+        public int localCol(int i) {
+            return (i % cols()) % k;
+        }
+
+        /** Row inside the member's own k×m sub-grid. */
+        public int localRow(int i) {
+            return (i / cols()) % m;
+        }
+
+        /** Inverse mapping: member + local cell → surface index. */
+        public int surfaceIndex(int bx, int by, int localCol, int localRow) {
+            return (by * m + localRow) * cols() + bx * k + localCol;
+        }
+    }
+
+    /**
+     * Sub-grid density for a surface: smallest ladder entry whose total
+     * cell count covers the visible apps — the merged-surface
+     * generalization of {@link #gridLayout} (which delegates here).
+     */
+    public static SurfaceLayout surfaceLayout(int appCount, int w, int h, int rot) {
+        int visible = Math.max(1, visibleApps(appCount, false, w * h));
+        int k = COLS;
+        int m = ROWS;
+        for (int[] step : DENSITY_LADDER) {
+            if (step[0] * step[1] * w * h >= visible) {
+                k = step[0];
+                m = step[1];
+                break;
+            }
+        }
+        // Rotation only exists on single blocks (merged surfaces clamp
+        // to 0); odd quarter-turns swap the sub-grid sense.
+        if (w == 1 && h == 1 && (rot & 1) == 1) {
+            return new SurfaceLayout(1, 1, m, k);
+        }
+        return new SurfaceLayout(w, h, k, m);
+    }
+
+    /**
      * The pip grid sizes itself to the app count — one app fills the
      * whole glass, few apps get big tiles, converging on the densest
      * {@link #COLS}×{@link #ROWS} grid. Renderer and click hit-test both
-     * derive their geometry from this table; never duplicate it.
+     * derive their geometry from this table (via {@link #surfaceLayout});
+     * never duplicate it.
      */
     public static GridLayout gridLayout(int appCount) {
-        if (appCount <= 1) return new GridLayout(1, 1);
-        if (appCount == 2) return new GridLayout(1, 2);
-        if (appCount <= 4) return new GridLayout(2, 2);
-        if (appCount <= 6) return new GridLayout(2, 3);
-        if (appCount <= 9) return new GridLayout(3, 3);
-        if (appCount <= 12) return new GridLayout(3, 4);
-        if (appCount <= 16) return new GridLayout(4, 4);
-        return new GridLayout(COLS, ROWS);
+        SurfaceLayout sl = surfaceLayout(appCount, 1, 1, 0);
+        return new GridLayout(sl.k(), sl.m());
+    }
+
+    // ------------------------------------------------------------------
+    // List mode on a merged surface: newspaper columns — indices run DOWN
+    // each block column (LIST_ROWS per member) before jumping to the next
+    // column of blocks. The three helpers below are the only mapping.
+    // ------------------------------------------------------------------
+
+    /** Member block column showing list index i on an h-block-tall surface. */
+    public static int listBlockX(int i, int h) {
+        return i / (LIST_ROWS * h);
+    }
+
+    /** Member block row showing list index i. */
+    public static int listBlockY(int i, int h) {
+        return (i % (LIST_ROWS * h)) / LIST_ROWS;
+    }
+
+    /** Row inside the member's own list showing index i. */
+    public static int listLocalRow(int i, int h) {
+        return i % LIST_ROWS;
+    }
+
+    /** Inverse: member + local list row → surface list index. */
+    public static int listIndex(int bx, int by, int localRow, int h) {
+        return bx * LIST_ROWS * h + by * LIST_ROWS + localRow;
     }
 
     // ------------------------------------------------------------------
@@ -192,6 +289,46 @@ public final class TabletScreenMath {
             case CEILING -> Direction.DOWN;
             case WALL -> state.getValue(TabletBlock.FACING);
         };
+    }
+
+    /**
+     * World direction of screen-space +u (visual RIGHT): the forward
+     * image of the canonical +X axis under the model rotation stack
+     * (preRot, then xRot, then yRot — the exact rotations {@link
+     * #screenUV} inverts, translation-free). Surface formation, member
+     * offsets, and the controller render box all derive from this pair;
+     * a sign error here is self-consistent (controller merely lands in
+     * the wrong visual corner) — verify per orientation class in-game.
+     */
+    public static Direction screenRight(BlockState state) {
+        return transformDirection(state, 1, 0, 0);
+    }
+
+    /** World direction of screen-space +v (visual DOWN): forward image of +Z. */
+    public static Direction screenDown(BlockState state) {
+        return transformDirection(state, 0, 0, 1);
+    }
+
+    private static Direction transformDirection(BlockState state, int dx, int dy, int dz) {
+        // Forward vertex order: preRot first, then xRot, then yRot.
+        // Forward Y quarter-step on directions: (dx, dz) -> (-dz, dx).
+        // Forward X quarter-step on directions: (dy, dz) -> (dz, -dy).
+        for (int i = preRot(state) / 90; i > 0; i--) {
+            int nx = -dz;
+            dz = dx;
+            dx = nx;
+        }
+        for (int i = xRot(state) / 90; i > 0; i--) {
+            int ny = dz;
+            dz = -dy;
+            dy = ny;
+        }
+        for (int i = yRot(state) / 90; i > 0; i--) {
+            int nx = -dz;
+            dz = dx;
+            dx = nx;
+        }
+        return Direction.fromDelta(dx, dy, dz);
     }
 
     /**
@@ -319,6 +456,20 @@ public final class TabletScreenMath {
     /** Like {@link #hitPip}, but null for a miss and with the along-fraction. */
     public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
                                         int appCount, boolean list, int rot) {
+        return hitPipDetailed(state, pos, hit, appCount, list, rot, 0, 0, 1, 1);
+    }
+
+    /**
+     * Surface-aware hit test (1.7.0): the clicked block does its normal
+     * single-glass UV math, then the member's (bx, by) position on the
+     * w×h surface maps the local cell to the surface app index through
+     * {@link SurfaceLayout}/the list helpers. {@code logicalU} stays
+     * MEMBER-local — slider bars live inside one block's glass, and the
+     * drag maps against {@link #surfaceSliderBarU}'s member-local span.
+     */
+    public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
+                                        int appCount, boolean list, int rot,
+                                        int bx, int by, int w, int h) {
         if (appCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
         if (uv == null) return null;
@@ -335,28 +486,49 @@ public final class TabletScreenMath {
         // step, tracking the (possibly swapped) space dimensions.
         double pu = u - GLASS_U0;
         double pv = v - GLASS_V0;
-        double w = GLASS_U1 - GLASS_U0;
-        double h = GLASS_V1 - GLASS_V0;
+        double gw = GLASS_U1 - GLASS_U0;
+        double gh = GLASS_V1 - GLASS_V0;
         for (int i = 0; i < (rot & 3); i++) {
             double nu = pv;
-            double nv = w - pu;
+            double nv = gw - pu;
             pu = nu;
             pv = nv;
-            double t = w;
-            w = h;
-            h = t;
+            double t = gw;
+            gw = gh;
+            gh = t;
         }
 
         int index;
         if (list) {
-            index = (int) (pv * LIST_ROWS / h);
+            int localRow = (int) (pv * LIST_ROWS / gh);
+            index = listIndex(bx, by, localRow, h);
         } else {
-            GridLayout grid = gridLayout(appCount, rot);
-            int row = (int) (pv * grid.rows() / h);
-            int col = (int) (pu * grid.cols() / w);
-            index = row * grid.cols() + col;
+            SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+            int localRow = (int) (pv * sl.m() / gh);
+            int localCol = (int) (pu * sl.k() / gw);
+            index = sl.surfaceIndex(bx, by, localCol, localRow);
         }
-        if (index >= visibleApps(appCount, list)) return null;
+        if (index >= visibleApps(appCount, list, w * h)) return null;
         return new PipHit(index, (float) (GLASS_U0 + pu));
+    }
+
+    /**
+     * MEMBER-local u-span of a surface slider's value bar. The single
+     * block form ({@link #sliderBarU}) delegates here with a 1×1 surface;
+     * for merged surfaces the bar sits inside whichever member shows the
+     * tile, and the span uses that member's local column.
+     */
+    public static float[] surfaceSliderBarU(int surfaceIndex, int appCount, boolean list,
+                                            int rot, int w, int h) {
+        float gw = glassW(rot);
+        if (list) {
+            float su1 = GLASS_U0 + gw - SPACE - LIST_SWITCH_MARGIN;
+            return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
+        }
+        SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+        float tileW = tileSize(gw, sl.k());
+        float u0 = tileU0(sl.localCol(surfaceIndex), tileW);
+        float inset = sliderInset(tileW);
+        return new float[]{u0 + inset, u0 + tileW - inset};
     }
 }

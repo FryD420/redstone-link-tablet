@@ -1,4 +1,11 @@
-# Multiblock screens — design (not yet implemented)
+# Multiblock screens — design (IMPLEMENTED in 1.7.0)
+
+> Status 2026-07-19: implemented on the `tablet-overlay` branch per this
+> design plus the decisions at the bottom. Key architecture addition:
+> PER-BLOCK SUB-GRIDS (tiles never straddle bezel seams; `TabletScreenMath.
+> SurfaceLayout` is the only index↔member mapper) and scheduled-tick
+> formation scans (`TabletSurfaceScanner`; onPlace must never scan
+> synchronously — LIT setBlock recursion).
 
 Combine multiple placed tablets into one large screen/control panel. This is
 the agreed design; implementation is deferred to a future round. Modeled on
@@ -61,10 +68,22 @@ surface — no assembly tool, no GUI.
 - On split (any member broken), clear holds for the controller pos — same
   self-healing rule as app reorder.
 
-## Open questions (decide before implementation)
+## Open questions — RESOLVED (user, 2026-07-19)
 
-1. Max size: 3×3, or allow 4×3 for widescreen wall panels?
-2. Should merged surfaces raise `MAX_APPS` (currently 32 per tablet)?
-3. Cheaper "extension tablet" part item, or full tablets only?
-4. Case-color mismatches: recommend each block keeps its own bezel tint while
-   screen content renders uniformly — confirm the look in-game.
+1. Max size: **4×3** (widescreen allowed).
+2. App cap: **scales, 32 × memberCount**, enforced at ADD time only —
+   splits never delete; an over-cap standalone tablet just can't add
+   until back under (lossless-split guarantee).
+3. **Full tablets only** — no extension item.
+4. **Each block keeps its own bezel tint** (video-wall mosaic) while
+   content renders uniformly.
+
+Implementation decisions (design pass, same day):
+- Content rotation **clamps to 0 while merged** (`effectiveRotation()`);
+  the stored rotation stays dormant and restores on split.
+- Wrench on a merged member **always block-rotates** (glass branch
+  skipped) — the state change splits it out via the scanner.
+- All faces allowed (wall/floor/ceiling); axis math centralized in
+  `TabletScreenMath.screenRight/screenDown`.
+- Invalid arrangements (L-shapes, 5-wide rows) dissolve the WHOLE
+  component to standalone — filled-rectangle-or-nothing, data safe.

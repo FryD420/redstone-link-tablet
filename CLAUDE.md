@@ -59,6 +59,17 @@ transmit on Create's Redstone Link network.
 - Dynamic screen grid (1.3.0): `TabletScreenMath.gridLayout(appCount)` is the
   ONLY count→cols×rows table; renderer and server hit-test both call it —
   never duplicate the breakpoints.
+- Multiblock surfaces (1.7.0): `TabletScreenMath.SurfaceLayout` (+ the
+  `listBlockX/Y/listLocalRow` trio) is the ONLY surface-index↔member-cell
+  mapper — members show STRIDED subsets, never contiguous slices; renderer
+  and hit-test must both go through it. Formation runs ONLY from scheduled
+  block ticks (`TabletSurfaceScanner`): `TabletBlock.onPlace` must keep
+  skipping LIT-only state changes or `updateLit`'s setBlock recurses into
+  the scanner (stack overflow). Slider drags on surfaces are MEMBER-local
+  for geometry (ray + bar span) but target the CONTROLLER's pos in
+  payloads — never mix. Content rotation clamps to 0 while merged
+  (`effectiveRotation()`); parts render/transmit nothing (controller owns
+  everything); roles never travel on the item.
 - Themes (1.3.0): `theme/ScreenTheme` — DARK must stay byte-identical to the
   pre-1.3.0 hardcoded colors and is never persisted (no component, no NBT),
   so 1.2.x tablets stay untouched. The theme STREAM_CODEC is ordinal-based:

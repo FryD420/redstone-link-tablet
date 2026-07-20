@@ -2,7 +2,6 @@ package com.modpack.linktablet.client.render;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
-import com.modpack.linktablet.block.TabletScreenMath.GridLayout;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -76,6 +75,29 @@ public final class TabletScreenRenderer {
         return tileV0(row, rowH);
     }
 
+    // ---- Surface position mapping (1.7.0): SurfaceLayout / the list
+    // helpers are the ONLY index converters; these just add the member's
+    // 16-texel block offset. ----
+
+    private static float surfU0(TabletScreenMath.SurfaceLayout sl, int i, float tileW) {
+        return 16f * sl.blockX(i) + tileU0(sl.localCol(i), tileW);
+    }
+
+    private static float surfV0(TabletScreenMath.SurfaceLayout sl, int i, float tileH) {
+        return 16f * sl.blockY(i) + tileV0(sl.localRow(i), tileH);
+    }
+
+    /** U texel offset of the member showing list index i (newspaper order). */
+    private static float listOffU(int i, int surfaceH) {
+        return 16f * TabletScreenMath.listBlockX(i, surfaceH);
+    }
+
+    /** Top V of list index i's row, member offset included. */
+    private static float listRowV0(int i, int surfaceH, float rowH) {
+        return 16f * TabletScreenMath.listBlockY(i, surfaceH)
+                + listV0(TabletScreenMath.listLocalRow(i, surfaceH), rowH);
+    }
+
     /** Hollow-ring (momentary) thickness in texels at the densest grid. */
     private static final float RING = 0.5f;
 
@@ -121,6 +143,22 @@ public final class TabletScreenRenderer {
     public static void render(PoseStack poseStack, MultiBufferSource buffers,
                               List<SignalApp> apps, boolean list, int rot, ScreenTheme theme,
                               boolean backlit, int packedLight, Set<Integer> heldPips) {
+        render(poseStack, buffers, apps, list, rot, theme, backlit, packedLight, heldPips, 1, 1);
+    }
+
+    /**
+     * Surface-aware entry (1.7.0): a merged w×h surface draws every
+     * member's glass at a texel offset of (16·bx, 16·by) under ONE pose —
+     * one block is exactly 16 texels, so no per-member pose pushes are
+     * needed and the strict three-pass order holds across the whole
+     * surface by construction. Content rotation only exists at 1×1
+     * (surfaces clamp to 0; see TabletBlockEntity.effectiveRotation).
+     */
+    public static void render(PoseStack poseStack, MultiBufferSource buffers,
+                              List<SignalApp> apps, boolean list, int rot, ScreenTheme theme,
+                              boolean backlit, int packedLight, Set<Integer> heldPips,
+                              int surfaceW, int surfaceH) {
+        int members = surfaceW * surfaceH;
         // Content rotation: draw in a "logical" glass (landscape when rot
         // is odd) spun about the physical glass center. The pivot maps
         // the logical rect exactly onto the physical one; the hit-test
@@ -130,7 +168,7 @@ public final class TabletScreenRenderer {
         float u1 = TabletScreenMath.GLASS_U0 + glassW;
         float v1 = TabletScreenMath.GLASS_V0 + glassH;
         poseStack.pushPose();
-        if ((rot & 3) != 0) {
+        if ((rot & 3) != 0 && members == 1) {
             float pivotU = (TabletScreenMath.GLASS_U0 + TabletScreenMath.GLASS_U1) / 2f / 16f;
             float pivotV = (TabletScreenMath.GLASS_V0 + TabletScreenMath.GLASS_V1) / 2f / 16f;
             float logicalU = (TabletScreenMath.GLASS_U0 + glassW / 2f) / 16f;
@@ -145,33 +183,39 @@ public final class TabletScreenRenderer {
         // The background bleeds half a texel under the bezel ring (the
         // screen sits below the lip, so the ring covers the overdraw) —
         // otherwise the baked screen art shimmers through the seam.
+        // Every member gets its own backlit glass + theme frame: the
+        // bezel strips between members stay bezels (video-wall look).
         float bleed = 0.5f;
         int bgLight = backlit ? LightTexture.FULL_BRIGHT : packedLight;
         int bg = backlit ? theme.screenBgLit : theme.screenBgOff;
-        fillRect(pose, vc,
-                TabletScreenMath.GLASS_U0 - bleed, TabletScreenMath.GLASS_V0 - bleed,
-                u1 + bleed, v1 + bleed,
-                0f, bg, bgLight);
-
-        // Theme frame hugging the glass edge — the GUI panel's rail
-        // brought in-world (1.5.1). Lives in the existing margins, so
-        // layout and hit-tests are untouched. A dark seam (not a bright
-        // ridge) separates rail from canvas: on themes whose border color
-        // sits near the unlit background a bright ridge reads as a stray
-        // glowing rectangle, while a shadow seam degrades to invisible.
         float frameW = 0.4f;
         int frame = theme.bodyOuter;
-        ring(pose, vc, TabletScreenMath.GLASS_U0, TabletScreenMath.GLASS_V0, u1, v1,
-                LAYER * 0.5f, frame, bgLight, frameW);
-        ring(pose, vc, TabletScreenMath.GLASS_U0 + frameW, TabletScreenMath.GLASS_V0 + frameW,
-                u1 - frameW, v1 - frameW, LAYER * 0.5f, shade(frame, 0.5f), bgLight, 0.12f);
+        for (int bx = 0; bx < surfaceW; bx++) {
+            for (int by = 0; by < surfaceH; by++) {
+                float oU = 16f * bx;
+                float oV = 16f * by;
+                fillRect(pose, vc,
+                        oU + TabletScreenMath.GLASS_U0 - bleed, oV + TabletScreenMath.GLASS_V0 - bleed,
+                        oU + u1 + bleed, oV + v1 + bleed,
+                        0f, bg, bgLight);
 
-        int count = TabletScreenMath.visibleApps(apps.size(), list);
-        GridLayout grid = TabletScreenMath.gridLayout(apps.size(), rot);
+                // Theme frame hugging each glass edge — the GUI panel's
+                // rail brought in-world (1.5.1). A dark seam (not a
+                // bright ridge) separates rail from canvas.
+                ring(pose, vc, oU + TabletScreenMath.GLASS_U0, oV + TabletScreenMath.GLASS_V0,
+                        oU + u1, oV + v1, LAYER * 0.5f, frame, bgLight, frameW);
+                ring(pose, vc, oU + TabletScreenMath.GLASS_U0 + frameW, oV + TabletScreenMath.GLASS_V0 + frameW,
+                        oU + u1 - frameW, oV + v1 - frameW, LAYER * 0.5f, shade(frame, 0.5f), bgLight, 0.12f);
+            }
+        }
+
+        int count = TabletScreenMath.visibleApps(apps.size(), list, members);
+        TabletScreenMath.SurfaceLayout sl =
+                TabletScreenMath.surfaceLayout(apps.size(), surfaceW, surfaceH, rot);
         float rowH = listRowH(glassH);
-        float tileW = tileSize(glassW, grid.cols());
-        float tileH = tileSize(glassH, grid.rows());
-        boolean labels = !list && grid.cells() <= LABEL_CELLS_MAX;
+        float tileW = tileSize(glassW, sl.k());
+        float tileH = tileSize(glassH, sl.m());
+        boolean labels = !list && sl.k() * sl.m() <= LABEL_CELLS_MAX;
         float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
         // Bottom strip of each big tile reserved for the name label
         float labelZone = labels ? textH + LABEL_GAP : 0f;
@@ -187,10 +231,13 @@ public final class TabletScreenRenderer {
             int color = app.color() | 0xFF000000;
             boolean held = heldPips.contains(i);
             if (list) {
-                renderSwitchRow(pose, vc, i, app, color, theme, packedLight, held, rowH, u1);
+                float oU = listOffU(i, surfaceH);
+                renderSwitchRow(pose, vc, listRowV0(i, surfaceH, rowH), app, color, theme,
+                        packedLight, held, rowH,
+                        oU + TabletScreenMath.GLASS_U0 + SPACE, oU + u1 - SPACE);
             } else {
-                float u0 = tileU0(i % grid.cols(), tileW);
-                float v0 = tileV0(i / grid.cols(), tileH);
+                float u0 = surfU0(sl, i, tileW);
+                float v0 = surfV0(sl, i, tileH);
                 renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, app, color, theme,
                         packedLight, ringW, held, labelZone);
             }
@@ -201,13 +248,13 @@ public final class TabletScreenRenderer {
             int light = glowing ? LightTexture.FULL_BRIGHT : packedLight;
             float cu, cv, size;
             if (list) {
-                cu = TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
-                cv = listV0(i, rowH) + rowH / 2f;
+                cu = listOffU(i, surfaceH) + TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
+                cv = listRowV0(i, surfaceH, rowH) + rowH / 2f;
                 // Icon fills the inset chip exactly, like the GUI's 16px-on-16px
                 size = Math.min(LIST_ICON, rowH * 2f / 3f);
             } else {
-                cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
-                cv = tileV0(i / grid.cols(), tileH) + (tileH - labelZone) / 2f;
+                cu = surfU0(sl, i, tileW) + tileW / 2f;
+                cv = surfV0(sl, i, tileH) + (tileH - labelZone) / 2f;
                 float cell = Math.min(tileW, tileH - labelZone);
                 if (cell >= CHIP_MIN_CELL) {
                     // Icon fills the inset chip exactly, like the list rows
@@ -224,18 +271,20 @@ public final class TabletScreenRenderer {
         Font font = Minecraft.getInstance().font;
         if (list) {
             float scale = LIST_TEXT_H / 16f / FONT_LINE;
-            // Between the icon chip and the switch; slider rows have a
-            // wider track plus the level numeral, so budget per row
-            float textU0 = TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
             for (int i = 0; i < count; i++) {
                 SignalApp app = apps.get(i);
-                float controlU0 = u1 - SPACE - SWITCH_MARGIN
+                float oU = listOffU(i, surfaceH);
+                // Between the icon chip and the switch; slider rows have a
+                // wider track plus the level numeral, so budget per row
+                float textU0 = oU + TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
+                float rowV0 = listRowV0(i, surfaceH, rowH);
+                float controlU0 = oU + u1 - SPACE - SWITCH_MARGIN
                         - (app.slider() ? SWITCH_W * 1.6f : SWITCH_W);
                 float textU1 = controlU0 - 0.4f;
                 if (app.slider()) {
                     String level = String.valueOf(app.strength());
                     float levelW = font.width(level) * LIST_TEXT_H / FONT_LINE;
-                    float levelTop = listV0(i, rowH) + (rowH - LIST_TEXT_H) / 2f;
+                    float levelTop = rowV0 + (rowH - LIST_TEXT_H) / 2f;
                     drawLabel(poseStack, buffers, font, level, controlU0 - 0.3f - levelW,
                             levelTop, scale, false, false, theme.textPrimary, bgLight);
                     textU1 = controlU0 - 0.6f - levelW;
@@ -243,7 +292,7 @@ public final class TabletScreenRenderer {
                 int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
                 FittedLabel label = fitLabel(font, app.name(), maxPx);
                 if (label.text().isBlank()) continue;
-                float top = listV0(i, rowH) + (rowH - LIST_TEXT_H * label.fit()) / 2f;
+                float top = rowV0 + (rowH - LIST_TEXT_H * label.fit()) / 2f;
                 // Plain text: rows sit on the themed track, no outline needed
                 drawLabel(poseStack, buffers, font, label.text(), textU0, top, scale * label.fit(),
                         false, false, theme.textPrimary, bgLight);
@@ -255,9 +304,9 @@ public final class TabletScreenRenderer {
             for (int i = 0; i < count; i++) {
                 FittedLabel label = fitLabel(font, apps.get(i).name(), maxPx);
                 if (label.text().isBlank()) continue;
-                float cu = tileU0(i % grid.cols(), tileW) + tileW / 2f;
+                float cu = surfU0(sl, i, tileW) + tileW / 2f;
                 // Bottom-aligned so a shrunk label hugs the tile edge
-                float top = tileV0(i / grid.cols(), tileH) + tileH - textH * label.fit() - SPACE;
+                float top = surfV0(sl, i, tileH) + tileH - textH * label.fit() - SPACE;
                 // White with a black outline: the label sits on the app's
                 // own tile color (any brightness), not the theme surface
                 drawLabel(poseStack, buffers, font, label.text(), cu, top, scale * label.fit(),
@@ -273,8 +322,8 @@ public final class TabletScreenRenderer {
                 SignalApp app = apps.get(i);
                 if (!app.slider()) continue;
                 String level = String.valueOf(app.strength());
-                float u0 = tileU0(i % grid.cols(), tileW);
-                float v0 = tileV0(i / grid.cols(), tileH);
+                float u0 = surfU0(sl, i, tileW);
+                float v0 = surfV0(sl, i, tileH);
                 float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
                 float levelW = font.width(level) * numH / FONT_LINE;
                 float cell = Math.min(tileW, tileH - labelZone);
@@ -471,15 +520,13 @@ public final class TabletScreenRenderer {
         }
     }
 
-    /** List row: colored chip left, mini switch right (icon drawn later). */
+    /** List row: colored chip left, mini switch right (icon drawn later).
+     *  Bounds arrive precomputed (member offsets included on surfaces). */
     private static void renderSwitchRow(PoseStack.Pose pose, VertexConsumer vc,
-                                        int i, SignalApp app, int color,
+                                        float v0, SignalApp app, int color,
                                         ScreenTheme theme, int packedLight, boolean held,
-                                        float rowH, float glassU1) {
-        float v0 = listV0(i, rowH);
+                                        float rowH, float u0, float u1) {
         float v1 = v0 + rowH;
-        float u0 = TabletScreenMath.GLASS_U0 + SPACE;
-        float u1 = glassU1 - SPACE;
         boolean on = (app.active() && !app.momentary()) || held;
         int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
 

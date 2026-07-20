@@ -81,6 +81,11 @@ public class ModNetworking {
         List<SignalApp> apps();
 
         void save(List<SignalApp> apps);
+
+        /** Add-time cap: merged surfaces scale it (32 per member). */
+        default int maxApps() {
+            return MAX_APPS;
+        }
     }
 
     @Nullable
@@ -90,7 +95,12 @@ public class ModNetworking {
             if (!player.level().isLoaded(pos)) return null;
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
-            if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return null;
+            if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
+            // Merged surfaces: edits land on the controller (a stale
+            // client may still target a part; the controller is at most
+            // 3 blocks further — inside the distance budget's slack)
+            TabletBlockEntity be = clicked.resolveController();
+            if (be == null) return null;
             return new AppHost() {
                 @Override
                 public List<SignalApp> apps() {
@@ -100,6 +110,11 @@ public class ModNetworking {
                 @Override
                 public void save(List<SignalApp> apps) {
                     be.setApps(apps);
+                }
+
+                @Override
+                public int maxApps() {
+                    return be.maxApps();
                 }
             };
         }
@@ -419,7 +434,7 @@ public class ModNetworking {
         if (host == null) return;
         List<SignalApp> apps = host.apps();
         if (ctx.index() < -1 || ctx.index() >= apps.size()) return;
-        if (ctx.index() == -1 && apps.size() >= MAX_APPS) return;
+        if (ctx.index() == -1 && apps.size() >= host.maxApps()) return;
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         serverPlayer.openMenu(new SimpleMenuProvider(
                         (id, inv, p) -> new AppEditMenu(ModMenus.APP_EDIT.get(), id, inv, ctx),
@@ -491,7 +506,7 @@ public class ModNetworking {
         if (app.frequencies().isEmpty()) return;
         List<SignalApp> apps = host.apps();
         if (payload.index() == -1) {
-            if (apps.size() >= MAX_APPS) return;
+            if (apps.size() >= host.maxApps()) return;
             apps.add(app);
         } else {
             if (payload.index() < 0 || payload.index() >= apps.size()) return;
@@ -525,7 +540,10 @@ public class ModNetworking {
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.setScreenList(payload.list());
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setScreenList(payload.list());
+                }
             }
             return;
         }
@@ -547,7 +565,10 @@ public class ModNetworking {
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.setTheme(payload.theme());
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setTheme(payload.theme());
+                }
             }
             return;
         }

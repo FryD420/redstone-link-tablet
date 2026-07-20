@@ -35,7 +35,14 @@ public final class BlockSliderDrag {
 
     private static final double MAX_DISTANCE_SQ = 64.0;
 
+    /**
+     * The clicked member: ray projection and the bar span are computed
+     * against ITS screen plane (member-local u). On a merged surface
+     * this may differ from {@link #controllerPos}, which owns the app
+     * data and receives the payloads.
+     */
     private static BlockPos pos;
+    private static BlockPos controllerPos;
     private static int index = -1;
     private static int lastSent = -1;
 
@@ -43,8 +50,9 @@ public final class BlockSliderDrag {
     }
 
     /** Grabs a slider (called from the block's use handler, client side). */
-    public static void start(BlockPos clickedPos, int appIndex) {
+    public static void start(BlockPos clickedPos, BlockPos controller, int appIndex) {
         pos = clickedPos.immutable();
+        controllerPos = controller.immutable();
         index = appIndex;
         lastSent = -1;
     }
@@ -55,6 +63,7 @@ public final class BlockSliderDrag {
 
     private static void stop() {
         pos = null;
+        controllerPos = null;
         index = -1;
         lastSent = -1;
     }
@@ -82,12 +91,19 @@ public final class BlockSliderDrag {
         }
         BlockState state = mc.level.getBlockState(pos);
         if (!(state.getBlock() instanceof TabletBlock)
-                || !(mc.level.getBlockEntity(pos) instanceof TabletBlockEntity be)
+                || !(mc.level.getBlockEntity(pos) instanceof TabletBlockEntity member)
                 || player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > MAX_DISTANCE_SQ) {
             stop();
             return;
         }
-        List<SignalApp> apps = be.getApps();
+        // The controller owns the data; a merge/split mid-drag that
+        // changes who that is invalidates the grab.
+        TabletBlockEntity controller = member.resolveController();
+        if (controller == null || !controller.getBlockPos().equals(controllerPos)) {
+            stop();
+            return;
+        }
+        List<SignalApp> apps = controller.getApps();
         if (index >= apps.size() || !apps.get(index).slider()) {
             stop();
             return;
@@ -95,17 +111,22 @@ public final class BlockSliderDrag {
 
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getViewVector(1.0F);
-        float logicalU = TabletScreenMath.logicalUFromRay(state, pos, eye, look, be.getScreenRotation());
+        // Member-local: the ray hits THIS block's plane and the bar span
+        // lives inside this block's glass (U4 — never mix in controller
+        // coordinates here; only the payload targets the controller).
+        float logicalU = TabletScreenMath.logicalUFromRay(state, pos, eye, look,
+                controller.effectiveRotation());
         if (Float.isNaN(logicalU)) return;
-        // Map against the bar's exact span so its end tracks the crosshair
-        float[] bar = TabletScreenMath.sliderBarU(index, apps.size(), be.isScreenList(), be.getScreenRotation());
+        float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
+                controller.isScreenList(), controller.effectiveRotation(),
+                controller.getSurfaceW(), controller.getSurfaceH());
         float frac = net.minecraft.util.Mth.clamp((logicalU - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
         int value = apps.get(index).valueFromFraction(frac);
         if (value == lastSent) return;
         lastSent = value;
         if (value != apps.get(index).strength()) {
             PacketDistributor.sendToServer(new ModNetworking.SetSliderPayload(
-                    ModNetworking.AppTarget.ofBlock(pos), index, value));
+                    ModNetworking.AppTarget.ofBlock(controllerPos), index, value));
         }
     }
 }

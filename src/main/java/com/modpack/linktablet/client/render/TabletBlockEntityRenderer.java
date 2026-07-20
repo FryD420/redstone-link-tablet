@@ -30,6 +30,9 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
     @Override
     public void render(TabletBlockEntity be, float partialTick, PoseStack poseStack,
                        MultiBufferSource buffers, int packedLight, int packedOverlay) {
+        // Merged-surface parts draw nothing: the controller's pass covers
+        // every member's glass (1.7.0).
+        if (be.isSurfacePart()) return;
         // Rendered even with no apps: the flat glass replaces the baked
         // screen art everywhere, so empty and in-use tablets match.
         List<SignalApp> apps = be.getApps();
@@ -52,8 +55,27 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         poseStack.translate(2 / 16f, SCREEN_HEIGHT, 1 / 16f);
 
         TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
-                be.getScreenRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
-                packedLight, be.getHeldPips());
+                be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                packedLight, be.getHeldPips(), be.getSurfaceW(), be.getSurfaceH());
         poseStack.popPose();
+    }
+
+    /**
+     * A controller draws across every member block — without widening
+     * the box, frustum culling clips the surface whenever the controller
+     * block itself leaves the view.
+     */
+    @Override
+    public net.minecraft.world.phys.AABB getRenderBoundingBox(TabletBlockEntity be) {
+        net.minecraft.core.BlockPos pos = be.getBlockPos();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(pos);
+        if (be.isSurfaceController()) {
+            BlockState state = be.getBlockState();
+            net.minecraft.core.BlockPos far = pos
+                    .relative(TabletScreenMath.screenRight(state), be.getSurfaceW() - 1)
+                    .relative(TabletScreenMath.screenDown(state), be.getSurfaceH() - 1);
+            box = box.minmax(new net.minecraft.world.phys.AABB(far));
+        }
+        return box.inflate(0.5);
     }
 }
