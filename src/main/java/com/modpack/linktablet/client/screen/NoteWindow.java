@@ -23,16 +23,18 @@ import java.util.function.Supplier;
  * vanilla frame suppressed — the themed panel + ink field underneath
  * are the visuals, following the ChromeEditBox recipe.
  *
- * <p>Closing the tablet GUI with a window open PINS it: {@link
- * com.modpack.linktablet.client.PinnedNote} renders a read-only copy on
- * the HUD ({@link #paintFrame} is the shared painter), and TabletScreen
- * re-hydrates the editable window when the GUI reopens.
+ * <p>Closing the tablet GUI with a window open PINS it: the {@link
+ * NoteWindows} manager keeps rendering it — read-only on the bare HUD,
+ * editable again whenever any screen is open.
  *
- * <p>The owner ({@link TabletScreen}) forwards input while a window is
- * open and saves via {@link #value()} when it closes. The window never
- * sends packets itself.
+ * <p>Input arrives through the {@link NoteWindows} manager's screen
+ * events. Since the 1.7.0 {@link FloatingWindow} extraction the window
+ * flushes its own edits: {@link #defocus()}/{@link #onClose()} send a
+ * {@code SetNotePayload} when the text changed — the server stays
+ * authoritative and other players' edits sync back through normal
+ * app-list sync.
  */
-public class NoteWindow {
+public class NoteWindow implements FloatingWindow {
 
     public static final int W = 176;
     public static final int H = 120;
@@ -76,17 +78,12 @@ public class NoteWindow {
         this.box.setFocused(true);
     }
 
-    String value() {
+    private String value() {
         return box.getValue();
     }
 
-    boolean changed() {
+    private boolean changed() {
         return !value().equals(original);
-    }
-
-    /** Resets the dirty baseline after the manager sends a save. */
-    void markSaved() {
-        original = value();
     }
 
     int x() {
@@ -97,17 +94,41 @@ public class NoteWindow {
         return y;
     }
 
-    boolean boxFocused() {
+    /** Sends the note to the server when it changed since the last save. */
+    private void save() {
+        if (!changed()) return;
+        if (appIndex >= view.apps().size()) return;
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.modpack.linktablet.network.ModNetworking.SetNotePayload(
+                        view.target(), appIndex, value()));
+        original = value();
+    }
+
+    @Override
+    public boolean wantsKeyboard() {
         return box.isFocused();
     }
 
-    void unfocus() {
+    @Override
+    public void defocus() {
+        save();
         box.setFocused(false);
+    }
+
+    @Override
+    public boolean shouldClose() {
+        return appIndex < 0 || appIndex >= view.apps().size();
+    }
+
+    @Override
+    public void onClose() {
+        save();
     }
 
     // ---- Geometry ----------------------------------------------------
 
-    boolean contains(double mx, double my) {
+    @Override
+    public boolean contains(double mx, double my) {
         return mx >= x && mx < x + W && my >= y && my < y + H;
     }
 
@@ -115,7 +136,8 @@ public class NoteWindow {
         return mx >= x && mx < x + W - TITLE_H && my >= y && my < y + TITLE_H;
     }
 
-    boolean overCloseButton(double mx, double my) {
+    @Override
+    public boolean overCloseButton(double mx, double my) {
         int cx = x + W - CLOSE_SIZE - 7;
         int cy = y + 5;
         return mx >= cx - 2 && mx < cx + CLOSE_SIZE + 2 && my >= cy - 2 && my < cy + CLOSE_SIZE + 2;
@@ -123,7 +145,8 @@ public class NoteWindow {
 
     // ---- Render ------------------------------------------------------
 
-    void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         ScreenTheme t = theme.get();
 
         // Keep the window reachable across screen resizes
@@ -177,7 +200,8 @@ public class NoteWindow {
      * consumed); false when it fell outside — the owner lets it through
      * to the GUI. The close button is the OWNER's check, before this.
      */
-    boolean mouseClicked(double mx, double my, int button) {
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
         if (button == 0 && overTitleBar(mx, my)) {
             draggingTitle = true;
             dragDX = mx - x;
@@ -194,8 +218,9 @@ public class NoteWindow {
         return false;
     }
 
-    boolean mouseDragged(double mx, double my, int button, double dx, double dy,
-                         int screenW, int screenH) {
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy,
+                                int screenW, int screenH) {
         if (draggingTitle) {
             x = Mth.clamp((int) (mx - dragDX), 2, screenW - W - 2);
             y = Mth.clamp((int) (my - dragDY), 2, screenH - H - 2);
@@ -204,20 +229,24 @@ public class NoteWindow {
         return box.isFocused() && box.mouseDragged(mx, my, button, dx, dy);
     }
 
-    void mouseReleased(double mx, double my, int button) {
+    @Override
+    public void mouseReleased(double mx, double my, int button) {
         draggingTitle = false;
         box.mouseReleased(mx, my, button);
     }
 
-    boolean mouseScrolled(double mx, double my, double sx, double sy) {
+    @Override
+    public boolean mouseScrolled(double mx, double my, double sx, double sy) {
         return box.mouseScrolled(mx, my, sx, sy);
     }
 
-    boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        return box.keyPressed(keyCode, scanCode, modifiers);
+    @Override
+    public void keyPressed(int keyCode, int scanCode, int modifiers) {
+        box.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    boolean charTyped(char chr, int modifiers) {
-        return box.charTyped(chr, modifiers);
+    @Override
+    public void charTyped(char chr, int modifiers) {
+        box.charTyped(chr, modifiers);
     }
 }

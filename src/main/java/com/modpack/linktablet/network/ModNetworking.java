@@ -51,21 +51,28 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
-    // Target: a tablet in a hand, or a placed tablet block
+    // Target: a tablet in a hand, a placed tablet block, or a tablet in
+    // an inventory slot (1.7.0 — the pinned overlay acts on tablets the
+    // player carries but isn't holding)
     // ------------------------------------------------------------------
-    public record AppTarget(boolean mainHand, Optional<BlockPos> pos) {
+    public record AppTarget(boolean mainHand, Optional<BlockPos> pos, Optional<Integer> slot) {
         public static final StreamCodec<RegistryFriendlyByteBuf, AppTarget> STREAM_CODEC =
                 StreamCodec.composite(
                         ByteBufCodecs.BOOL, AppTarget::mainHand,
                         ByteBufCodecs.optional(BlockPos.STREAM_CODEC), AppTarget::pos,
+                        ByteBufCodecs.optional(ByteBufCodecs.VAR_INT), AppTarget::slot,
                         AppTarget::new);
 
         public static AppTarget ofHand(InteractionHand hand) {
-            return new AppTarget(hand == InteractionHand.MAIN_HAND, Optional.empty());
+            return new AppTarget(hand == InteractionHand.MAIN_HAND, Optional.empty(), Optional.empty());
         }
 
         public static AppTarget ofBlock(BlockPos pos) {
-            return new AppTarget(true, Optional.of(pos));
+            return new AppTarget(true, Optional.of(pos), Optional.empty());
+        }
+
+        public static AppTarget ofSlot(int slot) {
+            return new AppTarget(true, Optional.empty(), Optional.of(slot));
         }
     }
 
@@ -96,8 +103,15 @@ public class ModNetworking {
                 }
             };
         }
-        ItemStack stack = player.getItemInHand(
-                target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        ItemStack stack;
+        if (target.slot().isPresent()) {
+            int slot = target.slot().get();
+            if (slot < 0 || slot >= player.getInventory().getContainerSize()) return null;
+            stack = player.getInventory().getItem(slot);
+        } else {
+            stack = player.getItemInHand(
+                    target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        }
         if (!(stack.getItem() instanceof TabletItem)) return null;
         return new AppHost() {
             @Override
@@ -110,6 +124,24 @@ public class ModNetworking {
                 stack.set(ModDataComponents.TABLET_APPS.get(), List.copyOf(apps));
             }
         };
+    }
+
+    /**
+     * The tablet stack an item-mode target points at (hand or inventory
+     * slot), or EMPTY when it isn't a tablet — for handlers that write
+     * item components directly instead of going through {@link AppHost}.
+     */
+    private static ItemStack resolveStack(Player player, AppTarget target) {
+        ItemStack stack;
+        if (target.slot().isPresent()) {
+            int slot = target.slot().get();
+            if (slot < 0 || slot >= player.getInventory().getContainerSize()) return ItemStack.EMPTY;
+            stack = player.getInventory().getItem(slot);
+        } else {
+            stack = player.getItemInHand(
+                    target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        }
+        return stack.getItem() instanceof TabletItem ? stack : ItemStack.EMPTY;
     }
 
     // ------------------------------------------------------------------
@@ -318,7 +350,9 @@ public class ModNetworking {
         // "11": Timer apps — SignalApp gained timed/pulseTicks on the
         // wire and TimedAppPayload was added ("10" never shipped; both
         // land in 1.6.0, but each wire growth gets its own fence).
-        PayloadRegistrar registrar = event.registrar("11");
+        // "12": 1.7.0 pinned overlay — AppTarget gained the inventory-
+        // slot mode (third optional field on every payload's wire).
+        PayloadRegistrar registrar = event.registrar("12");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -495,9 +529,8 @@ public class ModNetworking {
             }
             return;
         }
-        ItemStack stack = player.getItemInHand(
-                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
-        if (stack.getItem() instanceof TabletItem) {
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
             if (payload.list()) {
                 stack.set(ModDataComponents.SCREEN_LIST.get(), true);
             } else {
@@ -518,9 +551,8 @@ public class ModNetworking {
             }
             return;
         }
-        ItemStack stack = player.getItemInHand(
-                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
-        if (stack.getItem() instanceof TabletItem) {
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
             // DARK is the default and is never written, so 1.2.x tablets
             // stay component-free.
             if (payload.theme() == ScreenTheme.DARK) {

@@ -48,6 +48,39 @@ public sealed interface AppView {
         }
     }
 
+    /**
+     * Tablet in an inventory slot — the pinned overlay's item binding
+     * (1.7.0): unlike {@link Hand}, it keeps working while the player
+     * mines with something else. Callers re-validate the slot (see the
+     * overlay's self-heal) — an empty or foreign stack reads as no apps.
+     */
+    record Slot(int slot) implements AppView {
+        @Override
+        public List<SignalApp> apps() {
+            ItemStack stack = stack();
+            return stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
+        }
+
+        @Override
+        public ModNetworking.AppTarget target() {
+            return ModNetworking.AppTarget.ofSlot(slot);
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            return stack().getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        }
+
+        public ItemStack stack() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null || slot < 0
+                    || slot >= mc.player.getInventory().getContainerSize()) {
+                return ItemStack.EMPTY;
+            }
+            return mc.player.getInventory().getItem(slot);
+        }
+    }
+
     record Block(BlockPos pos) implements AppView {
         @Override
         public List<SignalApp> apps() {

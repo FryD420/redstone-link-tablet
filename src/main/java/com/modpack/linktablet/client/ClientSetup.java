@@ -79,6 +79,12 @@ public class ClientSetup {
     }
 
     @SubscribeEvent
+    public static void onRegisterKeyMappings(net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent event) {
+        event.register(OverlayKeys.OVERLAY_INTERACT);
+        event.register(OverlayKeys.OPEN_TABLET);
+    }
+
+    @SubscribeEvent
     public static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
         event.registerItem(new IClientItemExtensions() {
             @Override

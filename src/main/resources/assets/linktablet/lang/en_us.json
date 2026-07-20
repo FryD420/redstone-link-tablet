@@ -50,6 +50,17 @@
   "message.linktablet.link_no_frequency": "This link has no frequency set",
   "message.linktablet.link_already_added": "Already added — editing %s",
   "message.linktablet.tablet_full": "Tablet is full",
+  "message.linktablet.no_tablet": "No Link Tablet in your inventory",
+
+  "key.categories.linktablet": "Link Tablet",
+  "key.linktablet.overlay_interact": "Use Pinned Tablet",
+  "key.linktablet.open_tablet": "Open Tablet",
+
+  "gui.linktablet.overlay.title": "Link Tablet",
+  "gui.linktablet.overlay.empty": "No apps on this tablet",
+  "gui.linktablet.overlay.focus": "Pinned tablet",
+  "gui.linktablet.overlay.pin": "Pin to screen",
+  "gui.linktablet.overlay.unpin": "Unpin from screen",
 
   "linktablet.ponder.tablet.header": "Controlling Redstone Links remotely",
   "linktablet.ponder.tablet.text_1": "This Redstone Link receives on the frequency set by its two item slots",

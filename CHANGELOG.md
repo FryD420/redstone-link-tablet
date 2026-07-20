@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Pinned tablet overlay (requested by the tester crew): a pin button in
+  the tablet GUI keeps a floating mini-tablet on your screen while you
+  play — live app rows on the HUD, draggable, and it remembers its spot
+  and pin across sessions. Press the new "Use Pinned Tablet" key
+  (default B, rebindable) to free your mouse chat-style and tap apps,
+  drag sliders, or hold buttons without opening anything; it's also
+  clickable with the normal cursor over your inventory, chat, or any
+  other screen. Right-click a row to jump into the full tablet GUI.
+  Pinned placed tablets dim out of edit range; pinned carried tablets
+  follow the item around your inventory.
+- New "Open Tablet" keybind (default unbound): opens the tablet GUI
+  from anywhere — hand first, then anywhere in your inventory.
+- Note for servers: the network protocol changed — these clients and
+  servers don't pair with 1.6.0 or older.
+
 ## 1.6.0 — 2026-07-19
 
 - Per-app notes (requested by the tester crew): every app can carry a
