@@ -111,11 +111,13 @@ public final class BlockSliderDrag {
 
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getViewVector(1.0F);
-        // Member-local: the ray hits THIS block's plane and the bar span
-        // lives inside this block's glass (U4 — never mix in controller
-        // coordinates here; only the payload targets the controller).
-        float logicalU = TabletScreenMath.logicalUFromRay(state, pos, eye, look,
-                controller.effectiveRotation());
+        // The ray hits the clicked MEMBER's plane; the surface-aware
+        // helper folds in the member offset BEFORE the rotation swizzle
+        // so the result lives in the same continuous space as
+        // surfaceSliderBarU (rotated surfaces included).
+        float logicalU = TabletScreenMath.logicalSurfaceUFromRay(state, pos, eye, look,
+                controller.effectiveRotation(), member.getSurfaceDx(), member.getSurfaceDy(),
+                controller.getSurfaceW(), controller.getSurfaceH());
         if (Float.isNaN(logicalU)) return;
         float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
                 controller.isScreenList(), controller.effectiveRotation(),

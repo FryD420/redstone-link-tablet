@@ -3,6 +3,31 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
+## Status (2026-07-19, LATE night — 1.7.0 bundle on `tablet-overlay`)
+- **1.7.0 is feature-complete but UNRELEASED** (user call: hold the
+  send). Two features, both dev-tested live across long sessions:
+  1. **Pinned tablet overlay** (commit 511f862): mini-tablet window +
+     first keybinds (B = chat-style interact, Open Tablet unbound);
+     AppTarget slot mode, registrar "11"→"12". Tested "works great".
+  2. **Multiblock screens** (821ce45 + tonight's uncommitted-at-time
+     fix wave): merge coplanar tablets up to 4×3 into ONE continuous
+     display. Tonight's debug arc (all fixed): floor-facing mismatch →
+     placement auto-adopt; per-block panels → continuous raised panel
+     covering full block faces + case-tint bezel band + skirt; bulk
+     role-sync dropped by vanilla's batched BE path → explicit
+     per-player packets; stale roles → onLoad self-heal (parts AND
+     controllers); merged rotation (square=90° steps, oblong=180°) via
+     wrench ANYWHERE on the face (bezel = hidden trap, removed);
+     big-icon depth clipping → size-proportional lift; member
+     selection outline suppressed.
+- **Before release**: strip the TEMP "linktablet-surface" debug logging
+  (TabletSurfaceScanner + TabletBlockEntity.loadAdditional); one more
+  full polish pass by the user; CHANGELOG "Unreleased" → 1.7.0; user
+  modpack test; merge to main, tag v1.7.0, push, platform uploads.
+  Remaining test debt: multiplayer via dev server, floor/ceiling
+  orientation pass, ponder + held-item regression, chunk-border
+  surface.
+
 ## Status (2026-07-19, evening)
 - **v1.6.0 is the current release** (tagged, pushed, uploaded): per-app
   NOTE WINDOWS (floating/draggable/multi-open; editable over ANY screen

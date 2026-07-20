@@ -25,6 +25,11 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
      * recessed below the bezel lip (1.05), like a real inset display. */
     private static final float SCREEN_HEIGHT = 1f / 16f + 0.001f;
 
+    /** Merged surfaces float ONE continuous panel just above the bezel
+     * lips instead — it spans every member, covering interior bezels
+     * and case seams so the wall reads as a single big screen. */
+    private static final float MERGED_SCREEN_HEIGHT = 1.1f / 16f + 0.001f;
+
     public TabletBlockEntityRenderer(BlockEntityRendererProvider.Context context) {}
 
     @Override
@@ -52,11 +57,15 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         if (preRot != 0) poseStack.mulPose(Axis.YN.rotationDegrees(preRot));
         poseStack.translate(-0.5, -0.5, -0.5);
         // Screen artwork origin in the canonical floor/north frame
-        poseStack.translate(2 / 16f, SCREEN_HEIGHT, 1 / 16f);
+        poseStack.translate(2 / 16f,
+                be.isSurfaceController() ? MERGED_SCREEN_HEIGHT : SCREEN_HEIGHT, 1 / 16f);
 
+        int caseTint = be.getCaseColor() != null
+                ? 0xFF000000 | be.getCaseColor().getTextureDiffuseColor()
+                : TabletScreenRenderer.DEFAULT_CASE_TINT;
         TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
                 be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
-                packedLight, be.getHeldPips(), be.getSurfaceW(), be.getSurfaceH());
+                packedLight, be.getHeldPips(), be.getSurfaceW(), be.getSurfaceH(), caseTint);
         poseStack.popPose();
     }
 

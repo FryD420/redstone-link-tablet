@@ -33,6 +33,10 @@ import java.util.Set;
  */
 public final class TabletSurfaceScanner {
 
+    /** TEMP debug for the 1.7.0 shakedown — strip before release. */
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger("linktablet-surface");
+
     public static final int MAX_W = 4;
     public static final int MAX_H = 3;
 
@@ -86,6 +90,11 @@ public final class TabletSurfaceScanner {
         int h = maxD - minD + 1;
         boolean valid = !overflow && w <= MAX_W && h <= MAX_H
                 && members.size() == w * h && members.size() > 1;
+        LOGGER.info("[surface] rescan @{} key={}/{}/{} right={} down={} members={} rect={}x{} valid={}",
+                origin.toShortString(),
+                refState.getValue(TabletBlock.FACE), refState.getValue(TabletBlock.FACING),
+                refState.getValue(TabletBlock.LANDSCAPE),
+                right, down, members.size(), w, h, valid);
 
         // Old controllers first — their holds must clear either way
         Set<BlockPos> holdTargets = new HashSet<>();

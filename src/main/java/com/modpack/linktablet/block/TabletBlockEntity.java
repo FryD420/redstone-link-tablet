@@ -226,13 +226,31 @@ public class TabletBlockEntity extends BlockEntity {
     }
 
     /**
-     * Content rotation the surface actually renders/hit-tests with:
-     * merged surfaces clamp to 0 (whole-pose rotation is geometrically
-     * impossible across fixed glass rects); the stored rotation stays
-     * dormant and comes back on split.
+     * Content rotation the surface actually renders/hit-tests with.
+     * Merged surfaces support 180° flips always, and full 90° steps
+     * only when SQUARE (a rotated oblong logical glass can't map onto
+     * the fixed physical span) — odd quarter-turns on a non-square
+     * surface clamp down to the nearest flip. Standalone tablets are
+     * unrestricted, and a part's own stored rotation stays dormant.
      */
     public int effectiveRotation() {
-        return isMerged() ? 0 : screenRotation;
+        if (!isMerged()) return screenRotation;
+        if (surfaceW == surfaceH) return screenRotation;
+        return screenRotation & 2;
+    }
+
+    /**
+     * Glass-wrench on a merged surface: advance the CONTROLLER's
+     * rotation to the next step its shape allows (square: quarter
+     * turns; oblong: half turns).
+     */
+    public void rotateScreenSurface() {
+        int step = surfaceW == surfaceH ? 1 : 2;
+        screenRotation = (effectiveRotation() + step) & 3;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     /** Controller position derived from this member's own offset + state. */
@@ -280,7 +298,16 @@ public class TabletBlockEntity extends BlockEntity {
         surfaceH = (byte) h;
         clearHeldPips();
         setChanged();
-        if (level != null) {
+        // Role changes hit MANY BEs in one tick (a whole surface merges
+        // or dissolves at once), and vanilla's batched multi-block
+        // update path DROPS block-entity data — sendBlockUpdated with an
+        // unchanged state only reaches clients on the single-block path.
+        // Send the BE packet explicitly to every tracking player.
+        if (level instanceof ServerLevel serverLevel) {
+            ClientboundBlockEntityDataPacket packet = getUpdatePacket();
+            serverLevel.getChunkSource().chunkMap
+                    .getPlayers(new net.minecraft.world.level.ChunkPos(worldPosition), false)
+                    .forEach(player -> player.connection.send(packet));
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
         if (isSurfacePart()) {
@@ -377,16 +404,39 @@ public class TabletBlockEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         refreshTransmitters();
-        // Chunk-edge self-heal: a part whose controller chunk is loaded
-        // but no longer claims it (broken while we were unloaded) gets a
-        // rescan; a part whose controller is UNLOADED stays inert until
-        // that chunk loads (its own onLoad will re-check).
-        if (level instanceof ServerLevel serverLevel
-                && isSurfacePart()
-                && serverLevel.isLoaded(getControllerPos())
-                && getController() == null) {
+        // Load-time self-heal against stale roles, whatever their
+        // origin (missed removal hooks, lost scheduled ticks): a part
+        // whose loaded controller no longer claims it, or a CONTROLLER
+        // whose members no longer point back, reschedules a rescan.
+        // Unloaded neighbors defer judgment — their own onLoad re-checks.
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        boolean stale =
+                (isSurfacePart()
+                        && serverLevel.isLoaded(getControllerPos())
+                        && getController() == null)
+                || (isSurfaceController() && !surfaceIntact(serverLevel));
+        if (stale) {
             serverLevel.scheduleTick(worldPosition, getBlockState().getBlock(), 1);
         }
+    }
+
+    /** Whether every loaded member of this controller's surface still claims it. */
+    private boolean surfaceIntact(ServerLevel serverLevel) {
+        BlockState state = getBlockState();
+        var right = TabletScreenMath.screenRight(state);
+        var down = TabletScreenMath.screenDown(state);
+        for (int dx = 0; dx < surfaceW; dx++) {
+            for (int dy = 0; dy < surfaceH; dy++) {
+                if (dx == 0 && dy == 0) continue;
+                BlockPos member = worldPosition.relative(right, dx).relative(down, dy);
+                if (!serverLevel.isLoaded(member)) continue;
+                if (!(serverLevel.getBlockEntity(member) instanceof TabletBlockEntity be)
+                        || be.getSurfaceDx() != dx || be.getSurfaceDy() != dy) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     @Override
@@ -448,6 +498,13 @@ public class TabletBlockEntity extends BlockEntity {
         this.surfaceDy = tag.getByte("surface_dy");
         this.surfaceW = tag.contains("surface_w") ? tag.getByte("surface_w") : 1;
         this.surfaceH = tag.contains("surface_h") ? tag.getByte("surface_h") : 1;
+        // TEMP debug for the 1.7.0 shakedown — strip before release
+        if (level != null && level.isClientSide) {
+            org.slf4j.LoggerFactory.getLogger("linktablet-surface").info(
+                    "[surface] client BE @{} dx={} dy={} w={} h={} apps={} list={} rot={}",
+                    worldPosition.toShortString(), surfaceDx, surfaceDy, surfaceW, surfaceH,
+                    apps.size(), screenList, screenRotation);
+        }
         // Only ever present in sync tags (see getUpdateTag) — a disk load
         // always clears the transient held-pip visuals.
         heldPips.clear();

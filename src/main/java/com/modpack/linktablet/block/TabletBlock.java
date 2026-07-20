@@ -104,6 +104,43 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         };
     }
 
+    /**
+     * Merge-friendly placement (1.7.0): floor/ceiling tablets face
+     * wherever the PLAYER faced at placement, so hand-placing a grid
+     * naturally produces mixed FACINGs — different merge keys, no
+     * surface. Adopting a coplanar neighbor's orientation makes
+     * "slap tablets next to each other" just work; wall tablets
+     * similarly adopt a neighbor's LANDSCAPE flip.
+     */
+    @Override
+    public BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {
+        BlockState state = super.getStateForPlacement(context);
+        if (state == null) return null;
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        if (state.getValue(FACE) == AttachFace.WALL) {
+            Direction facing = state.getValue(FACING);
+            for (Direction dir : Direction.values()) {
+                if (dir.getAxis() == facing.getAxis()) continue;
+                BlockState nb = level.getBlockState(pos.relative(dir));
+                if (nb.getBlock() instanceof TabletBlock
+                        && nb.getValue(FACE) == AttachFace.WALL
+                        && nb.getValue(FACING) == facing) {
+                    return state.setValue(LANDSCAPE, nb.getValue(LANDSCAPE));
+                }
+            }
+        } else {
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockState nb = level.getBlockState(pos.relative(dir));
+                if (nb.getBlock() instanceof TabletBlock
+                        && nb.getValue(FACE) == state.getValue(FACE)) {
+                    return state.setValue(FACING, nb.getValue(FACING));
+                }
+            }
+        }
+        return state;
+    }
+
     // ------------------------------------------------------------------
     // Multiblock surface formation (1.7.0). onPlace/onRemove only
     // SCHEDULE a scan tick: onPlace fires before the BE exists (and
@@ -311,19 +348,28 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public InteractionResult onWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
-        // Merged members skip the glass branch: content rotation is
-        // clamped to 0 on surfaces, so a glass-wrench would be a silent
-        // no-op — instead ANY wrench click block-rotates the clicked
-        // member, which changes its merge key and splits it out.
-        // "Wrenching a video wall restructures it."
-        boolean merged = level.getBlockEntity(pos) instanceof TabletBlockEntity tbe && tbe.isMerged();
-        boolean onGlass = !merged && TabletScreenMath.isOnGlass(state, pos,
+        // Merged surfaces: the continuous panel hides where the member
+        // bezels physically are, so bezel clicks would be invisible
+        // unmerge traps — a plain wrench ANYWHERE on a merged surface
+        // rotates the content (square surfaces get quarter turns,
+        // oblong ones half turns). Restructuring is deliberate only:
+        // sneak-wrench pickup or breaking a member.
+        boolean merged = level.getBlockEntity(pos) instanceof TabletBlockEntity clicked
+                && clicked.isMerged();
+        boolean onGlass = merged || TabletScreenMath.isOnGlass(state, pos,
                 context.getClickedFace(), context.getClickLocation(), 1.0);
 
         if (onGlass) {
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.rotateScreen();
-                IWrenchable.playRotateSound(level, pos);
+                TabletBlockEntity target = be.resolveController();
+                if (target != null) {
+                    if (target.isMerged()) {
+                        target.rotateScreenSurface();
+                    } else {
+                        target.rotateScreen();
+                    }
+                    IWrenchable.playRotateSound(level, pos);
+                }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

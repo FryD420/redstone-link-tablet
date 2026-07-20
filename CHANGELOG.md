@@ -3,16 +3,20 @@
 ## Unreleased
 
 - Multiblock screens: place tablets side by side (same wall, floor, or
-  ceiling, same orientation) and they merge into one large screen — up
-  to 4 wide by 3 tall. The top-left tablet runs the show: its apps
-  spread across the whole surface at bigger tiles, taps and slider
-  drags work on every panel, and the whole wall lights up together.
+  ceiling — new tablets auto-adopt their neighbor's orientation, so
+  just slap them down) and they merge into one large display, up to 4
+  wide by 3 tall. It renders as ONE continuous screen: a single glass
+  panel covering the whole surface, a case-colored bezel frame around
+  it (dye the lead tablet and the whole frame dyes), and no per-block
+  seams or outlines. The lead (top-left) tablet's apps spread across
+  the big screen at bigger tiles; taps and slider drags work anywhere
+  on it, list rows run its full width, and the whole wall lights up
+  together. Wrench anywhere on the glass to rotate the content —
+  square surfaces turn in quarter steps, wide ones flip upside down.
   Merging is always safe: every tablet keeps its own apps dormant and
-  gets them back the moment it's split off (break, pick up, or wrench
-  any member to restructure). Bigger surfaces hold more apps — 32 per
-  member tablet. Bezels keep their own dye colors, so mixed-color
-  video walls are a look. (Screen content rotation is parked at
-  upright while merged and comes back on split.)
+  gets them back the moment it's split off (sneak-wrench or break a
+  member to restructure). Bigger surfaces hold more apps — 32 per
+  member tablet.
 - Pinned tablet overlay (requested by the tester crew): a pin button in
   the tablet GUI keeps a floating mini-tablet on your screen while you
   play — live app rows on the HUD, draggable, and it remembers its spot

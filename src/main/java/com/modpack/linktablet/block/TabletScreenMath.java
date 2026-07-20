@@ -80,12 +80,31 @@ public final class TabletScreenMath {
 
     /** Apps visible on the physical screen in the given layout. */
     public static int visibleApps(int appCount, boolean list) {
-        return visibleApps(appCount, list, 1);
+        return visibleApps(appCount, list, 1, 1);
     }
 
-    /** Visible cap for a merged surface: every member adds a full screen. */
-    public static int visibleApps(int appCount, boolean list, int members) {
-        return Math.min(appCount, (list ? LIST_ROWS : MAX_PIPS) * members);
+    /**
+     * Visible cap on a w×h surface. Grid: every member adds a full
+     * screen's worth of pips. List: rows run the full surface width, so
+     * only the HEIGHT adds rows (a 4×3 wall is 15 long rows, not 60).
+     */
+    public static int visibleApps(int appCount, boolean list, int w, int h) {
+        return Math.min(appCount, list ? LIST_ROWS * h : MAX_PIPS * w * h);
+    }
+
+    /**
+     * Continuous glass span of a merged surface along u (1.7.0): the
+     * raised surface panel covers interior bezels, so content space runs
+     * unbroken from the first member's glass edge to the last's —
+     * 10 + 16·(w−1) texels.
+     */
+    public static float surfaceGlassW(int w) {
+        return (GLASS_U1 - GLASS_U0) + 16f * (w - 1);
+    }
+
+    /** Continuous glass span along v: 12 + 16·(h−1) texels. */
+    public static float surfaceGlassH(int h) {
+        return (GLASS_V1 - GLASS_V0) + 16f * (h - 1);
     }
 
     /** Grid dimensions for a given app count. */
@@ -104,13 +123,11 @@ public final class TabletScreenMath {
             {1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 4}, {4, 4}, {COLS, ROWS}};
 
     /**
-     * A w×h-block merged surface tiled with a k×m sub-grid PER MEMBER
-     * (tiles never straddle the bezel seams — video-wall layout). The
-     * surface grid is (k·w)×(m·h), app indices row-major across the
-     * WHOLE surface, so a member shows a strided subset, never a
-     * contiguous slice. These mapping methods are the ONLY converter
-     * between surface indices and member cells: renderer and hit-test
-     * both call them — never duplicate the arithmetic.
+     * Grid density for a w×h merged surface: (k·w)×(m·h) UNIFORM cells
+     * over the continuous glass span ({@link #surfaceGlassW}) — the
+     * raised surface panel covers interior bezels (1.7.0), so tiles flow
+     * straight across block seams like one big screen. App indices are
+     * plain row-major over {@link #cols}×{@link #rows}.
      */
     public record SurfaceLayout(int blocksW, int blocksH, int k, int m) {
         public int cols() {
@@ -124,40 +141,15 @@ public final class TabletScreenMath {
         public int cells() {
             return cols() * rows();
         }
-
-        /** Member block column (0..blocksW-1) showing surface index i. */
-        public int blockX(int i) {
-            return (i % cols()) / k;
-        }
-
-        /** Member block row (0..blocksH-1) showing surface index i. */
-        public int blockY(int i) {
-            return (i / cols()) / m;
-        }
-
-        /** Column inside the member's own k×m sub-grid. */
-        public int localCol(int i) {
-            return (i % cols()) % k;
-        }
-
-        /** Row inside the member's own k×m sub-grid. */
-        public int localRow(int i) {
-            return (i / cols()) % m;
-        }
-
-        /** Inverse mapping: member + local cell → surface index. */
-        public int surfaceIndex(int bx, int by, int localCol, int localRow) {
-            return (by * m + localRow) * cols() + bx * k + localCol;
-        }
     }
 
     /**
-     * Sub-grid density for a surface: smallest ladder entry whose total
-     * cell count covers the visible apps — the merged-surface
-     * generalization of {@link #gridLayout} (which delegates here).
+     * Cell density for a surface: smallest ladder entry whose total cell
+     * count covers the visible apps — the merged-surface generalization
+     * of {@link #gridLayout} (which delegates here).
      */
     public static SurfaceLayout surfaceLayout(int appCount, int w, int h, int rot) {
-        int visible = Math.max(1, visibleApps(appCount, false, w * h));
+        int visible = Math.max(1, visibleApps(appCount, false, w, h));
         int k = COLS;
         int m = ROWS;
         for (int[] step : DENSITY_LADDER) {
@@ -167,10 +159,11 @@ public final class TabletScreenMath {
                 break;
             }
         }
-        // Rotation only exists on single blocks (merged surfaces clamp
-        // to 0); odd quarter-turns swap the sub-grid sense.
-        if (w == 1 && h == 1 && (rot & 1) == 1) {
-            return new SurfaceLayout(1, 1, m, k);
+        // Odd quarter-turns swap the cell sense — only possible when the
+        // glass is square in blocks (1×1 or n×n; oblong surfaces clamp
+        // to half-turns, which don't swap).
+        if ((rot & 1) == 1 && w == h) {
+            return new SurfaceLayout(w, h, m, k);
         }
         return new SurfaceLayout(w, h, k, m);
     }
@@ -185,32 +178,6 @@ public final class TabletScreenMath {
     public static GridLayout gridLayout(int appCount) {
         SurfaceLayout sl = surfaceLayout(appCount, 1, 1, 0);
         return new GridLayout(sl.k(), sl.m());
-    }
-
-    // ------------------------------------------------------------------
-    // List mode on a merged surface: newspaper columns — indices run DOWN
-    // each block column (LIST_ROWS per member) before jumping to the next
-    // column of blocks. The three helpers below are the only mapping.
-    // ------------------------------------------------------------------
-
-    /** Member block column showing list index i on an h-block-tall surface. */
-    public static int listBlockX(int i, int h) {
-        return i / (LIST_ROWS * h);
-    }
-
-    /** Member block row showing list index i. */
-    public static int listBlockY(int i, int h) {
-        return (i % (LIST_ROWS * h)) / LIST_ROWS;
-    }
-
-    /** Row inside the member's own list showing index i. */
-    public static int listLocalRow(int i, int h) {
-        return i % LIST_ROWS;
-    }
-
-    /** Inverse: member + local list row → surface list index. */
-    public static int listIndex(int bx, int by, int localRow, int h) {
-        return bx * LIST_ROWS * h + by * LIST_ROWS + localRow;
     }
 
     // ------------------------------------------------------------------
@@ -388,6 +355,18 @@ public final class TabletScreenMath {
      * away from the plane.
      */
     public static float logicalUFromRay(BlockState state, BlockPos pos, Vec3 eye, Vec3 look, int rot) {
+        return logicalSurfaceUFromRay(state, pos, eye, look, rot, 0, 0, 1, 1);
+    }
+
+    /**
+     * Surface-aware ray→logical-u (1.7.0): the ray intersects the
+     * clicked MEMBER's plane; its member offset converts to the
+     * continuous surface space before the content-rotation swizzle, so
+     * the result matches {@link #surfaceSliderBarU}'s spans on merged
+     * (and merged-rotated) surfaces.
+     */
+    public static float logicalSurfaceUFromRay(BlockState state, BlockPos pos, Vec3 eye, Vec3 look,
+                                               int rot, int bx, int by, int w, int h) {
         Direction face = screenFace(state);
         double plane = screenPlaneCoord(state, pos);
         double eyeCoord = face.getAxis().choose(eye.x, eye.y, eye.z);
@@ -398,19 +377,20 @@ public final class TabletScreenMath {
         double[] uv = screenUV(state, pos, face, eye.add(look.scale(t)));
         if (uv == null) return Float.NaN;
 
-        // Same inverse content-rotation swizzle as hitPipDetailed
-        double pu = uv[0] - GLASS_U0;
-        double pv = uv[1] - GLASS_V0;
-        double w = GLASS_U1 - GLASS_U0;
-        double h = GLASS_V1 - GLASS_V0;
+        // Same inverse content-rotation swizzle as hitPipDetailed, over
+        // the continuous surface spans
+        double pu = uv[0] + 16.0 * bx - GLASS_U0;
+        double pv = uv[1] + 16.0 * by - GLASS_V0;
+        double gw = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
+        double gh = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
         for (int i = 0; i < (rot & 3); i++) {
             double nu = pv;
-            double nv = w - pu;
+            double nv = gw - pu;
             pu = nu;
             pv = nv;
-            double tmp = w;
-            w = h;
-            h = tmp;
+            double tmp = gw;
+            gw = gh;
+            gh = tmp;
         }
         return (float) (GLASS_U0 + pu);
     }
@@ -460,12 +440,14 @@ public final class TabletScreenMath {
     }
 
     /**
-     * Surface-aware hit test (1.7.0): the clicked block does its normal
-     * single-glass UV math, then the member's (bx, by) position on the
-     * w×h surface maps the local cell to the surface app index through
-     * {@link SurfaceLayout}/the list helpers. {@code logicalU} stays
-     * MEMBER-local — slider bars live inside one block's glass, and the
-     * drag maps against {@link #surfaceSliderBarU}'s member-local span.
+     * Surface-aware hit test (1.7.0): the clicked member's UV plus its
+     * 16-texel block offset gives a coordinate in the surface's
+     * CONTINUOUS glass span; cells divide that span evenly, exactly
+     * like the renderer's uniform layout. Interior bezel strips are
+     * part of the span (the raised panel covers them), so clicks there
+     * hit cells too; only the surface's outer bezel falls through to
+     * the GUI. {@code logicalU} is CONTINUOUS (surface space) — the
+     * slider drag adds the member offset the same way.
      */
     public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
                                         int appCount, boolean list, int rot,
@@ -473,21 +455,21 @@ public final class TabletScreenMath {
         if (appCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
         if (uv == null) return null;
-        double u = uv[0];
-        double v = uv[1];
+        double cu = uv[0] + 16.0 * bx;
+        double cv = uv[1] + 16.0 * by;
 
-        // Only the glass is ever a toggle target; the bezel ring always
-        // falls through to the GUI. Cells divide the glass evenly, so
-        // they track the renderer's margin/gap layout automatically.
-        if (u < GLASS_U0 || u >= GLASS_U1) return null;
-        if (v < GLASS_V0 || v >= GLASS_V1) return null;
+        double spanW = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
+        double spanH = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
+        if (cu < GLASS_U0 || cu >= GLASS_U0 + spanW) return null;
+        if (cv < GLASS_V0 || cv >= GLASS_V0 + spanH) return null;
 
-        // Undo the content rotation: one inverse CW quarter-turn per
-        // step, tracking the (possibly swapped) space dimensions.
-        double pu = u - GLASS_U0;
-        double pv = v - GLASS_V0;
-        double gw = GLASS_U1 - GLASS_U0;
-        double gh = GLASS_V1 - GLASS_V0;
+        // Undo the content rotation (single blocks only — surfaces clamp
+        // rot to 0): one inverse CW quarter-turn per step, tracking the
+        // (possibly swapped) space dimensions.
+        double pu = cu - GLASS_U0;
+        double pv = cv - GLASS_V0;
+        double gw = spanW;
+        double gh = spanH;
         for (int i = 0; i < (rot & 3); i++) {
             double nu = pv;
             double nv = gw - pu;
@@ -500,34 +482,35 @@ public final class TabletScreenMath {
 
         int index;
         if (list) {
-            int localRow = (int) (pv * LIST_ROWS / gh);
-            index = listIndex(bx, by, localRow, h);
+            index = (int) (pv * LIST_ROWS * h / gh);
         } else {
             SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
-            int localRow = (int) (pv * sl.m() / gh);
-            int localCol = (int) (pu * sl.k() / gw);
-            index = sl.surfaceIndex(bx, by, localCol, localRow);
+            int row = (int) (pv * sl.rows() / gh);
+            int col = (int) (pu * sl.cols() / gw);
+            index = row * sl.cols() + col;
         }
-        if (index >= visibleApps(appCount, list, w * h)) return null;
+        if (index >= visibleApps(appCount, list, w, h)) return null;
         return new PipHit(index, (float) (GLASS_U0 + pu));
     }
 
     /**
-     * MEMBER-local u-span of a surface slider's value bar. The single
-     * block form ({@link #sliderBarU}) delegates here with a 1×1 surface;
-     * for merged surfaces the bar sits inside whichever member shows the
-     * tile, and the span uses that member's local column.
+     * CONTINUOUS u-span of a surface slider's value bar (surface space —
+     * same coordinates {@link #hitPipDetailed} returns and the drag
+     * maps with). The single-block form ({@link #sliderBarU}) delegates
+     * here with a 1×1 surface.
      */
     public static float[] surfaceSliderBarU(int surfaceIndex, int appCount, boolean list,
                                             int rot, int w, int h) {
-        float gw = glassW(rot);
+        // Logical span: odd (square-only) rotations swap the axes
+        float gw = w * h == 1 ? glassW(rot)
+                : (rot & 1) == 0 ? surfaceGlassW(w) : surfaceGlassH(h);
         if (list) {
             float su1 = GLASS_U0 + gw - SPACE - LIST_SWITCH_MARGIN;
             return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
         }
         SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
-        float tileW = tileSize(gw, sl.k());
-        float u0 = tileU0(sl.localCol(surfaceIndex), tileW);
+        float tileW = tileSize(gw, sl.cols());
+        float u0 = tileU0(surfaceIndex % sl.cols(), tileW);
         float inset = sliderInset(tileW);
         return new float[]{u0 + inset, u0 + tileW - inset};
     }
