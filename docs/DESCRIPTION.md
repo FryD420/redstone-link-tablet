@@ -13,15 +13,18 @@
 The **Link Tablet** is a handheld device with an app-style touchscreen that drives
 [Create](https://modrinth.com/mod/create)'s Redstone Links remotely. Lights, doors,
 trains, farms, the entire factory — name them, give them an icon, and control them
-from one screen, anywhere in link range.
+from one screen, anywhere in link range. Mount tablets side by side and they merge
+into one **wall-sized display**; pin a **mini-tablet to your HUD** and flip switches
+without ever opening a GUI.
 
 ![The tablet GUI over a floating-island vista — a slider, a timer, and toggle apps in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
 
 ## Apps, not levers
 
-- **Up to 32 apps per tablet**, each with a name, color, an optional item icon,
-  and its own state — shown as an icon grid or a list of toggle switches, with
-  drag-to-rearrange in both layouts.
+- **Up to 32 apps per tablet** (and 32 more per tablet on merged multi-tablet
+  screens), each with a name, color, an optional item icon, and its own state —
+  shown as an icon grid or a list of toggle switches, with drag-to-rearrange in
+  both layouts.
 - **Four app types**, cycled right in the editor:
   - **Toggle** — classic on/off with a persistent state.
   - **Hold** — transmits only while you hold the button. Doorbells, dispensers,
@@ -46,6 +49,8 @@ Controller can trigger, the tablet can too:
 - The app editor includes **your real inventory** with vanilla drag mechanics:
   drop an item on the frequency slots (they take a copy — nothing is consumed),
   or use the searchable all-items picker for things you don't carry.
+- Running **JEI or EMI**? Drag an item straight from the ingredient panel onto
+  a frequency slot — no need to own it at all.
 - **One-item frequencies** work, matching Create's own links.
 - Frequencies carry the **full item, components included** — frequency-card mods
   (Create Unique Cards and friends), dyed items, and renamed gear all count as
@@ -66,10 +71,28 @@ that machine never fully turns off.
 
 Every app can carry a free-text note, opened from a little glyph on its tile.
 Notes are **floating windows**: drag them by the title bar, open several at once,
-and they stay with you — over the tablet, over your inventory or any other
-screen (fully editable there), and pinned read-only on your HUD while you play.
+and they stay with you — over the tablet, over your inventory and other screens
+(fully editable there), and pinned read-only on your HUD while you play. They
+politely stay out of settings menus and other screens where they don't belong.
 Perfect for "flush the sorter before enabling" warnings or a train schedule —
 you can see two of them pinned in the screenshot up top.
+
+## Pin it to your HUD
+
+The pin button in the tablet GUI keeps a **floating mini-tablet on your screen
+while you play** — live app rows with real switches, draggable anywhere, and it
+remembers its spot and pin across sessions. Press the **"Use Pinned Tablet" key
+(default B)** to free your mouse chat-style and tap toggles, drag sliders, or
+hold buttons — mid-mining, mid-flight, no GUI ever opens. It's also clickable
+with the normal cursor over your inventory or chat, and a right-click on any
+row jumps into the full tablet interface. (There's an "Open Tablet" keybind
+too, unbound by default, that opens the tablet from anywhere in your
+inventory.)
+
+Pin a placed tablet and it dims when you wander out of edit range; pin a
+carried one and it follows the item around your inventory.
+
+<!-- 📸 SCREENSHOT: the pinned mini-tablet on the HUD during gameplay — mining or riding a train, a slider mid-drag, hotbar visible so it reads as "playing, not in a menu" -->
 
 ## The screen is real
 
@@ -95,6 +118,26 @@ the edge to spin the tablet — wall tablets physically flip between portrait an
 landscape.
 
 ![A shaded Create factory hall with a wall-mounted tablet showing its live switch list](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mounted-factory2.png)
+
+## One screen, many tablets
+
+Mount tablets side by side — same wall, floor, or ceiling; new ones
+auto-match their neighbor's orientation — and they **merge into one big
+display, up to 4 wide by 3 tall**: a single continuous glass panel with a
+case-colored bezel frame and no seams. Your apps spread across the whole
+surface at bigger tiles, taps and click-and-slide work anywhere on the
+glass, list rows run its full width, the entire wall lights up together —
+and every merged tablet raises the app cap by another 32. Dye the lead
+tablet and the whole frame dyes; wrench the glass and the whole screen's
+content rotates.
+
+Merging is always safe: every tablet keeps its own apps dormant and gets
+them back the moment it's split off. And it's always your choice — a
+**chain-link button** in the screen header breaks a merged surface back
+into independent tablets, or keeps a single tablet standalone so you can
+build a bank of separate dashboards side by side.
+
+<!-- 📸 SCREENSHOT: a merged tablet wall (3×2 or 4×3) in a factory setting, dyed bezel, a good mix of app tiles — the new hero candidate; bonus if a hand is mid-tap on the glass -->
 
 ## Make it yours
 
@@ -149,6 +192,8 @@ Controller. Mounted tablets transmit from the block instead.
 - Plays nicely with other link-network senders — receivers take the strongest
   signal, like stacked Redstone Links.
 - Frequency-card mods (component-based frequency items) work out of the box.
+- Optional **JEI and EMI** integration: drag ingredients straight into the
+  frequency slots.
 - MIT licensed, free to use in any modpack.
 
 Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-link-tablet).
@@ -157,7 +202,22 @@ Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-li
 
 ## Shooting checklist (not part of the description)
 
-Shot 2026-07-19 by FryD42 + wife. Done and embedded above:
+### 1.7.0 refresh — TO SHOOT (text is done, slots are placeholders above)
+
+- ⬜ **multiblock wall** — a merged surface (3×2 or 4×3) in a factory
+  setting: dyed bezel, good tile variety, ideally mid-tap on the glass.
+  This is the flashiest shot the mod has ever had — strong candidate to
+  REPLACE hero4 as the listing hero / social preview once shot.
+- ⬜ **pinned overlay** — the mini-tablet on the HUD during real gameplay
+  (mining / riding a train), slider mid-drag, hotbar visible so it clearly
+  isn't a GUI screenshot.
+- Existing 1.6.0 shots all stay valid. When shot: drop files in
+  `docs/images/`, swap each `<!-- 📸 SCREENSHOT -->` comment for the image
+  embed (raw.githubusercontent URL), push, re-paste into both listings.
+  The description TEXT can go up before the shots — the comment slots
+  render as nothing.
+
+### 1.6.0 shoot — done (2026-07-19, FryD42 + wife), embedded above:
 
 - ✅ **hero4.png** — GUI + floating notes over the island vista; the list shows
   a slider (with numeric readout), a timer, a hold app, and an active toggle,
