@@ -43,6 +43,12 @@ public class TabletBlockEntity extends BlockEntity {
     private DyeColor caseColor;
     /** Physical mini-screen layout: true = switch list, false = pip grid. */
     private boolean screenList;
+    /**
+     * Solo screen (1.7.0): the GUI's link toggle. A solo tablet never
+     * joins a merged surface — the scanner's flood skips it entirely.
+     * Block-only, like the surface roles: never travels on the item.
+     */
+    private boolean soloScreen;
     /** UI theme; DARK is the default and is never persisted. */
     private ScreenTheme theme = ScreenTheme.DARK;
     /** Screen content rotation, quarter turns CW; 0 is never persisted. */
@@ -86,6 +92,19 @@ public class TabletBlockEntity extends BlockEntity {
     public void setScreenList(boolean screenList) {
         if (this.screenList == screenList) return;
         this.screenList = screenList;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public boolean isSoloScreen() {
+        return soloScreen;
+    }
+
+    public void setSoloScreen(boolean soloScreen) {
+        if (this.soloScreen == soloScreen) return;
+        this.soloScreen = soloScreen;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -468,6 +487,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenList) {
             tag.putBoolean("screen_list", true);
         }
+        if (soloScreen) {
+            tag.putBoolean("solo_screen", true);
+        }
         if (theme != ScreenTheme.DARK) {
             tag.putString("theme", theme.getSerializedName());
         }
@@ -492,19 +514,13 @@ public class TabletBlockEntity extends BlockEntity {
                 : SignalApp.CODEC.listOf().parse(NbtOps.INSTANCE, appsTag).result().orElse(List.of());
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
+        this.soloScreen = tag.getBoolean("solo_screen");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
         this.surfaceDx = tag.getByte("surface_dx");
         this.surfaceDy = tag.getByte("surface_dy");
         this.surfaceW = tag.contains("surface_w") ? tag.getByte("surface_w") : 1;
         this.surfaceH = tag.contains("surface_h") ? tag.getByte("surface_h") : 1;
-        // TEMP debug for the 1.7.0 shakedown — strip before release
-        if (level != null && level.isClientSide) {
-            org.slf4j.LoggerFactory.getLogger("linktablet-surface").info(
-                    "[surface] client BE @{} dx={} dy={} w={} h={} apps={} list={} rot={}",
-                    worldPosition.toShortString(), surfaceDx, surfaceDy, surfaceW, surfaceH,
-                    apps.size(), screenList, screenRotation);
-        }
         // Only ever present in sync tags (see getUpdateTag) — a disk load
         // always clears the transient held-pip visuals.
         heldPips.clear();

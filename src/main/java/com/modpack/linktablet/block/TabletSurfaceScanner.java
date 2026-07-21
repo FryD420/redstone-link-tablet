@@ -33,10 +33,6 @@ import java.util.Set;
  */
 public final class TabletSurfaceScanner {
 
-    /** TEMP debug for the 1.7.0 shakedown — strip before release. */
-    private static final org.slf4j.Logger LOGGER =
-            org.slf4j.LoggerFactory.getLogger("linktablet-surface");
-
     public static final int MAX_W = 4;
     public static final int MAX_H = 3;
 
@@ -47,6 +43,17 @@ public final class TabletSurfaceScanner {
     public static void rescan(ServerLevel level, BlockPos origin, BlockState refState) {
         Direction right = TabletScreenMath.screenRight(refState);
         Direction down = TabletScreenMath.screenDown(refState);
+
+        // A solo origin never merges; if it still carries a stale role,
+        // shed it (former co-members reform from their own ticks)
+        if (level.getBlockEntity(origin) instanceof TabletBlockEntity originBe
+                && originBe.isSoloScreen()) {
+            if (originBe.isMerged()) {
+                TabletTransmitterHandler.clearHeldForBlock(level, originBe.getControllerPos());
+                originBe.setSurfaceRole(0, 0, 1, 1);
+            }
+            return;
+        }
 
         // Flood the coplanar component with an identical merge key
         List<BlockPos> members = new ArrayList<>();
@@ -60,7 +67,8 @@ public final class TabletSurfaceScanner {
             if (!level.isLoaded(pos)) continue;
             BlockState state = level.getBlockState(pos);
             if (!sameMergeKey(refState, state)) continue;
-            if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity)) continue;
+            if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity be)
+                    || be.isSoloScreen()) continue;
             members.add(pos);
             if (members.size() > MAX_WALK) {
                 overflow = true;
@@ -90,12 +98,6 @@ public final class TabletSurfaceScanner {
         int h = maxD - minD + 1;
         boolean valid = !overflow && w <= MAX_W && h <= MAX_H
                 && members.size() == w * h && members.size() > 1;
-        LOGGER.info("[surface] rescan @{} key={}/{}/{} right={} down={} members={} rect={}x{} valid={}",
-                origin.toShortString(),
-                refState.getValue(TabletBlock.FACE), refState.getValue(TabletBlock.FACING),
-                refState.getValue(TabletBlock.LANDSCAPE),
-                right, down, members.size(), w, h, valid);
-
         // Old controllers first — their holds must clear either way
         Set<BlockPos> holdTargets = new HashSet<>();
         for (BlockPos pos : members) {
@@ -137,6 +139,45 @@ public final class TabletSurfaceScanner {
             level.playSound(null, origin,
                     valid ? SoundEvents.AMETHYST_BLOCK_PLACE : SoundEvents.AMETHYST_BLOCK_BREAK,
                     SoundSource.BLOCKS, 0.5F, valid ? 1.4F : 1.1F);
+        }
+    }
+
+    /**
+     * GUI link toggle (1.7.0). Unlinking a merged surface dissolves it
+     * and marks EVERY member solo — nothing re-merges next tick, and
+     * each tablet can be re-linked individually later. Unlinking a
+     * standalone tablet just flags it; re-linking clears the flag and
+     * lets a normal rescan re-form whatever fits.
+     */
+    public static void setLinked(ServerLevel level, BlockPos pos, boolean linked) {
+        if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity be)) return;
+        if (linked) {
+            be.setSoloScreen(false);
+            level.scheduleTick(pos, level.getBlockState(pos).getBlock(), 0);
+            return;
+        }
+        TabletBlockEntity controller = be.resolveController();
+        if (controller != null && controller.isSurfaceController()) {
+            BlockState state = controller.getBlockState();
+            Direction right = TabletScreenMath.screenRight(state);
+            Direction down = TabletScreenMath.screenDown(state);
+            BlockPos origin = controller.getBlockPos();
+            for (int dx = 0; dx < controller.getSurfaceW(); dx++) {
+                for (int dy = 0; dy < controller.getSurfaceH(); dy++) {
+                    BlockPos memberPos = origin.relative(right, dx).relative(down, dy);
+                    if (level.getBlockEntity(memberPos) instanceof TabletBlockEntity member) {
+                        member.setSoloScreen(true);
+                        member.setSurfaceRole(0, 0, 1, 1);
+                    }
+                }
+            }
+            TabletTransmitterHandler.clearHeldForBlock(level, origin);
+            level.playSound(null, origin, SoundEvents.AMETHYST_BLOCK_BREAK,
+                    SoundSource.BLOCKS, 0.5F, 1.1F);
+        } else {
+            be.setSoloScreen(true);
+            // Sweep any stale role via the solo-origin path
+            level.scheduleTick(pos, level.getBlockState(pos).getBlock(), 0);
         }
     }
 

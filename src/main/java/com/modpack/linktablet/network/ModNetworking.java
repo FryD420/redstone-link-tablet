@@ -335,6 +335,25 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: the placed tablet's link toggle — false dissolves the
+    // clicked surface and marks its members solo (never auto-merge),
+    // true re-links the clicked tablet (block targets only)
+    // ------------------------------------------------------------------
+    public record SurfaceLinkPayload(AppTarget target, boolean linked) implements CustomPacketPayload {
+        public static final Type<SurfaceLinkPayload> TYPE = new Type<>(id("surface_link"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SurfaceLinkPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SurfaceLinkPayload::target,
+                        ByteBufCodecs.BOOL, SurfaceLinkPayload::linked,
+                        SurfaceLinkPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: open the app edit container menu (server-backed so the
     // editor gets real, vanilla-feeling inventory slots)
     // ------------------------------------------------------------------
@@ -367,7 +386,9 @@ public class ModNetworking {
         // land in 1.6.0, but each wire growth gets its own fence).
         // "12": 1.7.0 pinned overlay — AppTarget gained the inventory-
         // slot mode (third optional field on every payload's wire).
-        PayloadRegistrar registrar = event.registrar("12");
+        // "13": 1.7.0 solo screens — SurfaceLinkPayload added (the
+        // placed tablet's link toggle; both land in 1.7.0).
+        PayloadRegistrar registrar = event.registrar("13");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -379,6 +400,20 @@ public class ModNetworking {
         registrar.playToServer(SetSliderPayload.TYPE, SetSliderPayload.STREAM_CODEC, ModNetworking::handleSetSlider);
         registrar.playToServer(SetNotePayload.TYPE, SetNotePayload.STREAM_CODEC, ModNetworking::handleSetNote);
         registrar.playToServer(TimedAppPayload.TYPE, TimedAppPayload.STREAM_CODEC, ModNetworking::handleTimed);
+        registrar.playToServer(SurfaceLinkPayload.TYPE, SurfaceLinkPayload.STREAM_CODEC, ModNetworking::handleSurfaceLink);
+    }
+
+    private static void handleSurfaceLink(SurfaceLinkPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isEmpty()) return;
+        BlockPos pos = payload.target().pos().get();
+        if (!player.level().isLoaded(pos)) return;
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+                > MAX_BLOCK_DISTANCE_SQ) return;
+        if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
+                    serverLevel, pos, payload.linked());
+        }
     }
 
     private static void handleTimed(TimedAppPayload payload, IPayloadContext context) {

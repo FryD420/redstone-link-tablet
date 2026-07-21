@@ -6,6 +6,9 @@ import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -20,8 +23,10 @@ import java.util.List;
 /**
  * Global floating-window manager (1.6.0, generalized for 1.7.0): open
  * {@link FloatingWindow}s live HERE, not on any screen, so they persist
- * and stay usable EVERYWHERE — over the tablet GUI, over the inventory
- * or any other screen, and on the HUD while no screen is open. Notes
+ * and stay usable over the tablet GUI, containers, chat, and the JEI/EMI
+ * browsers (see {@link #overlaysAllowedOn} — settings menus and other
+ * foreign screens suppress them), and on the HUD while no screen is
+ * open. Notes
  * render read-only there; the pinned mini-tablet stays live and becomes
  * clickable through {@link OverlayFocusScreen}'s chat-style mouse
  * capture. All window kinds share ONE list: one z-order, one event path.
@@ -134,6 +139,36 @@ public final class NoteWindows {
         });
     }
 
+    /**
+     * Whitelist (1.7.0): overlays only live over screens where they're
+     * useful — containers, chat, our own screens, and the JEI/EMI recipe
+     * browsers. Everything else (vanilla options, Sodium/Iris/any mod's
+     * settings, pause menu, world lists) gets neither rendering nor input
+     * capture. Every screen-scoped handler below consults this; the HUD
+     * pass has its own {@code mc.screen == null} gate.
+     */
+    private static boolean overlaysAllowedOn(Screen screen) {
+        if (screen == null) return false;
+        if (screen instanceof OverlayFocusScreen
+                || screen instanceof AbstractContainerScreen<?>
+                || screen instanceof ChatScreen) {
+            return true;
+        }
+        String name = screen.getClass().getName();
+        return name.startsWith("com.modpack.linktablet.")
+                || name.startsWith("mezz.jei.")
+                || name.startsWith("dev.emi.");
+    }
+
+    /** Suppressed-screen housekeeping: never keep a stale drag/press/edit. */
+    private static boolean suppressedOn(Screen screen) {
+        if (overlaysAllowedOn(screen)) return false;
+        for (FloatingWindow window : WINDOWS) {
+            window.defocus();
+        }
+        return true;
+    }
+
     // ---- Rendering ---------------------------------------------------
 
     @SubscribeEvent
@@ -155,6 +190,7 @@ public final class NoteWindows {
     @SubscribeEvent
     public static void onRenderScreen(ScreenEvent.Render.Post event) {
         if (Minecraft.getInstance().level == null || WINDOWS.isEmpty()) return;
+        if (suppressedOn(event.getScreen())) return;
         prune();
         for (FloatingWindow window : WINDOWS) {
             window.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(),
@@ -166,7 +202,7 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
-        if (WINDOWS.isEmpty()) return;
+        if (WINDOWS.isEmpty() || suppressedOn(event.getScreen())) return;
         double mx = event.getMouseX();
         double my = event.getMouseY();
         for (int i = WINDOWS.size() - 1; i >= 0; i--) {
@@ -197,6 +233,7 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
+        if (suppressedOn(event.getScreen())) return;
         Minecraft mc = Minecraft.getInstance();
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
@@ -211,6 +248,7 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
+        if (suppressedOn(event.getScreen())) return;
         // Never cancelled: screens must still see their own drag ends
         for (FloatingWindow window : WINDOWS) {
             window.mouseReleased(event.getMouseX(), event.getMouseY(), event.getButton());
@@ -219,6 +257,7 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
+        if (suppressedOn(event.getScreen())) return;
         for (int i = WINDOWS.size() - 1; i >= 0; i--) {
             FloatingWindow window = WINDOWS.get(i);
             if (window.contains(event.getMouseX(), event.getMouseY())) {
@@ -234,6 +273,7 @@ public final class NoteWindows {
     public static void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
         // ESC always goes to the screen (exit GUI, windows persist)
         if (event.getKeyCode() == 256) return;
+        if (suppressedOn(event.getScreen())) return;
         for (FloatingWindow window : WINDOWS) {
             if (window.wantsKeyboard()) {
                 window.keyPressed(event.getKeyCode(), event.getScanCode(), event.getModifiers());
@@ -245,6 +285,7 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onCharTyped(ScreenEvent.CharacterTyped.Pre event) {
+        if (suppressedOn(event.getScreen())) return;
         for (FloatingWindow window : WINDOWS) {
             if (window.wantsKeyboard()) {
                 window.charTyped(event.getCodePoint(), event.getModifiers());

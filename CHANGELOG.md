@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 — 2026-07-21
 
 - Multiblock screens: place tablets side by side (same wall, floor, or
   ceiling — new tablets auto-adopt their neighbor's orientation, so
@@ -29,6 +29,18 @@
   follow the item around your inventory.
 - New "Open Tablet" keybind (default unbound): opens the tablet GUI
   from anywhere — hand first, then anywhere in your inventory.
+- Notes and the pinned mini-tablet now stay out of the way on settings
+  menus (vanilla options, Sodium, any mod's config screen), the pause
+  menu, and other screens where they don't belong. They keep working
+  everywhere they're useful: the tablet, inventories and other
+  containers, chat, the JEI/EMI recipe browsers, and the HUD.
+- JEI/EMI support: drag an item straight from the ingredient list onto
+  a frequency slot in the app editor — no need to own the item.
+- Side-by-side without merging: placed tablets have a new chain-link
+  button in their screen header. Click it on a merged surface to break
+  the whole thing back into independent tablets (they won't re-merge),
+  or on a single tablet to keep it standalone before building next to
+  it. Click again to let a tablet rejoin its neighbors.
 - Note for servers: the network protocol changed — these clients and
   servers don't pair with 1.6.0 or older.
 

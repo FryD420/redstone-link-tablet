@@ -3,6 +3,36 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
+## Status (2026-07-21 — 1.7.0 tester build cut, in modpack test)
+- Release gates cleared: TEMP "linktablet-surface" debug logging
+  STRIPPED (scanner + BE), CHANGELOG dated 1.7.0 — 2026-07-21.
+- Three additions this session (all uncommitted on `tablet-overlay`,
+  jar handed to the user for modpack testing):
+  1. **Overlay whitelist**: notes + mini-tablet only render/capture
+     input over containers, chat, our own screens, and JEI/EMI
+     (`NoteWindows.overlaysAllowedOn` gates all seven screen-scoped
+     handlers; suppression defocuses so no stale drags). Options menus
+     (vanilla/Sodium/etc.), pause menu, everything else: hidden.
+  2. **JEI + EMI ghost drag** into the edit screen's frequency slots:
+     `compat/jei/JeiCompat` + `compat/emi/EmiCompat`, discovered by the
+     viewers' own plugin scans (no ModList guards). Optional deps in
+     mods.toml; JEI 19.39.0.369 / EMI 1.1.24 pinned in
+     gradle.properties. NOTE: terraformers maven truncates big jars on
+     this connection — EMI dev-runtime jar comes from the Modrinth
+     maven instead.
+  3. **Solo screens** (user request: side-by-side tablets WITHOUT
+     merging): chain-link header button on placed tablets. Unlink on a
+     merged surface dissolves it and marks EVERY member solo; unlink on
+     a standalone pre-flags it; re-link rejoins. BE-only flag
+     (`solo_screen`, never on the item), scanner flood skips solo BEs,
+     `TabletSurfaceScanner.setLinked` is the server entry,
+     `SurfaceLinkPayload` added → registrar "12"→"13".
+- Dev boot checks clean both builds (JEI+EMI loaded, plugins register).
+- Remaining before release: user modpack + tester verdict, multiplayer
+  dev-server test, floor/ceiling orientation pass, ponder + held-item
+  regression, chunk-border surface; then commit, merge to main, tag
+  v1.7.0, push, upload.
+
 ## Status (2026-07-19, LATE night — 1.7.0 bundle on `tablet-overlay`)
 - **1.7.0 is feature-complete but UNRELEASED** (user call: hold the
   send). Two features, both dev-tested live across long sessions:

@@ -5,6 +5,7 @@ import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.OverlayPin;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.UISounds;
+import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.menu.AppEditMenu;
@@ -262,6 +263,28 @@ public class TabletScreen extends Screen {
     /** Overlay pin button, right of the theme button (1.7.0). */
     private int pinBtnX() {
         return themeBtnX() + MODE_BTN_SIZE + 4;
+    }
+
+    /** Neighbor-link toggle, right of the pin — placed tablets only. */
+    private int linkBtnX() {
+        return pinBtnX() + MODE_BTN_SIZE + 4;
+    }
+
+    private boolean isBlockView() {
+        return view instanceof AppView.Block;
+    }
+
+    /** Whether the viewed placed tablet is SOLO (opted out of merging). */
+    private boolean soloScreen() {
+        if (!(view instanceof AppView.Block block) || minecraft == null
+                || minecraft.level == null) {
+            return false;
+        }
+        if (!(minecraft.level.getBlockEntity(block.pos()) instanceof TabletBlockEntity be)) {
+            return false;
+        }
+        TabletBlockEntity resolved = be.resolveController();
+        return (resolved != null ? resolved : be).isSoloScreen();
     }
 
     // Theme dropdown: one row per theme (swatches + name), below the button
@@ -586,6 +609,26 @@ public class TabletScreen extends Screen {
         graphics.fill(px + 5, y + 3, px + 7, y + 6, pin);
         graphics.fill(px + 2, y + 6, px + 10, y + 8, pin);
         graphics.fill(px + 5, y + 8, px + 7, y + 11, pin);
+
+        // Link glyph (placed tablets only): two chain links — joined by
+        // a bar while merging is allowed, broken apart (and lit) while
+        // this tablet is SOLO
+        if (isBlockView()) {
+            int kx = linkBtnX();
+            boolean solo = soloScreen();
+            int link = glyphColor(solo, overModeBtn(mouseX, mouseY, kx));
+            graphics.fill(kx + 1, y + 3, kx + 5, y + 4, link);
+            graphics.fill(kx + 1, y + 8, kx + 5, y + 9, link);
+            graphics.fill(kx + 1, y + 4, kx + 2, y + 8, link);
+            graphics.fill(kx + 4, y + 4, kx + 5, y + 8, link);
+            graphics.fill(kx + 7, y + 3, kx + 11, y + 4, link);
+            graphics.fill(kx + 7, y + 8, kx + 11, y + 9, link);
+            graphics.fill(kx + 7, y + 4, kx + 8, y + 8, link);
+            graphics.fill(kx + 10, y + 4, kx + 11, y + 8, link);
+            if (!solo) {
+                graphics.fill(kx + 4, y + 5, kx + 8, y + 7, link);
+            }
+        }
     }
 
     private int glyphColor(boolean active, boolean hovered) {
@@ -870,6 +913,15 @@ public class TabletScreen extends Screen {
                     OverlayPin.pin(view);
                     UISounds.tick(1.5F);
                 }
+                return true;
+            }
+            if (isBlockView() && overModeBtn(mouseX, mouseY, linkBtnX())) {
+                boolean solo = soloScreen();
+                UISounds.tick(solo ? 1.5F : 0.8F);
+                // Currently solo → ask to re-link; currently linked →
+                // unlink (dissolves the whole surface when merged)
+                PacketDistributor.sendToServer(
+                        new ModNetworking.SurfaceLinkPayload(target(), solo));
                 return true;
             }
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {
