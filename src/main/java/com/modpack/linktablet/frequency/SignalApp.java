@@ -148,6 +148,19 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
         return !note.isBlank();
     }
 
+    /**
+     * 🐍 (1.7.1): an app named "Snake" iconed with a Linked Controller
+     * is really a shortcut — GUI clicks and placed-screen taps open the
+     * game instead of toggling (both sides consult this, so the world
+     * tap stays inert on the server). Derived, never on the wire.
+     */
+    public boolean snakeShortcut() {
+        return name.strip().equalsIgnoreCase("snake")
+                && icon.map(id -> id.equals(ResourceLocation
+                        .fromNamespaceAndPath("create", "linked_controller")))
+                .orElse(false);
+    }
+
     private static String cleanNote(String raw) {
         String clean = raw.length() > MAX_NOTE_LENGTH ? raw.substring(0, MAX_NOTE_LENGTH) : raw;
         return clean.isBlank() ? "" : clean;
