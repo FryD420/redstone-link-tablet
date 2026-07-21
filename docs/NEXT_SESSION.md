@@ -5,10 +5,12 @@ at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-21 — 1.7.0 TAGGED + PUSHED, uploads with the user)
 - Modpack-tested by the user ("much better"), committed (6caabb0),
-  merged to main (e9ead01), tagged v1.7.0, pushed. Platform uploads
-  pending with the user. Test debt released WITHOUT (multiplayer,
-  floor/ceiling, ponder + held-item regression, chunk-border) — sweep
-  next session, hotfix if testers hit anything.
+  merged to main (e9ead01), tagged v1.7.0, pushed. UPLOADED BY THE
+  USER SAME DAY — LIVE ON ALL PLATFORMS. Listing description rewritten
+  for 1.7.0 (0af9f08, text-only; 📸 slots await the shoot). Test-debt
+  sweep (multiplayer, floor/ceiling, ponder regression, chunk-border)
+  DROPPED by user decision 2026-07-21: let the testers find bugs,
+  hotfix reactively — do not re-add this item.
 - Release gates cleared: TEMP "linktablet-surface" debug logging
   STRIPPED (scanner + BE), CHANGELOG dated 1.7.0 — 2026-07-21.
 - Three additions this session (all uncommitted on `tablet-overlay`,
