@@ -74,6 +74,11 @@ transmit on Create's Redstone Link network.
   packet in `setSurfaceRole` — bulk same-tick `sendBlockUpdated`s hit
   vanilla's batched path, which DROPS BE data (ghost-role bug).
   `onLoad` self-heals stale parts AND controllers (`surfaceIntact`).
+  Solo screens (1.7.0): `solo_screen` BE flag (GUI chain-link button,
+  `SurfaceLinkPayload` → `TabletSurfaceScanner.setLinked`) — the
+  scanner flood SKIPS solo BEs and a solo origin sheds stale roles;
+  unlinking a merged surface marks EVERY member solo (no auto
+  re-merge). Block-only, never on the item.
   Rotation on merged: square = quarter turns, oblong = half turns
   (`effectiveRotation` clamps); wrench ANYWHERE on a merged face
   rotates (bezel clicks are hidden traps under the panel) — sneak-
