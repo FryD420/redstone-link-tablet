@@ -3,6 +3,9 @@
   "item.linktablet.tablet.tooltip": "Toggle Create Redstone Links remotely",
   "item.linktablet.tablet.case": "Case: %s",
   "item.linktablet.tablet.tooltip.mount": "Sneak + right-click a surface to mount",
+  "item.linktablet.swivel_mount": "Swivel Mount",
+  "item.linktablet.swivel_mount.tooltip": "Use on a placed tablet to put it on a ball joint — wrench to aim it at you",
+  "message.linktablet.mount_merged": "Split the merged screen before mounting",
   "block.linktablet.tablet": "Link Tablet",
   "itemGroup.linktablet": "Link Tablet",
 

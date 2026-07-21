@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.8.0 — 2026-07-21
+
+- New item: the **Swivel Mount** — craft it from brass sheets and an
+  iron nugget, then use it on any placed tablet to put it on a
+  ball-joint stand. Wrench the mounted tablet (anywhere) and it aims
+  itself straight at your eyes — angle it on a desk, a dashboard, or
+  the cockpit of whatever you're building. Wrench the bezel instead to
+  flip the mounted tablet between portrait and landscape — on floors
+  and ceilings too, not just walls — and sneak-wrench the glass to
+  rotate the screen content, same as a flat tablet. Taps and slider
+  drags work on the angled glass exactly like a flat tablet, and the
+  boxy block-selection outline stays out of the way. Sneak +
+  right-click (or sneak-wrench off the glass, or break it) returns
+  both the tablet and the mount. Mounted tablets stay standalone —
+  they never merge into multiblock screens.
+- Tablets are nameable: rename one on an anvil and the tablet GUI (and
+  the pinned overlay's title bar) wears that name instead of "Link
+  Tablet". The name survives placing, breaking, and picking the tablet
+  back up. Perfect for telling "Factory Master" apart from "Barn Door
+  Remote".
+- Note for servers: no protocol change — 1.8.0 pairs with 1.7.x.
+
 ## 1.7.1 — 2026-07-21
 
 - Fixed a minor screen issue.

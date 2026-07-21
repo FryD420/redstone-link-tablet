@@ -34,6 +34,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.neoforge.common.Tags;
@@ -53,6 +54,13 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public static final BooleanProperty LIT = BlockStateProperties.LIT;
     /** Wall mounts only: the case itself turned sideways (bezel-wrench). */
     public static final BooleanProperty LANDSCAPE = BooleanProperty.create("landscape");
+    /**
+     * Swivel mount (1.8.0): the tablet sits on a ball-joint stand and
+     * aims at stored BE pitch/yaw. The chunk model goes EMPTY (blockstate
+     * JSON can't tilt off-axis) — the BER draws stand, case, and screen.
+     * Mounted tablets never merge; wrench = re-aim at the clicker's eyes.
+     */
+    public static final BooleanProperty MOUNTED = BooleanProperty.create("mounted");
 
     // Panel is 12x14x1 pixels, flush against its support
     private static final VoxelShape FLOOR_NS = Block.box(2, 0, 1, 14, 1, 15);
@@ -68,6 +76,14 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     private static final VoxelShape WALL_S_LAND = Block.box(1, 2, 0, 15, 14, 1);
     private static final VoxelShape WALL_E_LAND = Block.box(0, 2, 1, 1, 14, 15);
     private static final VoxelShape WALL_W_LAND = Block.box(15, 2, 1, 16, 14, 15);
+    // Mounted: one coarse box per attach face — VoxelShapes can't tilt,
+    // so this just has to contain the stand plus the swiveling panel
+    private static final VoxelShape MOUNT_FLOOR = Block.box(2, 0, 2, 14, 11, 14);
+    private static final VoxelShape MOUNT_CEILING = Block.box(2, 5, 2, 14, 16, 14);
+    private static final VoxelShape MOUNT_WALL_N = Block.box(2, 2, 5, 14, 14, 16);
+    private static final VoxelShape MOUNT_WALL_S = Block.box(2, 2, 0, 14, 14, 11);
+    private static final VoxelShape MOUNT_WALL_E = Block.box(0, 2, 2, 11, 14, 14);
+    private static final VoxelShape MOUNT_WALL_W = Block.box(5, 2, 2, 16, 14, 14);
 
     public TabletBlock(Properties properties) {
         super(properties);
@@ -75,7 +91,8 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 .setValue(FACE, AttachFace.WALL)
                 .setValue(FACING, Direction.NORTH)
                 .setValue(LIT, false)
-                .setValue(LANDSCAPE, false));
+                .setValue(LANDSCAPE, false)
+                .setValue(MOUNTED, false));
     }
 
     @Override
@@ -85,13 +102,25 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACE, FACING, LIT, LANDSCAPE);
+        builder.add(FACE, FACING, LIT, LANDSCAPE, MOUNTED);
     }
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         Direction facing = state.getValue(FACING);
         boolean landscape = state.getValue(LANDSCAPE);
+        if (state.getValue(MOUNTED)) {
+            return switch (state.getValue(FACE)) {
+                case FLOOR -> MOUNT_FLOOR;
+                case CEILING -> MOUNT_CEILING;
+                case WALL -> switch (facing) {
+                    case SOUTH -> MOUNT_WALL_S;
+                    case EAST -> MOUNT_WALL_E;
+                    case WEST -> MOUNT_WALL_W;
+                    default -> MOUNT_WALL_N;
+                };
+            };
+        }
         return switch (state.getValue(FACE)) {
             case FLOOR -> facing.getAxis() == Direction.Axis.Z ? FLOOR_NS : FLOOR_EW;
             case CEILING -> facing.getAxis() == Direction.Axis.Z ? CEILING_NS : CEILING_EW;
@@ -213,6 +242,31 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         if (stack.is(Tags.Items.TOOLS_WRENCH)) {
             return ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
         }
+        // Swivel mount install (1.8.0): stand appears, tablet aims at
+        // the installer's eyes. Merged surfaces must be split first.
+        if (stack.is(ModItems.SWIVEL_MOUNT.get()) && !state.getValue(MOUNTED)) {
+            if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                if (be.isMerged()) {
+                    if (!level.isClientSide) {
+                        player.displayClientMessage(net.minecraft.network.chat.Component
+                                .translatable("message.linktablet.mount_merged"), true);
+                    }
+                    return ItemInteractionResult.FAIL;
+                }
+                if (!level.isClientSide) {
+                    level.setBlock(pos, state.setValue(MOUNTED, true), 3);
+                    if (level.getBlockEntity(pos) instanceof TabletBlockEntity mounted) {
+                        mounted.aimAt(player.getEyePosition());
+                    }
+                    if (!player.getAbilities().instabuild) {
+                        stack.shrink(1);
+                    }
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE,
+                            SoundSource.BLOCKS, 0.8F, 1.3F);
+                }
+                return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            }
+        }
         return super.useItemOn(stack, state, level, pos, player, hand, hitResult);
     }
 
@@ -223,9 +277,16 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             // Sneak + empty hand: pick the tablet back up, data intact
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 ItemStack stack = be.toItemStack();
+                boolean mounted = state.getValue(MOUNTED);
                 level.removeBlock(pos, false);
                 if (!player.addItem(stack)) {
                     popResource(level, pos, stack);
+                }
+                if (mounted) {
+                    ItemStack mount = new ItemStack(ModItems.SWIVEL_MOUNT.get());
+                    if (!player.addItem(mount)) {
+                        popResource(level, pos, mount);
+                    }
                 }
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.BLOCKS, 0.8F, 1.1F);
             }
@@ -246,20 +307,31 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             }
             BlockPos controllerPos = target.getBlockPos();
             List<SignalApp> apps = target.getApps();
-            TabletScreenMath.PipHit pipHit = TabletScreenMath.hitPipDetailed(state, pos, hitResult,
-                    apps.size(), target.isScreenList(), target.effectiveRotation(),
-                    be.getSurfaceDx(), be.getSurfaceDy(),
-                    target.getSurfaceW(), target.getSurfaceH());
+            // Mounted tablets (1.8.0): the hit location sits on the
+            // COARSE voxel box, so re-intersect the eye ray with the
+            // actual angled glass plane instead (both sides derive the
+            // basis from the same synced pitch/yaw).
+            TabletScreenMath.PipHit pipHit = be.isMounted()
+                    ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
+                            hitResult.getLocation(), apps.size(), target.isScreenList(),
+                            target.effectiveRotation())
+                    : TabletScreenMath.hitPipDetailed(state, pos, hitResult,
+                            apps.size(), target.isScreenList(), target.effectiveRotation(),
+                            be.getSurfaceDx(), be.getSurfaceDy(),
+                            target.getSurfaceW(), target.getSurfaceH());
 
-            // 🐍 The Snake shortcut is a client-side program, not a
-            // signal: its pip is inert on the server, and the client
+            // 🕹️ Secret-game shortcuts are client-side programs, not
+            // signals: their pip is inert on the server, and the client
             // opens the game GUI. Checked before every app type so the
             // disguise works whatever shape the app was saved in.
-            if (pipHit != null && apps.get(pipHit.index()).snakeShortcut()) {
-                if (level.isClientSide) {
-                    ClientHooks.openSnakeScreen(controllerPos);
+            if (pipHit != null) {
+                String game = apps.get(pipHit.index()).secretGameId();
+                if (game != null) {
+                    if (level.isClientSide) {
+                        ClientHooks.openSecretGame(game, controllerPos);
+                    }
+                    return InteractionResult.sidedSuccess(level.isClientSide);
                 }
-                return InteractionResult.sidedSuccess(level.isClientSide);
             }
 
             // Slider click-and-slide: the click grabs the slider and sets
@@ -359,6 +431,25 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public InteractionResult onWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
+        // Mounted (1.8.0): wrench on the GLASS re-aims the screen at the
+        // clicker's eyes; wrench on the BEZEL ring flips portrait ↔
+        // landscape — on ANY attach face, not just walls (the mount
+        // basis honors LANDSCAPE everywhere). Stand/case clicks re-aim
+        // too. Content rotation parks until unmounted (sneak-wrench
+        // pickup returns tablet + mount).
+        if (state.getValue(MOUNTED)) {
+            if (!level.isClientSide && context.getPlayer() != null
+                    && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                double[] uv = mountedWrenchUV(be, context);
+                if (mountedOnPanel(uv) && !mountedOnGlass(uv)) {
+                    level.setBlock(pos, state.cycle(LANDSCAPE), 3);
+                } else {
+                    be.aimAt(context.getPlayer().getEyePosition());
+                }
+                IWrenchable.playRotateSound(level, pos);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         // Merged surfaces: the continuous panel hides where the member
         // bezels physically are, so bezel clicks would be invisible
         // unmerge traps — a plain wrench ANYWHERE on a merged surface
@@ -395,6 +486,47 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
+    /**
+     * Mounted sneak-wrench (1.8.0): on the GLASS it rotates the screen
+     * content 90° — the one gesture the mounted wrench map had left
+     * (plain glass = aim, bezel = landscape). Sneak-wrench anywhere
+     * else keeps the IWrenchable default: pickup, tablet + mount.
+     */
+    @Override
+    public InteractionResult onSneakWrenched(BlockState state, UseOnContext context) {
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        if (state.getValue(MOUNTED) && context.getPlayer() != null
+                && level.getBlockEntity(pos) instanceof TabletBlockEntity be
+                && mountedOnGlass(mountedWrenchUV(be, context))) {
+            if (!level.isClientSide) {
+                be.rotateScreen();
+                IWrenchable.playRotateSound(level, pos);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        return IWrenchable.super.onSneakWrenched(state, context);
+    }
+
+    /** Eye-ray screen texels under a wrench click on a mounted tablet. */
+    private static double[] mountedWrenchUV(TabletBlockEntity be, UseOnContext context) {
+        Vec3 eye = context.getPlayer().getEyePosition();
+        return TabletScreenMath.mountedUV(be.mountBasis(), eye,
+                context.getClickLocation().subtract(eye));
+    }
+
+    /** Panel is texels u 0..12, v 0..14. */
+    private static boolean mountedOnPanel(double[] uv) {
+        return uv != null && uv[0] >= 0 && uv[0] < 12 && uv[1] >= 0 && uv[1] < 14;
+    }
+
+    /** Glass with the wrench's 1-texel inset, so the bezel ring is targetable. */
+    private static boolean mountedOnGlass(double[] uv) {
+        return uv != null
+                && uv[0] >= TabletScreenMath.GLASS_U0 + 1 && uv[0] < TabletScreenMath.GLASS_U1 - 1
+                && uv[1] >= TabletScreenMath.GLASS_V0 + 1 && uv[1] < TabletScreenMath.GLASS_V1 - 1;
+    }
+
     @Override
     protected BlockState rotate(BlockState state, Rotation rotation) {
         return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
@@ -410,10 +542,14 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         // No loot table: the drop is always the tablet item with its data,
         // including when the supporting block is broken.
         BlockEntity be = params.getOptionalParameter(LootContextParams.BLOCK_ENTITY);
-        if (be instanceof TabletBlockEntity tablet) {
-            return List.of(tablet.toItemStack());
+        ItemStack tabletStack = be instanceof TabletBlockEntity tablet
+                ? tablet.toItemStack()
+                : new ItemStack(ModItems.TABLET.get());
+        // The swivel mount comes back as its own item
+        if (state.getValue(MOUNTED)) {
+            return List.of(tabletStack, new ItemStack(ModItems.SWIVEL_MOUNT.get()));
         }
-        return List.of(new ItemStack(ModItems.TABLET.get()));
+        return List.of(tabletStack);
     }
 
     @Override

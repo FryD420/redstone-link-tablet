@@ -3,11 +3,8 @@ package com.modpack.linktablet.client.screen;
 import com.modpack.linktablet.client.AppView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
-import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.RandomSource;
 
 import java.util.ArrayDeque;
@@ -17,27 +14,19 @@ import java.util.Set;
 
 /**
  * 🐍 (1.7.1, unadvertised): opens from any app named "Snake" whose icon
- * is a Linked Controller — see {@code TabletScreen.isSnakeShortcut}.
- * Entirely client-side: no payloads, no lang keys (a lang entry would
- * spoil the hunt — all strings are literals on purpose), high score in
- * {@link ClientPrefs}. Chrome rules apply: surfaces blit the atlas,
- * the snake itself is procedural {@code fill()}.
+ * is a Linked Controller — see {@code SignalApp.secretGameId()}.
+ * Entirely client-side: no payloads, high score in {@link ClientPrefs}.
  */
-public class SnakeScreen extends Screen {
+public class SnakeScreen extends ArcadeScreen {
 
     private static final int COLS = 20;
     private static final int ROWS = 14;
     private static final int CELL = 8;
-    private static final int PAD = 6;
-    private static final int HEADER = 16;
 
     // GLFW key codes (same literal style as NoteWindows' ESC)
     private static final int K_UP = 265, K_DOWN = 264, K_LEFT = 263, K_RIGHT = 262;
     private static final int K_W = 87, K_A = 65, K_S = 83, K_D = 68;
 
-    private final AppView view;
-    /** GUI launches return to the tablet home; world taps back to the world. */
-    private final boolean returnToTablet;
     private final RandomSource random = RandomSource.create();
 
     /** Snake cells, head first, packed x<<8|y; occupied mirrors it. */
@@ -53,10 +42,18 @@ public class SnakeScreen extends Screen {
     private int tickCount;
 
     public SnakeScreen(AppView view, boolean returnToTablet) {
-        super(Component.literal("Snake"));
-        this.view = view;
-        this.returnToTablet = returnToTablet;
+        super("snake", view, returnToTablet);
         reset();
+    }
+
+    @Override
+    protected int boardW() {
+        return COLS * CELL;
+    }
+
+    @Override
+    protected int boardH() {
+        return ROWS * CELL;
     }
 
     private static int key(int x, int y) {
@@ -138,10 +135,8 @@ public class SnakeScreen extends Screen {
 
     private void die() {
         gameOver = true;
-        int best = ClientPrefs.snakeHigh();
-        if (score > best) {
-            ClientPrefs.setSnakeHigh(score);
-            newBest = true;
+        newBest = submitBest(score, false);
+        if (newBest) {
             UISounds.confirm();
         } else {
             UISounds.delete();
@@ -187,40 +182,17 @@ public class SnakeScreen extends Screen {
 
     // ---- Rendering -----------------------------------------------------
 
-    private int panelWidth() {
-        return COLS * CELL + PAD * 2;
-    }
-
-    private int panelHeight() {
-        return HEADER + ROWS * CELL + PAD * 2 + 4;
-    }
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        ScreenTheme theme = view.theme();
-        int left = (width - panelWidth()) / 2;
-        int top = (height - panelHeight()) / 2;
-
-        Chrome.panel(graphics, left - 6, top - 2, panelWidth() + 12, panelHeight() + 4, theme);
-
-        // Header plaque: title left, score / best right
-        Chrome.plaque(graphics, left, top + 2, panelWidth(), HEADER - 2, theme.rowBg);
-        graphics.drawString(font, "SNAKE", left + PAD, top + 5, theme.textPrimary, theme.textShadow);
-        String tally = score + " / " + Math.max(score, ClientPrefs.snakeHigh());
-        graphics.drawString(font, tally,
-                left + panelWidth() - PAD - font.width(tally), top + 5,
-                theme.textMuted, theme.textShadow);
-        Chrome.railH(graphics, left, top + HEADER + 1, panelWidth(), theme.bodyOuter);
-
-        // Board
-        int bx = left + PAD;
-        int by = top + HEADER + PAD;
-        graphics.fill(bx - 1, by - 1, bx + COLS * CELL + 1, by + ROWS * CELL + 1, theme.screenBgOff);
+        ScreenTheme theme = theme();
+        renderCabinet(graphics, score + " / " + Math.max(score, best()));
+        int bx = boardX();
+        int by = boardY();
 
         // Food: the first-frequency red, one texel inset
         graphics.fill(bx + foodX * CELL + 1, by + foodY * CELL + 1,
-                bx + foodX * CELL + CELL - 1, by + foodY * CELL - 1 + CELL, TabletScreen.FREQ1_COLOR);
+                bx + foodX * CELL + CELL - 1, by + foodY * CELL + CELL - 1, TabletScreen.FREQ1_COLOR);
 
         // Snake: accent head, dimmed body
         boolean head = true;
@@ -232,27 +204,8 @@ public class SnakeScreen extends Screen {
         }
 
         if (gameOver) {
-            graphics.fill(bx - 1, by - 1, bx + COLS * CELL + 1, by + ROWS * CELL + 1, 0xB0101216);
-            String headline = won ? "YOU WIN?!" : "GAME OVER";
-            String sub = newBest ? "new best: " + score : "score: " + score;
-            int cx = bx + COLS * CELL / 2;
-            int cy = by + ROWS * CELL / 2;
-            graphics.drawCenteredString(font, headline, cx, cy - 12, theme.accent);
-            graphics.drawCenteredString(font, sub, cx, cy, 0xFFE8EAF0);
-            graphics.drawCenteredString(font, "tap to restart", cx, cy + 14, 0xFF8A93A6);
+            renderOverlay(graphics, won ? "YOU WIN?!" : "GAME OVER",
+                    (newBest ? "new best: " : "score: ") + score, "tap to restart");
         }
-    }
-
-    // ---- Lifecycle -----------------------------------------------------
-
-    /** GUI path: the AppEditScreen return-trip idiom. World path: out. */
-    @Override
-    public void onClose() {
-        minecraft.setScreen(returnToTablet ? new TabletScreen(view) : null);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 }

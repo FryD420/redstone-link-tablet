@@ -376,11 +376,16 @@ public final class TabletScreenMath {
         if (t <= 0) return Float.NaN;
         double[] uv = screenUV(state, pos, face, eye.add(look.scale(t)));
         if (uv == null) return Float.NaN;
+        return logicalUFromSurfaceUV(uv[0], uv[1], rot, bx, by, w, h);
+    }
 
+    /** Shared tail of the ray→logical-u paths (quantized and mounted). */
+    private static float logicalUFromSurfaceUV(double u, double v, int rot,
+                                               int bx, int by, int w, int h) {
         // Same inverse content-rotation swizzle as hitPipDetailed, over
         // the continuous surface spans
-        double pu = uv[0] + 16.0 * bx - GLASS_U0;
-        double pv = uv[1] + 16.0 * by - GLASS_V0;
+        double pu = u + 16.0 * bx - GLASS_U0;
+        double pv = v + 16.0 * by - GLASS_V0;
         double gw = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
         double gh = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
         for (int i = 0; i < (rot & 3); i++) {
@@ -455,9 +460,12 @@ public final class TabletScreenMath {
         if (appCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
         if (uv == null) return null;
-        double cu = uv[0] + 16.0 * bx;
-        double cv = uv[1] + 16.0 * by;
+        return pipAtSurfaceUV(uv[0] + 16.0 * bx, uv[1] + 16.0 * by, appCount, list, rot, w, h);
+    }
 
+    /** Shared tail of the hit-test paths (quantized and mounted). */
+    private static PipHit pipAtSurfaceUV(double cu, double cv,
+                                         int appCount, boolean list, int rot, int w, int h) {
         double spanW = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
         double spanH = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
         if (cu < GLASS_U0 || cu >= GLASS_U0 + spanW) return null;
@@ -513,5 +521,99 @@ public final class TabletScreenMath {
         float u0 = tileU0(surfaceIndex % sl.cols(), tileW);
         float inset = sliderInset(tileW);
         return new float[]{u0 + inset, u0 + tileW - inset};
+    }
+
+    // ------------------------------------------------------------------
+    // Swivel mount (1.8.0): a mounted tablet sits on a ball joint at an
+    // arbitrary pitch/yaw, so its geometry runs through a real VECTOR
+    // basis instead of the quantized rotation tables above. ONE
+    // derivation ({@link #mountBasis}) feeds the renderer AND both hit
+    // paths — the same one-source-of-truth rule as the quantized stack.
+    // Mounted hit locations come from the COARSE voxel box, so the tap
+    // test and the drag both re-intersect the EYE RAY with the actual
+    // glass plane instead of trusting the hit location.
+    // ------------------------------------------------------------------
+
+    /** Ball-joint pivot height above the attach face, in blocks. */
+    public static final float MOUNT_PIVOT = 5 / 16f;
+    /** Ball center → panel center, along the screen normal, in blocks. */
+    public static final float MOUNT_PANEL_OFF = 2 / 16f;
+    /** Max tilt away from the attach face's normal, in degrees. */
+    public static final float MOUNT_MAX_TILT = 75f;
+
+    /**
+     * Screen frame of a mounted tablet: {@code normal} points out of the
+     * glass toward the viewer, {@code right}/{@code down} are +u/+v in
+     * world space, {@code anchor} is the texel origin (u=0, v=0) ON the
+     * glass plane.
+     */
+    public record MountBasis(Vec3 normal, Vec3 right, Vec3 down, Vec3 anchor) {
+        /** World point of the ball-joint pivot for a mounted tablet. */
+        public static Vec3 pivot(BlockPos pos, Direction attachNormal) {
+            return Vec3.atCenterOf(pos).add(
+                    Vec3.atLowerCornerOf(attachNormal.getNormal()).scale(MOUNT_PIVOT - 0.5));
+        }
+    }
+
+    /** Screen normal for stored mount angles (vanilla pitch/yaw semantics). */
+    public static Vec3 mountNormal(float pitch, float yaw) {
+        return Vec3.directionFromRotation(pitch, yaw);
+    }
+
+    public static MountBasis mountBasis(BlockPos pos, Direction attachNormal,
+                                        float pitch, float yaw, boolean landscape) {
+        Vec3 normal = mountNormal(pitch, yaw);
+        // v-down = world-down projected into the screen plane. A screen
+        // aimed straight along world-Y falls back to the yaw's
+        // horizontal (phone flat on a desk: content bottom toward the
+        // viewer). Matches the quantized frame on every axis-aligned
+        // aim, so un/mounting never flips the content.
+        Vec3 down = new Vec3(0, -1, 0).subtract(normal.scale(-normal.y));
+        down = down.lengthSqr() < 1.0E-4 ? mountNormal(0, yaw) : down.normalize();
+        Vec3 right = normal.cross(down).normalize();
+        // A landscape case stays landscape on the ball: the same 90°
+        // case turn the wall mount bakes (preRot) — the image of the
+        // old +u axis is the old +v axis. Content space stays portrait,
+        // exactly like the quantized landscape path.
+        if (landscape) {
+            Vec3 oldRight = right;
+            right = down;
+            down = oldRight.scale(-1);
+        }
+        Vec3 glassCenter = MountBasis.pivot(pos, attachNormal)
+                .add(normal.scale(MOUNT_PANEL_OFF + 0.5 / 16.0));
+        Vec3 anchor = glassCenter.subtract(right.scale(6 / 16.0)).subtract(down.scale(7 / 16.0));
+        return new MountBasis(normal, right, down, anchor);
+    }
+
+    /**
+     * Screen texels under the eye ray through {@code lookOrDelta}
+     * (a look DIRECTION, or {@code hitLocation - eye}), or null when the
+     * ray misses the front of the glass plane. Unclamped — callers do
+     * their own span checks.
+     */
+    public static double[] mountedUV(MountBasis basis, Vec3 eye, Vec3 lookOrDelta) {
+        double denom = lookOrDelta.dot(basis.normal());
+        if (denom >= -1.0E-8) return null; // parallel, or facing the back
+        double t = basis.anchor().subtract(eye).dot(basis.normal()) / denom;
+        if (t <= 0) return null;
+        Vec3 delta = eye.add(lookOrDelta.scale(t)).subtract(basis.anchor());
+        return new double[]{16 * delta.dot(basis.right()), 16 * delta.dot(basis.down())};
+    }
+
+    /** Mounted tap: {@link #hitPipDetailed} for the ball-joint frame. */
+    public static PipHit mountedHitPip(MountBasis basis, Vec3 eye, Vec3 hitLocation,
+                                       int appCount, boolean list, int rot) {
+        if (appCount <= 0) return null;
+        double[] uv = mountedUV(basis, eye, hitLocation.subtract(eye));
+        if (uv == null) return null;
+        return pipAtSurfaceUV(uv[0], uv[1], appCount, list, rot, 1, 1);
+    }
+
+    /** Mounted drag: {@link #logicalUFromRay} for the ball-joint frame. */
+    public static float mountedLogicalUFromRay(MountBasis basis, Vec3 eye, Vec3 look, int rot) {
+        double[] uv = mountedUV(basis, eye, look);
+        if (uv == null) return Float.NaN;
+        return logicalUFromSurfaceUV(uv[0], uv[1], rot, 0, 0, 1, 1);
     }
 }

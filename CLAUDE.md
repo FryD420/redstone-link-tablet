@@ -79,6 +79,19 @@ transmit on Create's Redstone Link network.
   scanner flood SKIPS solo BEs and a solo origin sheds stale roles;
   unlinking a merged surface marks EVERY member solo (no auto
   re-merge). Block-only, never on the item.
+- Swivel mount (1.8.0): `MOUNTED` blockstate + BE pitch/yaw floats —
+  mounted tablets use the VECTOR-basis path in `TabletScreenMath`
+  (`mountBasis` is the one derivation feeding renderer AND both hit
+  paths; taps/drags re-intersect the EYE RAY with the glass plane
+  because hit locations sit on the coarse voxel box). Mounted never
+  merges (scanner skips like solo). Mounted wrench map: glass = re-aim
+  at the clicker's eyes, bezel ring = landscape flip (ANY face — the
+  basis honors LANDSCAPE everywhere), sneak-wrench glass = content
+  rotate, sneak-wrench elsewhere = pickup. Chunk model goes EMPTY
+  (`tablet_empty`), the BER draws stand + hand-tinted case model +
+  screen, and SurfaceHighlight hides the coarse selection box. Mount
+  angles are block-only (never on the item); the mount drops as its
+  own item.
   Rotation on merged: square = quarter turns, oblong = half turns
   (`effectiveRotation` clamps); wrench ANYWHERE on a merged face
   rotates (bezel clicks are hidden traps under the panel) — sneak-

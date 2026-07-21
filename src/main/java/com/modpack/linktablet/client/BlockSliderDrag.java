@@ -114,10 +114,14 @@ public final class BlockSliderDrag {
         // The ray hits the clicked MEMBER's plane; the surface-aware
         // helper folds in the member offset BEFORE the rotation swizzle
         // so the result lives in the same continuous space as
-        // surfaceSliderBarU (rotated surfaces included).
-        float logicalU = TabletScreenMath.logicalSurfaceUFromRay(state, pos, eye, look,
-                controller.effectiveRotation(), member.getSurfaceDx(), member.getSurfaceDy(),
-                controller.getSurfaceW(), controller.getSurfaceH());
+        // surfaceSliderBarU (rotated surfaces included). Mounted tablets
+        // (1.8.0) intersect the angled glass plane instead.
+        float logicalU = member.isMounted()
+                ? TabletScreenMath.mountedLogicalUFromRay(member.mountBasis(), eye, look,
+                        controller.effectiveRotation())
+                : TabletScreenMath.logicalSurfaceUFromRay(state, pos, eye, look,
+                        controller.effectiveRotation(), member.getSurfaceDx(), member.getSurfaceDy(),
+                        controller.getSurfaceW(), controller.getSurfaceH());
         if (Float.isNaN(logicalU)) return;
         float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
                 controller.isScreenList(), controller.effectiveRotation(),

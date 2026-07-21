@@ -30,6 +30,19 @@ public sealed interface AppView {
         return ModNetworking.MAX_APPS;
     }
 
+    /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
+    @org.jetbrains.annotations.Nullable
+    default net.minecraft.network.chat.Component customName() {
+        return null;
+    }
+
+    /** GUI title: the tablet's own name when it has one. */
+    default net.minecraft.network.chat.Component displayName() {
+        net.minecraft.network.chat.Component custom = customName();
+        return custom != null ? custom
+                : net.minecraft.network.chat.Component.translatable("gui.linktablet.tablet.title");
+    }
+
     record Hand(InteractionHand hand) implements AppView {
         @Override
         public List<SignalApp> apps() {
@@ -50,6 +63,13 @@ public sealed interface AppView {
             if (mc.player == null) return ScreenTheme.DARK;
             return mc.player.getItemInHand(hand)
                     .getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        }
+
+        @Override
+        public net.minecraft.network.chat.Component customName() {
+            Minecraft mc = Minecraft.getInstance();
+            return mc.player == null ? null : mc.player.getItemInHand(hand)
+                    .get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
         }
     }
 
@@ -74,6 +94,11 @@ public sealed interface AppView {
         @Override
         public ScreenTheme theme() {
             return stack().getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        }
+
+        @Override
+        public net.minecraft.network.chat.Component customName() {
+            return stack().get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
         }
 
         public ItemStack stack() {
@@ -112,6 +137,12 @@ public sealed interface AppView {
         public int maxApps() {
             TabletBlockEntity be = resolved();
             return be != null ? be.maxApps() : ModNetworking.MAX_APPS;
+        }
+
+        @Override
+        public net.minecraft.network.chat.Component customName() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getCustomName() : null;
         }
 
         /** The BE that owns this position's data (controller when merged). */

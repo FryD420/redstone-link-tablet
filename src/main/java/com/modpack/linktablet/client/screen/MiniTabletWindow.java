@@ -228,7 +228,9 @@ public class MiniTabletWindow implements FloatingWindow {
         graphics.fill(x + 3, y + 3, x + W + 3, y + h + 3, 0x50000000);
         Chrome.panel(graphics, x, y, W, h, t);
         String title = TextFit.ellipsize(font,
-                Component.translatable("gui.linktablet.overlay.title").getString(),
+                view.customName() != null
+                        ? view.customName().getString()
+                        : Component.translatable("gui.linktablet.overlay.title").getString(),
                 W - TITLE_H - 24);
         graphics.drawString(font, title, x + 10, y + 7, t.textPrimary, t.textShadow);
         Chrome.railH(graphics, x + 4, y + TITLE_H - 3, W - 8, t.bodyOuter);
