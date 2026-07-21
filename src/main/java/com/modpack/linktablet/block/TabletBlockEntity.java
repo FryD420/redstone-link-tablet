@@ -53,6 +53,16 @@ public class TabletBlockEntity extends BlockEntity {
     private ScreenTheme theme = ScreenTheme.DARK;
     /** Screen content rotation, quarter turns CW; 0 is never persisted. */
     private int screenRotation;
+    /** Custom (anvil) item name (1.8.0); survives the place/pickup trip. */
+    @Nullable
+    private net.minecraft.network.chat.Component customName;
+    /**
+     * Swivel mount angles (1.8.0), vanilla pitch/yaw semantics — only
+     * meaningful while the MOUNTED blockstate is set. Block-only, like
+     * the surface roles: never travel on the item.
+     */
+    private float mountPitch;
+    private float mountYaw;
 
     // Multiblock surface role (1.7.0). Offsets run along screenRight/
     // screenDown to the controller; (0,0) = controller or standalone.
@@ -148,6 +158,70 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    // ---- Swivel mount (1.8.0) ----------------------------------------
+
+    public boolean isMounted() {
+        BlockState state = getBlockState();
+        return state.hasProperty(TabletBlock.MOUNTED) && state.getValue(TabletBlock.MOUNTED);
+    }
+
+    public float getMountPitch() {
+        return mountPitch;
+    }
+
+    public float getMountYaw() {
+        return mountYaw;
+    }
+
+    /** The mounted screen frame — renderer and both hit paths share it. */
+    public TabletScreenMath.MountBasis mountBasis() {
+        return TabletScreenMath.mountBasis(worldPosition,
+                mountAttachNormal(), mountPitch, mountYaw,
+                getBlockState().getValue(TabletBlock.LANDSCAPE));
+    }
+
+    /** Normal of the face the stand is attached to. */
+    public net.minecraft.core.Direction mountAttachNormal() {
+        return TabletScreenMath.screenFace(getBlockState());
+    }
+
+    /**
+     * Face-me aiming: points the screen from the ball pivot at the given
+     * eye position, clamped so the panel never tilts more than
+     * {@link TabletScreenMath#MOUNT_MAX_TILT} away from the attach face.
+     */
+    public void aimAt(net.minecraft.world.phys.Vec3 eye) {
+        net.minecraft.core.Direction attach = mountAttachNormal();
+        net.minecraft.world.phys.Vec3 pivot =
+                TabletScreenMath.MountBasis.pivot(worldPosition, attach);
+        net.minecraft.world.phys.Vec3 toEye = eye.subtract(pivot);
+        if (toEye.lengthSqr() < 1.0E-6) return;
+        net.minecraft.world.phys.Vec3 normal = toEye.normalize();
+
+        // Clamp the tilt toward the attach face's normal
+        net.minecraft.world.phys.Vec3 attachN =
+                net.minecraft.world.phys.Vec3.atLowerCornerOf(attach.getNormal());
+        double cosMax = Math.cos(Math.toRadians(TabletScreenMath.MOUNT_MAX_TILT));
+        double dot = normal.dot(attachN);
+        if (dot < cosMax) {
+            net.minecraft.world.phys.Vec3 tangent = normal.subtract(attachN.scale(dot));
+            if (tangent.lengthSqr() < 1.0E-8) {
+                normal = attachN; // aiming straight through the wall — give up flat
+            } else {
+                double sinMax = Math.sin(Math.toRadians(TabletScreenMath.MOUNT_MAX_TILT));
+                normal = attachN.scale(cosMax).add(tangent.normalize().scale(sinMax)).normalize();
+            }
+        }
+
+        double horiz = Math.sqrt(normal.x * normal.x + normal.z * normal.z);
+        this.mountPitch = (float) Math.toDegrees(-Math.atan2(normal.y, horiz));
+        this.mountYaw = (float) Math.toDegrees(Math.atan2(-normal.x, normal.z));
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public ScreenTheme getTheme() {
         return theme;
     }
@@ -171,9 +245,15 @@ public class TabletBlockEntity extends BlockEntity {
         refreshTransmitters();
     }
 
+    @Nullable
+    public net.minecraft.network.chat.Component getCustomName() {
+        return customName;
+    }
+
     /** Copies apps, case color, screen layout, theme, and rotation from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
+        this.customName = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
         this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         this.theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         this.screenRotation = stack.getOrDefault(ModDataComponents.SCREEN_ROTATION.get(), 0) & 3;
@@ -188,6 +268,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (caseColor != null) {
             stack.set(ModDataComponents.CASE_COLOR.get(), caseColor);
+        }
+        if (customName != null) {
+            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, customName);
         }
         if (screenList) {
             stack.set(ModDataComponents.SCREEN_LIST.get(), true);
@@ -496,6 +579,14 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenRotation != 0) {
             tag.putInt("screen_rotation", screenRotation);
         }
+        if (mountPitch != 0 || mountYaw != 0) {
+            tag.putFloat("mount_pitch", mountPitch);
+            tag.putFloat("mount_yaw", mountYaw);
+        }
+        if (customName != null) {
+            tag.putString("custom_name",
+                    net.minecraft.network.chat.Component.Serializer.toJson(customName, registries));
+        }
         if (surfaceDx != 0 || surfaceDy != 0) {
             tag.putByte("surface_dx", surfaceDx);
             tag.putByte("surface_dy", surfaceDy);
@@ -517,6 +608,12 @@ public class TabletBlockEntity extends BlockEntity {
         this.soloScreen = tag.getBoolean("solo_screen");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
+        this.mountPitch = tag.getFloat("mount_pitch");
+        this.mountYaw = tag.getFloat("mount_yaw");
+        this.customName = tag.contains("custom_name")
+                ? net.minecraft.network.chat.Component.Serializer.fromJson(
+                        tag.getString("custom_name"), registries)
+                : null;
         this.surfaceDx = tag.getByte("surface_dx");
         this.surfaceDy = tag.getByte("surface_dy");
         this.surfaceW = tag.contains("surface_w") ? tag.getByte("surface_w") : 1;

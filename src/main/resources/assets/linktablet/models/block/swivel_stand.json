@@ -1,0 +1,47 @@
+{
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "create:block/brass_block",
+    "brass": "create:block/brass_block",
+    "ball": "minecraft:block/polished_blackstone"
+  },
+  "elements": [
+    {
+      "__comment": "base plate on the attach face — 4x4 so a steeply tilted panel never clips it",
+      "from": [6, 0, 6],
+      "to": [10, 1, 10],
+      "faces": {
+        "up":    { "uv": [6, 6, 10, 10], "texture": "#brass" },
+        "down":  { "uv": [6, 6, 10, 10], "texture": "#brass" },
+        "north": { "uv": [6, 15, 10, 16], "texture": "#brass" },
+        "south": { "uv": [6, 15, 10, 16], "texture": "#brass" },
+        "west":  { "uv": [6, 15, 10, 16], "texture": "#brass" },
+        "east":  { "uv": [6, 15, 10, 16], "texture": "#brass" }
+      }
+    },
+    {
+      "__comment": "neck up to the ball",
+      "from": [7, 1, 7],
+      "to": [9, 4, 9],
+      "faces": {
+        "north": { "uv": [7, 12, 9, 15], "texture": "#brass" },
+        "south": { "uv": [7, 12, 9, 15], "texture": "#brass" },
+        "west":  { "uv": [7, 12, 9, 15], "texture": "#brass" },
+        "east":  { "uv": [7, 12, 9, 15], "texture": "#brass" }
+      }
+    },
+    {
+      "__comment": "ball centered at pivot height y=5",
+      "from": [6.5, 3.75, 6.5],
+      "to": [9.5, 6.25, 9.5],
+      "faces": {
+        "up":    { "uv": [6, 6, 9, 9], "texture": "#ball" },
+        "down":  { "uv": [6, 6, 9, 9], "texture": "#ball" },
+        "north": { "uv": [6, 6, 9, 9], "texture": "#ball" },
+        "south": { "uv": [6, 6, 9, 9], "texture": "#ball" },
+        "west":  { "uv": [6, 6, 9, 9], "texture": "#ball" },
+        "east":  { "uv": [6, 6, 9, 9], "texture": "#ball" }
+      }
+    }
+  ]
+}

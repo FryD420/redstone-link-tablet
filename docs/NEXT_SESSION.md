@@ -30,7 +30,24 @@ at the repo root (auto-loaded every Claude session).
 
 ## Next session
 
-1. **Screenshot shoot follow-up (the ONLY open work item)** — the user
+0. **1.8.0 SHIPPED 2026-07-21** ("It works. lets send this"): Swivel
+   Mount (the headline: ball-joint stand, face-me aiming, full wrench
+   map, landscape on all faces) + nameable tablets (anvil name shows
+   in GUI/overlay, survives place/pickup) + — unadvertised, changelog
+   silent BY DESIGN — the full 19-title secret arcade (see local
+   memory secret-games-backlog; trigger = Linked Controller icon +
+   game name). No protocol change, pairs with 1.7.x.
+1. **Sable / Create Aeronautics compat (investigate on demand)** —
+   tablets on Sable sublevels (Aeronautics ships): prediction from
+   2026-07-21 analysis — rendering/transmit/flat-taps likely fine
+   (real interactive blocks, remapped raycasts), but ALL eye-ray math
+   mixes main-world eye coords with sublevel block coords and will
+   misbehave on a moved ship: mounted taps/aiming/wrench regions and
+   BlockSliderDrag. Fix if testers confirm: a Sable compat shim that
+   transforms the eye into sublevel space at the three eye-ray call
+   sites (optional-dep pattern like JEI/EMI). Wait for a real tester
+   report from an Aeronautics pack before building.
+2. **Screenshot shoot follow-up** — the user
    + wife will shoot, timing theirs: (a) a merged tablet wall (3×2 or
    4×3, dyed bezel, mid-tap — strong candidate to replace hero4 as
    hero/social preview), (b) the pinned overlay during real gameplay
@@ -38,7 +55,7 @@ at the repo root (auto-loaded every Claude session).
    bottom of `docs/DESCRIPTION.md` (two `<!-- 📸 -->` comments). When
    shot: drop in docs/images/, swap the comments for embeds, push,
    user re-pastes both listings.
-2. **Reactive hotfixes** — the tester crew is on 1.7.0 now. The
+3. **Reactive hotfixes** — the tester crew is on 1.7.x now. The
    pre-release test-debt sweep (multiplayer dev-server, floor/ceiling
    orientation, ponder + held-item regression, chunk-border surfaces)
    was DROPPED by user decision 2026-07-21 ("let the testers find

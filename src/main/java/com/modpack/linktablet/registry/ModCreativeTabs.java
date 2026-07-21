@@ -17,7 +17,10 @@ public class ModCreativeTabs {
         TABS.register("main", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.linktablet"))
                 .icon(() -> new ItemStack(ModItems.TABLET.get()))
-                .displayItems((params, output) -> output.accept(ModItems.TABLET.get()))
+                .displayItems((params, output) -> {
+                    output.accept(ModItems.TABLET.get());
+                    output.accept(ModItems.SWIVEL_MOUNT.get());
+                })
                 .build());
     }
 

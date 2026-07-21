@@ -65,6 +65,8 @@ public class ClientSetup {
         // draws (the item model JSON itself is a builtin/entity stub).
         event.register(TabletItemRenderer.MODEL_BASE);
         event.register(TabletItemRenderer.MODEL_LIT);
+        // Swivel-mount stand (1.8.0), drawn by the BER for mounted tablets
+        event.register(TabletBlockEntityRenderer.MODEL_STAND);
     }
 
     @SubscribeEvent

@@ -149,16 +149,39 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
     }
 
     /**
-     * 🐍 (1.7.1): an app named "Snake" iconed with a Linked Controller
-     * is really a shortcut — GUI clicks and placed-screen taps open the
-     * game instead of toggling (both sides consult this, so the world
-     * tap stays inert on the server). Derived, never on the wire.
+     * 🐍🕹️ (1.7.1, expanded 1.8.0): certain NAME + ICON pairs turn an
+     * app into a shortcut for a hidden game — GUI clicks and
+     * placed-screen taps open it instead of toggling (both sides
+     * consult this, so the world tap stays inert on the server).
+     * Derived, never on the wire. The client maps ids to screens in
+     * {@code client/screen/SecretGames}; extend BOTH tables together.
      */
-    public boolean snakeShortcut() {
-        return name.strip().equalsIgnoreCase("snake")
-                && icon.map(id -> id.equals(ResourceLocation
-                        .fromNamespaceAndPath("create", "linked_controller")))
-                .orElse(false);
+    /** ONE key item for the whole arcade — crack it once, the NAME
+     * picks the game. */
+    private static final ResourceLocation SECRET_GAME_ICON =
+            ResourceLocation.fromNamespaceAndPath("create", "linked_controller");
+
+    private static final java.util.Set<String> SECRET_GAMES = java.util.Set.of(
+            "snake", "lights", "sweeper", "mines", "whack", "breakout",
+            "simon", "reflex", "pong", "flappy", "dodge", "pairs", "memory",
+            "2048", "crossing", "runner", "stacker", "stack", "invaders",
+            "crates", "sokoban", "life", "paint");
+
+    /** Game id when this app is a secret-game shortcut, else null. */
+    @org.jetbrains.annotations.Nullable
+    public String secretGameId() {
+        String key = name.strip().toLowerCase(java.util.Locale.ROOT);
+        if (!SECRET_GAMES.contains(key)
+                || icon.isEmpty() || !icon.get().equals(SECRET_GAME_ICON)) {
+            return null;
+        }
+        return switch (key) {
+            case "mines" -> "sweeper";
+            case "pairs" -> "memory";
+            case "stack" -> "stacker";
+            case "sokoban" -> "crates";
+            default -> key;
+        };
     }
 
     private static String cleanNote(String raw) {

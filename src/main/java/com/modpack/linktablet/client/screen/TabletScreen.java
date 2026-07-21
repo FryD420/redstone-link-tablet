@@ -463,9 +463,11 @@ public class TabletScreen extends Screen {
         // Tablet body: themed canvas inside an untinted wood rail frame
         Chrome.panel(graphics, left - 6, top - 2, pw + 12, bodyHeight() + 4, theme);
 
+        // The tablet's own (anvil) name when it has one — read live so
+        // renames and merge/split re-resolutions show without reopening
         Component titleText = reorderMode
                 ? Component.translatable("gui.linktablet.reorder.title")
-                : title;
+                : view.displayName();
         // Title on a parchment plaque hung over the top rail, Stock-Keeper style
         int titleW = font.width(titleText);
         Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
@@ -1051,9 +1053,10 @@ public class TabletScreen extends Screen {
                     openNote(index);
                     return;
                 }
-                if (app.snakeShortcut()) {
+                String game = app.secretGameId();
+                if (game != null) {
                     UISounds.open();
-                    minecraft.setScreen(new SnakeScreen(view, true));
+                    minecraft.setScreen(SecretGames.create(game, view, true));
                     return;
                 }
                 if (app.slider()) {

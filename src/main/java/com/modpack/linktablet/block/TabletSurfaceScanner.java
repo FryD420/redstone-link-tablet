@@ -44,10 +44,11 @@ public final class TabletSurfaceScanner {
         Direction right = TabletScreenMath.screenRight(refState);
         Direction down = TabletScreenMath.screenDown(refState);
 
-        // A solo origin never merges; if it still carries a stale role,
-        // shed it (former co-members reform from their own ticks)
+        // A solo (or mounted, 1.8.0) origin never merges; if it still
+        // carries a stale role, shed it (former co-members reform from
+        // their own ticks)
         if (level.getBlockEntity(origin) instanceof TabletBlockEntity originBe
-                && originBe.isSoloScreen()) {
+                && (originBe.isSoloScreen() || originBe.isMounted())) {
             if (originBe.isMerged()) {
                 TabletTransmitterHandler.clearHeldForBlock(level, originBe.getControllerPos());
                 originBe.setSurfaceRole(0, 0, 1, 1);
@@ -68,7 +69,7 @@ public final class TabletSurfaceScanner {
             BlockState state = level.getBlockState(pos);
             if (!sameMergeKey(refState, state)) continue;
             if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity be)
-                    || be.isSoloScreen()) continue;
+                    || be.isSoloScreen() || be.isMounted()) continue;
             members.add(pos);
             if (members.size() > MAX_WALK) {
                 overflow = true;

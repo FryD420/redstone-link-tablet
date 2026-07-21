@@ -53,6 +53,7 @@ public class LinkTabletMod {
     private void addToVanillaTabs(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(ModItems.TABLET.get());
+            event.accept(ModItems.SWIVEL_MOUNT.get());
         }
     }
 
