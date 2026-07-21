@@ -1051,6 +1051,11 @@ public class TabletScreen extends Screen {
                     openNote(index);
                     return;
                 }
+                if (app.snakeShortcut()) {
+                    UISounds.open();
+                    minecraft.setScreen(new SnakeScreen(view, true));
+                    return;
+                }
                 if (app.slider()) {
                     // Click sets the value from position; keep dragging to sweep
                     draggingSlider = index;

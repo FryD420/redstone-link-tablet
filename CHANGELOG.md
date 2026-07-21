@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.1 — 2026-07-21
+
+- Fixed a minor screen issue.
+
 ## 1.7.0 — 2026-07-21
 
 - Multiblock screens: place tablets side by side (same wall, floor, or

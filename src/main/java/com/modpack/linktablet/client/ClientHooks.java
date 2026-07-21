@@ -41,6 +41,14 @@ public class ClientHooks {
         mc.setScreen(new TabletScreen(new AppView.Block(pos)));
     }
 
+    /** 🐍 World tap on the Snake shortcut pip: straight into the game.
+     * ESC returns to the world — the player never asked for the GUI. */
+    public static void openSnakeScreen(BlockPos controllerPos) {
+        UISounds.open();
+        Minecraft.getInstance().setScreen(new com.modpack.linktablet.client.screen.SnakeScreen(
+                new AppView.Block(controllerPos), false));
+    }
+
     /** Begins a placed-tablet slider drag (client drives it from here). */
     public static void startBlockSliderDrag(BlockPos memberPos, BlockPos controllerPos, int index) {
         BlockSliderDrag.start(memberPos, controllerPos, index);

@@ -251,6 +251,17 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     be.getSurfaceDx(), be.getSurfaceDy(),
                     target.getSurfaceW(), target.getSurfaceH());
 
+            // 🐍 The Snake shortcut is a client-side program, not a
+            // signal: its pip is inert on the server, and the client
+            // opens the game GUI. Checked before every app type so the
+            // disguise works whatever shape the app was saved in.
+            if (pipHit != null && apps.get(pipHit.index()).snakeShortcut()) {
+                if (level.isClientSide) {
+                    ClientHooks.openSnakeScreen(controllerPos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
+
             // Slider click-and-slide: the click grabs the slider and sets
             // the initial value (full glass-width mapping — 16 stops on
             // one tile would be untargetable); from there the CLIENT

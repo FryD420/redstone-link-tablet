@@ -25,6 +25,9 @@ public class ClientPrefs {
     private static int overlayX = -1;
     private static int overlayY = -1;
 
+    /** 🐍 (1.7.1): best score on the tablet's unadvertised resident. */
+    private static int snakeHigh = 0;
+
     /** Whether the tablet home screen shows the app list instead of the icon grid. */
     public static boolean listView() {
         load();
@@ -70,6 +73,18 @@ public class ClientPrefs {
         save();
     }
 
+    public static int snakeHigh() {
+        load();
+        return snakeHigh;
+    }
+
+    public static void setSnakeHigh(int value) {
+        load();
+        if (snakeHigh == value) return;
+        snakeHigh = value;
+        save();
+    }
+
     private static void load() {
         if (loaded) return;
         loaded = true;
@@ -83,6 +98,7 @@ public class ClientPrefs {
         overlayPin = props.getProperty("overlayPin", "");
         overlayX = parseInt(props.getProperty("overlayX"), -1);
         overlayY = parseInt(props.getProperty("overlayY"), -1);
+        snakeHigh = parseInt(props.getProperty("snakeHigh"), 0);
     }
 
     private static int parseInt(String value, int fallback) {
@@ -99,6 +115,7 @@ public class ClientPrefs {
         props.setProperty("overlayPin", overlayPin);
         props.setProperty("overlayX", Integer.toString(overlayX));
         props.setProperty("overlayY", Integer.toString(overlayY));
+        props.setProperty("snakeHigh", Integer.toString(snakeHigh));
         try (var out = java.nio.file.Files.newOutputStream(FILE)) {
             props.store(out, "Link Tablet client display preferences");
         } catch (IOException ignored) {
