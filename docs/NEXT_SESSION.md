@@ -3,7 +3,12 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-21 — 1.7.0 tester build cut, in modpack test)
+## Status (2026-07-21 — 1.7.0 TAGGED + PUSHED, uploads with the user)
+- Modpack-tested by the user ("much better"), committed (6caabb0),
+  merged to main (e9ead01), tagged v1.7.0, pushed. Platform uploads
+  pending with the user. Test debt released WITHOUT (multiplayer,
+  floor/ceiling, ponder + held-item regression, chunk-border) — sweep
+  next session, hotfix if testers hit anything.
 - Release gates cleared: TEMP "linktablet-surface" debug logging
   STRIPPED (scanner + BE), CHANGELOG dated 1.7.0 — 2026-07-21.
 - Three additions this session (all uncommitted on `tablet-overlay`,
