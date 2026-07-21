@@ -107,17 +107,17 @@ at the repo root (auto-loaded every Claude session).
    type". Open design points: what the HUD (mouse-captured) state can
    do, whether the parked open-tablet keybind ships with it, window
    sizing vs. app count.
-3. **Icon-friendly defaults** — still ON HOLD until the user reports
-   what exactly renders poorly (analysis ready in
-   docs/ICON_DEFAULTS_SCOPING.md).
-4. **Multiblock screens** — gated on the user's answers in
-   docs/MULTIBLOCK_DESIGN.md.
+3. ~~Icon-friendly defaults~~ — PARKED (user call 2026-07-21, after
+   1.7.0 shipped). Analysis stays in docs/ICON_DEFAULTS_SCOPING.md if
+   it ever comes back; don't propose it unless the user re-raises.
+4. **Multiblock screens** — SHIPPED in 1.7.0.
 
-Parked: first-person interactive GUI on the held tablet; the DH
-blockstate nit; any 1.20.1 backport (assessed 2026-07-19: possible but
-a big lift — Forge loader, no DataComponents/StreamCodec, a second
-codebase to maintain; wait for real demand signals now that the
-listings are public).
+Parked (2026-07-21 vetting): icon-friendly defaults (above);
+first-person interactive GUI on the held tablet; the DH blockstate
+nit; any 1.20.1 backport (assessed 2026-07-19: possible but a big
+lift — Forge loader, no DataComponents/StreamCodec, a second codebase
+to maintain; wait for real demand signals now that the listings are
+public).
 
 ## Active list (updated 2026-07-19 after the 1.6.0 cut)
 1. **Refresh listing screenshots — FULLY DONE 2026-07-19** (user +
