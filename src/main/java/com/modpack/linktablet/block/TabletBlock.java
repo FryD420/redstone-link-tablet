@@ -105,6 +105,102 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     }
 
     /**
+     * Merge-friendly placement (1.7.0): floor/ceiling tablets face
+     * wherever the PLAYER faced at placement, so hand-placing a grid
+     * naturally produces mixed FACINGs — different merge keys, no
+     * surface. Adopting a coplanar neighbor's orientation makes
+     * "slap tablets next to each other" just work; wall tablets
+     * similarly adopt a neighbor's LANDSCAPE flip.
+     */
+    @Override
+    public BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {
+        BlockState state = super.getStateForPlacement(context);
+        if (state == null) return null;
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        if (state.getValue(FACE) == AttachFace.WALL) {
+            Direction facing = state.getValue(FACING);
+            for (Direction dir : Direction.values()) {
+                if (dir.getAxis() == facing.getAxis()) continue;
+                BlockState nb = level.getBlockState(pos.relative(dir));
+                if (nb.getBlock() instanceof TabletBlock
+                        && nb.getValue(FACE) == AttachFace.WALL
+                        && nb.getValue(FACING) == facing) {
+                    return state.setValue(LANDSCAPE, nb.getValue(LANDSCAPE));
+                }
+            }
+        } else {
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockState nb = level.getBlockState(pos.relative(dir));
+                if (nb.getBlock() instanceof TabletBlock
+                        && nb.getValue(FACE) == state.getValue(FACE)) {
+                    return state.setValue(FACING, nb.getValue(FACING));
+                }
+            }
+        }
+        return state;
+    }
+
+    // ------------------------------------------------------------------
+    // Multiblock surface formation (1.7.0). onPlace/onRemove only
+    // SCHEDULE a scan tick: onPlace fires before the BE exists (and
+    // before TabletItem.useOn's loadFromItem), and LIT flips re-enter
+    // onPlace — running the scanner synchronously would recurse. The
+    // merge-key guard below is load-bearing: LIT-only state changes MUST
+    // NOT schedule, or updateLit -> setBlock -> onPlace would loop.
+    // ------------------------------------------------------------------
+
+    /** Whether two states of this block differ in a merge-relevant way. */
+    private static boolean mergeKeyChanged(BlockState a, BlockState b) {
+        return a.getValue(FACE) != b.getValue(FACE)
+                || a.getValue(FACING) != b.getValue(FACING)
+                || a.getValue(LANDSCAPE) != b.getValue(LANDSCAPE);
+    }
+
+    @Override
+    protected void onPlace(BlockState state, Level level, BlockPos pos,
+                           BlockState oldState, boolean movedByPiston) {
+        super.onPlace(state, level, pos, oldState, movedByPiston);
+        if (level.isClientSide) return;
+        if (oldState.is(this) && !mergeKeyChanged(state, oldState)) return; // LIT-only flip
+        level.scheduleTick(pos, this, 0);
+        if (oldState.is(this)) {
+            // Orientation changed in place (wrench): old neighbors may
+            // need to reform without this block
+            scheduleNeighborScans(level, pos, oldState);
+        }
+    }
+
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos,
+                            BlockState newState, boolean movedByPiston) {
+        if (!level.isClientSide && (!newState.is(this) || mergeKeyChanged(state, newState))) {
+            scheduleNeighborScans(level, pos, state);
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    /** Schedules scans on the coplanar tablet neighbors of a vanished member. */
+    private void scheduleNeighborScans(Level level, BlockPos pos, BlockState state) {
+        Direction right = TabletScreenMath.screenRight(state);
+        Direction down = TabletScreenMath.screenDown(state);
+        for (Direction dir : new Direction[]{right, right.getOpposite(), down, down.getOpposite()}) {
+            BlockPos next = pos.relative(dir);
+            if (level.isLoaded(next) && level.getBlockState(next).is(this)) {
+                level.scheduleTick(next, this, 0);
+            }
+        }
+    }
+
+    @Override
+    protected void tick(BlockState state, net.minecraft.server.level.ServerLevel level,
+                        BlockPos pos, net.minecraft.util.RandomSource random) {
+        if (state.is(this)) {
+            TabletSurfaceScanner.rescan(level, pos, state);
+        }
+    }
+
+    /**
      * Wrenches never reach their own {@code useOn} unless the block
      * steps aside — the block interaction runs first and this block
      * consumes every click (pip toggle or GUI). Skipping here lets
@@ -140,9 +236,20 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         // synced and the server receives the client's exact hit vec),
         // so client and server always agree on pip-vs-GUI.
         if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
-            List<SignalApp> apps = be.getApps();
+            // Merged surfaces (1.7.0): every action lands on the
+            // CONTROLLER's data; the clicked member only contributes its
+            // position on the surface to the hit test. Orphaned parts
+            // (controller unloaded/stale) are inert.
+            TabletBlockEntity target = be.resolveController();
+            if (target == null) {
+                return InteractionResult.CONSUME;
+            }
+            BlockPos controllerPos = target.getBlockPos();
+            List<SignalApp> apps = target.getApps();
             TabletScreenMath.PipHit pipHit = TabletScreenMath.hitPipDetailed(state, pos, hitResult,
-                    apps.size(), be.isScreenList(), be.getScreenRotation());
+                    apps.size(), target.isScreenList(), target.effectiveRotation(),
+                    be.getSurfaceDx(), be.getSurfaceDy(),
+                    target.getSurfaceW(), target.getSurfaceH());
 
             // Slider click-and-slide: the click grabs the slider and sets
             // the initial value (full glass-width mapping — 16 stops on
@@ -153,11 +260,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             if (pipHit != null && apps.get(pipHit.index()).slider()) {
                 int index = pipHit.index();
                 if (level.isClientSide) {
-                    ClientHooks.startBlockSliderDrag(pos, index);
+                    ClientHooks.startBlockSliderDrag(pos, controllerPos, index);
                 } else {
                     SignalApp app = apps.get(index);
-                    float[] bar = TabletScreenMath.sliderBarU(index, apps.size(),
-                            be.isScreenList(), be.getScreenRotation());
+                    float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
+                            target.isScreenList(), target.effectiveRotation(),
+                            target.getSurfaceW(), target.getSurfaceH());
                     float frac = net.minecraft.util.Mth.clamp(
                             (pipHit.logicalU() - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
                     SignalApp updated = app.withSliderValue(app.valueFromFraction(frac));
@@ -165,7 +273,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                         boolean wasOn = app.strength() > 0;
                         List<SignalApp> updatedApps = new ArrayList<>(apps);
                         updatedApps.set(index, updated);
-                        be.setApps(updatedApps);
+                        target.setApps(updatedApps);
                         if (wasOn != (updated.strength() > 0)) {
                             ModNetworking.playToggleClick(level, null, pos, updated.strength() > 0);
                         }
@@ -185,7 +293,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     // holding merely re-taps, which for a timer just
                     // keeps the clock topped up.
                     if (!level.isClientSide) {
-                        TabletTransmitterHandler.startTimed(player, true, pos, index,
+                        TabletTransmitterHandler.startTimed(player, true, controllerPos, index,
                                 app.frequencies(), app.strength(), app.pulseTicks());
                         ModNetworking.playToggleClick(level, null, pos, true);
                     }
@@ -198,7 +306,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     // (not SUCCESS) so the repeats don't swing the arm:
                     // feedback is the click sound and the lit pip.
                     if (!level.isClientSide) {
-                        boolean newPress = TabletTransmitterHandler.pressBlockPip(player, pos,
+                        boolean newPress = TabletTransmitterHandler.pressBlockPip(player, controllerPos,
                                 index, app.frequencies(), app.strength(), level.getGameTime());
                         if (newPress) {
                             ModNetworking.playToggleClick(level, null, pos, true);
@@ -209,13 +317,17 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 if (!level.isClientSide) {
                     List<SignalApp> updated = new ArrayList<>(apps);
                     updated.set(index, app.withActive(!app.active()));
-                    be.setApps(updated);
+                    target.setApps(updated);
                     // Unlike the GUI path, the clicker has no UI sound
                     // here, so nobody is excluded.
                     ModNetworking.playToggleClick(level, null, pos, !app.active());
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
             }
+            if (level.isClientSide) {
+                ClientHooks.openTabletBlockScreen(controllerPos);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         if (level.isClientSide) {
             ClientHooks.openTabletBlockScreen(pos);
@@ -236,13 +348,28 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public InteractionResult onWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
-        boolean onGlass = TabletScreenMath.isOnGlass(state, pos,
+        // Merged surfaces: the continuous panel hides where the member
+        // bezels physically are, so bezel clicks would be invisible
+        // unmerge traps — a plain wrench ANYWHERE on a merged surface
+        // rotates the content (square surfaces get quarter turns,
+        // oblong ones half turns). Restructuring is deliberate only:
+        // sneak-wrench pickup or breaking a member.
+        boolean merged = level.getBlockEntity(pos) instanceof TabletBlockEntity clicked
+                && clicked.isMerged();
+        boolean onGlass = merged || TabletScreenMath.isOnGlass(state, pos,
                 context.getClickedFace(), context.getClickLocation(), 1.0);
 
         if (onGlass) {
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.rotateScreen();
-                IWrenchable.playRotateSound(level, pos);
+                TabletBlockEntity target = be.resolveController();
+                if (target != null) {
+                    if (target.isMerged()) {
+                        target.rotateScreenSurface();
+                    } else {
+                        target.rotateScreen();
+                    }
+                    IWrenchable.playRotateSound(level, pos);
+                }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

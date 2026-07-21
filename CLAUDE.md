@@ -59,6 +59,29 @@ transmit on Create's Redstone Link network.
 - Dynamic screen grid (1.3.0): `TabletScreenMath.gridLayout(appCount)` is the
   ONLY count→cols×rows table; renderer and server hit-test both call it —
   never duplicate the breakpoints.
+- Multiblock surfaces (1.7.0): the merged screen is ONE CONTINUOUS
+  panel — content space runs unbroken across members
+  (`surfaceGlassW/H`, tiles/rows flow over block seams), drawn by the
+  controller at `MERGED_SCREEN_HEIGHT` (above the bezel lips) covering
+  the FULL block faces, with a case-tint bezel band + skirt walls.
+  `TabletScreenMath.surfaceLayout` is the only density table; hit-test
+  converts member UV → continuous coords (`+16·dx` BEFORE the rotation
+  swizzle — `logicalSurfaceUFromRay` for drags, never add offsets
+  after). Formation runs ONLY from scheduled block ticks
+  (`TabletSurfaceScanner`): `TabletBlock.onPlace` must keep skipping
+  LIT-only state changes or `updateLit`'s setBlock recurses (stack
+  overflow). Role changes MUST sync via the explicit per-player BE
+  packet in `setSurfaceRole` — bulk same-tick `sendBlockUpdated`s hit
+  vanilla's batched path, which DROPS BE data (ghost-role bug).
+  `onLoad` self-heals stale parts AND controllers (`surfaceIntact`).
+  Rotation on merged: square = quarter turns, oblong = half turns
+  (`effectiveRotation` clamps); wrench ANYWHERE on a merged face
+  rotates (bezel clicks are hidden traps under the panel) — sneak-
+  wrench/break to restructure. Parts render/transmit nothing; roles
+  never travel on the item; placement auto-adopts a coplanar
+  neighbor's FACING/LANDSCAPE. TEMP debug logging ("linktablet-
+  surface" logger, scanner + BE loadAdditional) MUST be stripped
+  before release.
 - Themes (1.3.0): `theme/ScreenTheme` — DARK must stay byte-identical to the
   pre-1.3.0 hardcoded colors and is never persisted (no component, no NBT),
   so 1.2.x tablets stay untouched. The theme STREAM_CODEC is ordinal-based:

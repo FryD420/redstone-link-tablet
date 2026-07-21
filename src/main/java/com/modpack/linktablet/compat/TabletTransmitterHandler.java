@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -164,6 +165,20 @@ public class TabletTransmitterHandler {
             if (holds == null) return;
             holds.keySet().removeIf(key -> key.pos() == null && key.mainHand() == mainHand);
             if (holds.isEmpty()) HELD.remove(player.getUUID());
+        }
+    }
+
+    /**
+     * Like the pos branch of {@link #clearHeldForTarget}, but callable
+     * without a player — surface merges/splits run from block ticks
+     * (1.7.0), and a role change invalidates every hold on the old and
+     * new controller positions across ALL players.
+     */
+    public static void clearHeldForBlock(Level level, BlockPos pos) {
+        HELD.values().forEach(holds -> holds.keySet().removeIf(key -> pos.equals(key.pos())));
+        HELD.values().removeIf(Map::isEmpty);
+        if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+            be.clearHeldPips();
         }
     }
 

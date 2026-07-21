@@ -51,21 +51,28 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
-    // Target: a tablet in a hand, or a placed tablet block
+    // Target: a tablet in a hand, a placed tablet block, or a tablet in
+    // an inventory slot (1.7.0 — the pinned overlay acts on tablets the
+    // player carries but isn't holding)
     // ------------------------------------------------------------------
-    public record AppTarget(boolean mainHand, Optional<BlockPos> pos) {
+    public record AppTarget(boolean mainHand, Optional<BlockPos> pos, Optional<Integer> slot) {
         public static final StreamCodec<RegistryFriendlyByteBuf, AppTarget> STREAM_CODEC =
                 StreamCodec.composite(
                         ByteBufCodecs.BOOL, AppTarget::mainHand,
                         ByteBufCodecs.optional(BlockPos.STREAM_CODEC), AppTarget::pos,
+                        ByteBufCodecs.optional(ByteBufCodecs.VAR_INT), AppTarget::slot,
                         AppTarget::new);
 
         public static AppTarget ofHand(InteractionHand hand) {
-            return new AppTarget(hand == InteractionHand.MAIN_HAND, Optional.empty());
+            return new AppTarget(hand == InteractionHand.MAIN_HAND, Optional.empty(), Optional.empty());
         }
 
         public static AppTarget ofBlock(BlockPos pos) {
-            return new AppTarget(true, Optional.of(pos));
+            return new AppTarget(true, Optional.of(pos), Optional.empty());
+        }
+
+        public static AppTarget ofSlot(int slot) {
+            return new AppTarget(true, Optional.empty(), Optional.of(slot));
         }
     }
 
@@ -74,6 +81,11 @@ public class ModNetworking {
         List<SignalApp> apps();
 
         void save(List<SignalApp> apps);
+
+        /** Add-time cap: merged surfaces scale it (32 per member). */
+        default int maxApps() {
+            return MAX_APPS;
+        }
     }
 
     @Nullable
@@ -83,7 +95,12 @@ public class ModNetworking {
             if (!player.level().isLoaded(pos)) return null;
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
-            if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return null;
+            if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
+            // Merged surfaces: edits land on the controller (a stale
+            // client may still target a part; the controller is at most
+            // 3 blocks further — inside the distance budget's slack)
+            TabletBlockEntity be = clicked.resolveController();
+            if (be == null) return null;
             return new AppHost() {
                 @Override
                 public List<SignalApp> apps() {
@@ -94,10 +111,22 @@ public class ModNetworking {
                 public void save(List<SignalApp> apps) {
                     be.setApps(apps);
                 }
+
+                @Override
+                public int maxApps() {
+                    return be.maxApps();
+                }
             };
         }
-        ItemStack stack = player.getItemInHand(
-                target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        ItemStack stack;
+        if (target.slot().isPresent()) {
+            int slot = target.slot().get();
+            if (slot < 0 || slot >= player.getInventory().getContainerSize()) return null;
+            stack = player.getInventory().getItem(slot);
+        } else {
+            stack = player.getItemInHand(
+                    target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        }
         if (!(stack.getItem() instanceof TabletItem)) return null;
         return new AppHost() {
             @Override
@@ -110,6 +139,24 @@ public class ModNetworking {
                 stack.set(ModDataComponents.TABLET_APPS.get(), List.copyOf(apps));
             }
         };
+    }
+
+    /**
+     * The tablet stack an item-mode target points at (hand or inventory
+     * slot), or EMPTY when it isn't a tablet — for handlers that write
+     * item components directly instead of going through {@link AppHost}.
+     */
+    private static ItemStack resolveStack(Player player, AppTarget target) {
+        ItemStack stack;
+        if (target.slot().isPresent()) {
+            int slot = target.slot().get();
+            if (slot < 0 || slot >= player.getInventory().getContainerSize()) return ItemStack.EMPTY;
+            stack = player.getInventory().getItem(slot);
+        } else {
+            stack = player.getItemInHand(
+                    target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+        }
+        return stack.getItem() instanceof TabletItem ? stack : ItemStack.EMPTY;
     }
 
     // ------------------------------------------------------------------
@@ -288,6 +335,25 @@ public class ModNetworking {
     }
 
     // ------------------------------------------------------------------
+    // Payload: the placed tablet's link toggle — false dissolves the
+    // clicked surface and marks its members solo (never auto-merge),
+    // true re-links the clicked tablet (block targets only)
+    // ------------------------------------------------------------------
+    public record SurfaceLinkPayload(AppTarget target, boolean linked) implements CustomPacketPayload {
+        public static final Type<SurfaceLinkPayload> TYPE = new Type<>(id("surface_link"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SurfaceLinkPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        AppTarget.STREAM_CODEC, SurfaceLinkPayload::target,
+                        ByteBufCodecs.BOOL, SurfaceLinkPayload::linked,
+                        SurfaceLinkPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Payload: open the app edit container menu (server-backed so the
     // editor gets real, vanilla-feeling inventory slots)
     // ------------------------------------------------------------------
@@ -318,7 +384,11 @@ public class ModNetworking {
         // "11": Timer apps — SignalApp gained timed/pulseTicks on the
         // wire and TimedAppPayload was added ("10" never shipped; both
         // land in 1.6.0, but each wire growth gets its own fence).
-        PayloadRegistrar registrar = event.registrar("11");
+        // "12": 1.7.0 pinned overlay — AppTarget gained the inventory-
+        // slot mode (third optional field on every payload's wire).
+        // "13": 1.7.0 solo screens — SurfaceLinkPayload added (the
+        // placed tablet's link toggle; both land in 1.7.0).
+        PayloadRegistrar registrar = event.registrar("13");
         registrar.playToServer(ToggleAppPayload.TYPE, ToggleAppPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentaryAppPayload.TYPE, MomentaryAppPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertAppPayload.TYPE, UpsertAppPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -330,6 +400,20 @@ public class ModNetworking {
         registrar.playToServer(SetSliderPayload.TYPE, SetSliderPayload.STREAM_CODEC, ModNetworking::handleSetSlider);
         registrar.playToServer(SetNotePayload.TYPE, SetNotePayload.STREAM_CODEC, ModNetworking::handleSetNote);
         registrar.playToServer(TimedAppPayload.TYPE, TimedAppPayload.STREAM_CODEC, ModNetworking::handleTimed);
+        registrar.playToServer(SurfaceLinkPayload.TYPE, SurfaceLinkPayload.STREAM_CODEC, ModNetworking::handleSurfaceLink);
+    }
+
+    private static void handleSurfaceLink(SurfaceLinkPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isEmpty()) return;
+        BlockPos pos = payload.target().pos().get();
+        if (!player.level().isLoaded(pos)) return;
+        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+                > MAX_BLOCK_DISTANCE_SQ) return;
+        if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
+                    serverLevel, pos, payload.linked());
+        }
     }
 
     private static void handleTimed(TimedAppPayload payload, IPayloadContext context) {
@@ -385,7 +469,7 @@ public class ModNetworking {
         if (host == null) return;
         List<SignalApp> apps = host.apps();
         if (ctx.index() < -1 || ctx.index() >= apps.size()) return;
-        if (ctx.index() == -1 && apps.size() >= MAX_APPS) return;
+        if (ctx.index() == -1 && apps.size() >= host.maxApps()) return;
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         serverPlayer.openMenu(new SimpleMenuProvider(
                         (id, inv, p) -> new AppEditMenu(ModMenus.APP_EDIT.get(), id, inv, ctx),
@@ -457,7 +541,7 @@ public class ModNetworking {
         if (app.frequencies().isEmpty()) return;
         List<SignalApp> apps = host.apps();
         if (payload.index() == -1) {
-            if (apps.size() >= MAX_APPS) return;
+            if (apps.size() >= host.maxApps()) return;
             apps.add(app);
         } else {
             if (payload.index() < 0 || payload.index() >= apps.size()) return;
@@ -491,13 +575,15 @@ public class ModNetworking {
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.setScreenList(payload.list());
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setScreenList(payload.list());
+                }
             }
             return;
         }
-        ItemStack stack = player.getItemInHand(
-                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
-        if (stack.getItem() instanceof TabletItem) {
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
             if (payload.list()) {
                 stack.set(ModDataComponents.SCREEN_LIST.get(), true);
             } else {
@@ -514,13 +600,15 @@ public class ModNetworking {
             if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
-                be.setTheme(payload.theme());
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setTheme(payload.theme());
+                }
             }
             return;
         }
-        ItemStack stack = player.getItemInHand(
-                payload.target().mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
-        if (stack.getItem() instanceof TabletItem) {
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
             // DARK is the default and is never written, so 1.2.x tablets
             // stay component-free.
             if (payload.theme() == ScreenTheme.DARK) {

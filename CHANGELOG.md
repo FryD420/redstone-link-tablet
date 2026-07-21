@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.7.0 — 2026-07-21
+
+- Multiblock screens: place tablets side by side (same wall, floor, or
+  ceiling — new tablets auto-adopt their neighbor's orientation, so
+  just slap them down) and they merge into one large display, up to 4
+  wide by 3 tall. It renders as ONE continuous screen: a single glass
+  panel covering the whole surface, a case-colored bezel frame around
+  it (dye the lead tablet and the whole frame dyes), and no per-block
+  seams or outlines. The lead (top-left) tablet's apps spread across
+  the big screen at bigger tiles; taps and slider drags work anywhere
+  on it, list rows run its full width, and the whole wall lights up
+  together. Wrench anywhere on the glass to rotate the content —
+  square surfaces turn in quarter steps, wide ones flip upside down.
+  Merging is always safe: every tablet keeps its own apps dormant and
+  gets them back the moment it's split off (sneak-wrench or break a
+  member to restructure). Bigger surfaces hold more apps — 32 per
+  member tablet.
+- Pinned tablet overlay (requested by the tester crew): a pin button in
+  the tablet GUI keeps a floating mini-tablet on your screen while you
+  play — live app rows on the HUD, draggable, and it remembers its spot
+  and pin across sessions. Press the new "Use Pinned Tablet" key
+  (default B, rebindable) to free your mouse chat-style and tap apps,
+  drag sliders, or hold buttons without opening anything; it's also
+  clickable with the normal cursor over your inventory, chat, or any
+  other screen. Right-click a row to jump into the full tablet GUI.
+  Pinned placed tablets dim out of edit range; pinned carried tablets
+  follow the item around your inventory.
+- New "Open Tablet" keybind (default unbound): opens the tablet GUI
+  from anywhere — hand first, then anywhere in your inventory.
+- Notes and the pinned mini-tablet now stay out of the way on settings
+  menus (vanilla options, Sodium, any mod's config screen), the pause
+  menu, and other screens where they don't belong. They keep working
+  everywhere they're useful: the tablet, inventories and other
+  containers, chat, the JEI/EMI recipe browsers, and the HUD.
+- JEI/EMI support: drag an item straight from the ingredient list onto
+  a frequency slot in the app editor — no need to own the item.
+- Side-by-side without merging: placed tablets have a new chain-link
+  button in their screen header. Click it on a merged surface to break
+  the whole thing back into independent tablets (they won't re-merge),
+  or on a single tablet to keep it standalone before building next to
+  it. Click again to let a tablet rejoin its neighbors.
+- Note for servers: the network protocol changed — these clients and
+  servers don't pair with 1.6.0 or older.
+
 ## 1.6.0 — 2026-07-19
 
 - Per-app notes (requested by the tester crew): every app can carry a

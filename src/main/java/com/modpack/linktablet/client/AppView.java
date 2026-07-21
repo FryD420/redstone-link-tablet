@@ -25,6 +25,11 @@ public sealed interface AppView {
 
     ScreenTheme theme();
 
+    /** Add-time app cap; merged surfaces scale it (32 per member). */
+    default int maxApps() {
+        return ModNetworking.MAX_APPS;
+    }
+
     record Hand(InteractionHand hand) implements AppView {
         @Override
         public List<SignalApp> apps() {
@@ -48,25 +53,74 @@ public sealed interface AppView {
         }
     }
 
-    record Block(BlockPos pos) implements AppView {
+    /**
+     * Tablet in an inventory slot — the pinned overlay's item binding
+     * (1.7.0): unlike {@link Hand}, it keeps working while the player
+     * mines with something else. Callers re-validate the slot (see the
+     * overlay's self-heal) — an empty or foreign stack reads as no apps.
+     */
+    record Slot(int slot) implements AppView {
         @Override
         public List<SignalApp> apps() {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.level == null) return List.of();
-            return mc.level.getBlockEntity(pos) instanceof TabletBlockEntity be ? be.getApps() : List.of();
+            ItemStack stack = stack();
+            return stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
         }
 
         @Override
         public ModNetworking.AppTarget target() {
-            return ModNetworking.AppTarget.ofBlock(pos);
+            return ModNetworking.AppTarget.ofSlot(slot);
         }
 
         @Override
         public ScreenTheme theme() {
+            return stack().getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
+        }
+
+        public ItemStack stack() {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.level == null) return ScreenTheme.DARK;
-            return mc.level.getBlockEntity(pos) instanceof TabletBlockEntity be
-                    ? be.getTheme() : ScreenTheme.DARK;
+            if (mc.player == null || slot < 0
+                    || slot >= mc.player.getInventory().getContainerSize()) {
+                return ItemStack.EMPTY;
+            }
+            return mc.player.getInventory().getItem(slot);
+        }
+    }
+
+    record Block(BlockPos pos) implements AppView {
+        @Override
+        public List<SignalApp> apps() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getApps() : List.of();
+        }
+
+        @Override
+        public ModNetworking.AppTarget target() {
+            // Target the CONTROLLER: this single redirect self-heals
+            // every consumer (GUI, pinned overlay) across merges and
+            // splits — the view re-resolves on every read.
+            TabletBlockEntity be = resolved();
+            return ModNetworking.AppTarget.ofBlock(be != null ? be.getBlockPos() : pos);
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getTheme() : ScreenTheme.DARK;
+        }
+
+        @Override
+        public int maxApps() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.maxApps() : ModNetworking.MAX_APPS;
+        }
+
+        /** The BE that owns this position's data (controller when merged). */
+        @org.jetbrains.annotations.Nullable
+        private TabletBlockEntity resolved() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return null;
+            if (!(mc.level.getBlockEntity(pos) instanceof TabletBlockEntity be)) return null;
+            return be.resolveController();
         }
     }
 }

@@ -28,12 +28,22 @@ public class ClientHooks {
 
     public static void openTabletBlockScreen(BlockPos pos) {
         UISounds.open();
-        Minecraft.getInstance().setScreen(new TabletScreen(new AppView.Block(pos)));
+        // Merged surfaces: the GUI always shows the controller's data
+        // (belt-and-suspenders — AppView.Block also resolves)
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null
+                && mc.level.getBlockEntity(pos) instanceof com.modpack.linktablet.block.TabletBlockEntity be) {
+            var controller = be.resolveController();
+            if (controller != null) {
+                pos = controller.getBlockPos();
+            }
+        }
+        mc.setScreen(new TabletScreen(new AppView.Block(pos)));
     }
 
     /** Begins a placed-tablet slider drag (client drives it from here). */
-    public static void startBlockSliderDrag(BlockPos pos, int index) {
-        BlockSliderDrag.start(pos, index);
+    public static void startBlockSliderDrag(BlockPos memberPos, BlockPos controllerPos, int index) {
+        BlockSliderDrag.start(memberPos, controllerPos, index);
     }
 
     /**

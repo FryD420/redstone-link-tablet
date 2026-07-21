@@ -16,6 +16,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -220,6 +221,22 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private void setStaged(int slot, ItemStack stack) {
         menu.ghostInventory.setStackInSlot(slot, stack);
         PacketDistributor.sendToServer(new GhostItemSubmitPacket(stack, slot));
+    }
+
+    /**
+     * Absolute 18×18 rect (border included) of frequency ghost slot 0/1 —
+     * the drop targets for the JEI/EMI drag handlers in {@code compat/}.
+     */
+    public Rect2i frequencySlotArea(int slot) {
+        int x = leftPos + (slot == 0 ? AppEditMenu.GHOST1_X : AppEditMenu.GHOST2_X) - 1;
+        return new Rect2i(x, topPos + AppEditMenu.GHOST_Y - 1, 18, 18);
+    }
+
+    /** Stages a viewer-dragged ingredient into a frequency slot (count 1). */
+    public void stageFrequencyItem(int slot, ItemStack stack) {
+        if (stack.isEmpty()) return;
+        setStaged(slot & 1, stack.copyWithCount(1));
+        UISounds.tick(1.3F);
     }
 
     /** Picker picks land in the first empty ghost slot (else slot 1). */

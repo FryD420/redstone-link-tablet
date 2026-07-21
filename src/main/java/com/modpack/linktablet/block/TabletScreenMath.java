@@ -75,21 +75,36 @@ public final class TabletScreenMath {
      * renderer's slider art (which draws through these same helpers).
      */
     public static float[] sliderBarU(int index, int appCount, boolean list, int rot) {
-        float w = glassW(rot);
-        if (list) {
-            float su1 = GLASS_U0 + w - SPACE - LIST_SWITCH_MARGIN;
-            return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
-        }
-        GridLayout grid = gridLayout(appCount, rot);
-        float tileW = tileSize(w, grid.cols());
-        float u0 = tileU0(index % grid.cols(), tileW);
-        float inset = sliderInset(tileW);
-        return new float[]{u0 + inset, u0 + tileW - inset};
+        return surfaceSliderBarU(index, appCount, list, rot, 1, 1);
     }
 
     /** Apps visible on the physical screen in the given layout. */
     public static int visibleApps(int appCount, boolean list) {
-        return Math.min(appCount, list ? LIST_ROWS : MAX_PIPS);
+        return visibleApps(appCount, list, 1, 1);
+    }
+
+    /**
+     * Visible cap on a w×h surface. Grid: every member adds a full
+     * screen's worth of pips. List: rows run the full surface width, so
+     * only the HEIGHT adds rows (a 4×3 wall is 15 long rows, not 60).
+     */
+    public static int visibleApps(int appCount, boolean list, int w, int h) {
+        return Math.min(appCount, list ? LIST_ROWS * h : MAX_PIPS * w * h);
+    }
+
+    /**
+     * Continuous glass span of a merged surface along u (1.7.0): the
+     * raised surface panel covers interior bezels, so content space runs
+     * unbroken from the first member's glass edge to the last's —
+     * 10 + 16·(w−1) texels.
+     */
+    public static float surfaceGlassW(int w) {
+        return (GLASS_U1 - GLASS_U0) + 16f * (w - 1);
+    }
+
+    /** Continuous glass span along v: 12 + 16·(h−1) texels. */
+    public static float surfaceGlassH(int h) {
+        return (GLASS_V1 - GLASS_V0) + 16f * (h - 1);
     }
 
     /** Grid dimensions for a given app count. */
@@ -100,20 +115,69 @@ public final class TabletScreenMath {
     }
 
     /**
+     * Density ladder for the per-block sub-grid — the ONE table both the
+     * single-block grid and merged surfaces walk (in order, first entry
+     * whose cell count covers the visible apps).
+     */
+    private static final int[][] DENSITY_LADDER = {
+            {1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 4}, {4, 4}, {COLS, ROWS}};
+
+    /**
+     * Grid density for a w×h merged surface: (k·w)×(m·h) UNIFORM cells
+     * over the continuous glass span ({@link #surfaceGlassW}) — the
+     * raised surface panel covers interior bezels (1.7.0), so tiles flow
+     * straight across block seams like one big screen. App indices are
+     * plain row-major over {@link #cols}×{@link #rows}.
+     */
+    public record SurfaceLayout(int blocksW, int blocksH, int k, int m) {
+        public int cols() {
+            return k * blocksW;
+        }
+
+        public int rows() {
+            return m * blocksH;
+        }
+
+        public int cells() {
+            return cols() * rows();
+        }
+    }
+
+    /**
+     * Cell density for a surface: smallest ladder entry whose total cell
+     * count covers the visible apps — the merged-surface generalization
+     * of {@link #gridLayout} (which delegates here).
+     */
+    public static SurfaceLayout surfaceLayout(int appCount, int w, int h, int rot) {
+        int visible = Math.max(1, visibleApps(appCount, false, w, h));
+        int k = COLS;
+        int m = ROWS;
+        for (int[] step : DENSITY_LADDER) {
+            if (step[0] * step[1] * w * h >= visible) {
+                k = step[0];
+                m = step[1];
+                break;
+            }
+        }
+        // Odd quarter-turns swap the cell sense — only possible when the
+        // glass is square in blocks (1×1 or n×n; oblong surfaces clamp
+        // to half-turns, which don't swap).
+        if ((rot & 1) == 1 && w == h) {
+            return new SurfaceLayout(w, h, m, k);
+        }
+        return new SurfaceLayout(w, h, k, m);
+    }
+
+    /**
      * The pip grid sizes itself to the app count — one app fills the
      * whole glass, few apps get big tiles, converging on the densest
      * {@link #COLS}×{@link #ROWS} grid. Renderer and click hit-test both
-     * derive their geometry from this table; never duplicate it.
+     * derive their geometry from this table (via {@link #surfaceLayout});
+     * never duplicate it.
      */
     public static GridLayout gridLayout(int appCount) {
-        if (appCount <= 1) return new GridLayout(1, 1);
-        if (appCount == 2) return new GridLayout(1, 2);
-        if (appCount <= 4) return new GridLayout(2, 2);
-        if (appCount <= 6) return new GridLayout(2, 3);
-        if (appCount <= 9) return new GridLayout(3, 3);
-        if (appCount <= 12) return new GridLayout(3, 4);
-        if (appCount <= 16) return new GridLayout(4, 4);
-        return new GridLayout(COLS, ROWS);
+        SurfaceLayout sl = surfaceLayout(appCount, 1, 1, 0);
+        return new GridLayout(sl.k(), sl.m());
     }
 
     // ------------------------------------------------------------------
@@ -195,6 +259,46 @@ public final class TabletScreenMath {
     }
 
     /**
+     * World direction of screen-space +u (visual RIGHT): the forward
+     * image of the canonical +X axis under the model rotation stack
+     * (preRot, then xRot, then yRot — the exact rotations {@link
+     * #screenUV} inverts, translation-free). Surface formation, member
+     * offsets, and the controller render box all derive from this pair;
+     * a sign error here is self-consistent (controller merely lands in
+     * the wrong visual corner) — verify per orientation class in-game.
+     */
+    public static Direction screenRight(BlockState state) {
+        return transformDirection(state, 1, 0, 0);
+    }
+
+    /** World direction of screen-space +v (visual DOWN): forward image of +Z. */
+    public static Direction screenDown(BlockState state) {
+        return transformDirection(state, 0, 0, 1);
+    }
+
+    private static Direction transformDirection(BlockState state, int dx, int dy, int dz) {
+        // Forward vertex order: preRot first, then xRot, then yRot.
+        // Forward Y quarter-step on directions: (dx, dz) -> (-dz, dx).
+        // Forward X quarter-step on directions: (dy, dz) -> (dz, -dy).
+        for (int i = preRot(state) / 90; i > 0; i--) {
+            int nx = -dz;
+            dz = dx;
+            dx = nx;
+        }
+        for (int i = xRot(state) / 90; i > 0; i--) {
+            int ny = dz;
+            dz = -dy;
+            dy = ny;
+        }
+        for (int i = yRot(state) / 90; i > 0; i--) {
+            int nx = -dz;
+            dz = dx;
+            dx = nx;
+        }
+        return Direction.fromDelta(dx, dy, dz);
+    }
+
+    /**
      * Screen-local texels {@code {u, v}} under a click, or null when the
      * clicked face isn't the screen. Undoes the blockstate rotation with
      * exact 90° integer swizzles — deterministic across client/server.
@@ -251,6 +355,18 @@ public final class TabletScreenMath {
      * away from the plane.
      */
     public static float logicalUFromRay(BlockState state, BlockPos pos, Vec3 eye, Vec3 look, int rot) {
+        return logicalSurfaceUFromRay(state, pos, eye, look, rot, 0, 0, 1, 1);
+    }
+
+    /**
+     * Surface-aware ray→logical-u (1.7.0): the ray intersects the
+     * clicked MEMBER's plane; its member offset converts to the
+     * continuous surface space before the content-rotation swizzle, so
+     * the result matches {@link #surfaceSliderBarU}'s spans on merged
+     * (and merged-rotated) surfaces.
+     */
+    public static float logicalSurfaceUFromRay(BlockState state, BlockPos pos, Vec3 eye, Vec3 look,
+                                               int rot, int bx, int by, int w, int h) {
         Direction face = screenFace(state);
         double plane = screenPlaneCoord(state, pos);
         double eyeCoord = face.getAxis().choose(eye.x, eye.y, eye.z);
@@ -261,19 +377,20 @@ public final class TabletScreenMath {
         double[] uv = screenUV(state, pos, face, eye.add(look.scale(t)));
         if (uv == null) return Float.NaN;
 
-        // Same inverse content-rotation swizzle as hitPipDetailed
-        double pu = uv[0] - GLASS_U0;
-        double pv = uv[1] - GLASS_V0;
-        double w = GLASS_U1 - GLASS_U0;
-        double h = GLASS_V1 - GLASS_V0;
+        // Same inverse content-rotation swizzle as hitPipDetailed, over
+        // the continuous surface spans
+        double pu = uv[0] + 16.0 * bx - GLASS_U0;
+        double pv = uv[1] + 16.0 * by - GLASS_V0;
+        double gw = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
+        double gh = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
         for (int i = 0; i < (rot & 3); i++) {
             double nu = pv;
-            double nv = w - pu;
+            double nv = gw - pu;
             pu = nu;
             pv = nv;
-            double tmp = w;
-            w = h;
-            h = tmp;
+            double tmp = gw;
+            gw = gh;
+            gh = tmp;
         }
         return (float) (GLASS_U0 + pu);
     }
@@ -319,44 +436,82 @@ public final class TabletScreenMath {
     /** Like {@link #hitPip}, but null for a miss and with the along-fraction. */
     public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
                                         int appCount, boolean list, int rot) {
+        return hitPipDetailed(state, pos, hit, appCount, list, rot, 0, 0, 1, 1);
+    }
+
+    /**
+     * Surface-aware hit test (1.7.0): the clicked member's UV plus its
+     * 16-texel block offset gives a coordinate in the surface's
+     * CONTINUOUS glass span; cells divide that span evenly, exactly
+     * like the renderer's uniform layout. Interior bezel strips are
+     * part of the span (the raised panel covers them), so clicks there
+     * hit cells too; only the surface's outer bezel falls through to
+     * the GUI. {@code logicalU} is CONTINUOUS (surface space) — the
+     * slider drag adds the member offset the same way.
+     */
+    public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
+                                        int appCount, boolean list, int rot,
+                                        int bx, int by, int w, int h) {
         if (appCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
         if (uv == null) return null;
-        double u = uv[0];
-        double v = uv[1];
+        double cu = uv[0] + 16.0 * bx;
+        double cv = uv[1] + 16.0 * by;
 
-        // Only the glass is ever a toggle target; the bezel ring always
-        // falls through to the GUI. Cells divide the glass evenly, so
-        // they track the renderer's margin/gap layout automatically.
-        if (u < GLASS_U0 || u >= GLASS_U1) return null;
-        if (v < GLASS_V0 || v >= GLASS_V1) return null;
+        double spanW = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
+        double spanH = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
+        if (cu < GLASS_U0 || cu >= GLASS_U0 + spanW) return null;
+        if (cv < GLASS_V0 || cv >= GLASS_V0 + spanH) return null;
 
-        // Undo the content rotation: one inverse CW quarter-turn per
-        // step, tracking the (possibly swapped) space dimensions.
-        double pu = u - GLASS_U0;
-        double pv = v - GLASS_V0;
-        double w = GLASS_U1 - GLASS_U0;
-        double h = GLASS_V1 - GLASS_V0;
+        // Undo the content rotation (single blocks only — surfaces clamp
+        // rot to 0): one inverse CW quarter-turn per step, tracking the
+        // (possibly swapped) space dimensions.
+        double pu = cu - GLASS_U0;
+        double pv = cv - GLASS_V0;
+        double gw = spanW;
+        double gh = spanH;
         for (int i = 0; i < (rot & 3); i++) {
             double nu = pv;
-            double nv = w - pu;
+            double nv = gw - pu;
             pu = nu;
             pv = nv;
-            double t = w;
-            w = h;
-            h = t;
+            double t = gw;
+            gw = gh;
+            gh = t;
         }
 
         int index;
         if (list) {
-            index = (int) (pv * LIST_ROWS / h);
+            index = (int) (pv * LIST_ROWS * h / gh);
         } else {
-            GridLayout grid = gridLayout(appCount, rot);
-            int row = (int) (pv * grid.rows() / h);
-            int col = (int) (pu * grid.cols() / w);
-            index = row * grid.cols() + col;
+            SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+            int row = (int) (pv * sl.rows() / gh);
+            int col = (int) (pu * sl.cols() / gw);
+            index = row * sl.cols() + col;
         }
-        if (index >= visibleApps(appCount, list)) return null;
+        if (index >= visibleApps(appCount, list, w, h)) return null;
         return new PipHit(index, (float) (GLASS_U0 + pu));
+    }
+
+    /**
+     * CONTINUOUS u-span of a surface slider's value bar (surface space —
+     * same coordinates {@link #hitPipDetailed} returns and the drag
+     * maps with). The single-block form ({@link #sliderBarU}) delegates
+     * here with a 1×1 surface.
+     */
+    public static float[] surfaceSliderBarU(int surfaceIndex, int appCount, boolean list,
+                                            int rot, int w, int h) {
+        // Logical span: odd (square-only) rotations swap the axes
+        float gw = w * h == 1 ? glassW(rot)
+                : (rot & 1) == 0 ? surfaceGlassW(w) : surfaceGlassH(h);
+        if (list) {
+            float su1 = GLASS_U0 + gw - SPACE - LIST_SWITCH_MARGIN;
+            return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
+        }
+        SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+        float tileW = tileSize(gw, sl.cols());
+        float u0 = tileU0(surfaceIndex % sl.cols(), tileW);
+        float inset = sliderInset(tileW);
+        return new float[]{u0 + inset, u0 + tileW - inset};
     }
 }
