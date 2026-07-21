@@ -3,181 +3,85 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-21 — 1.7.0 TAGGED + PUSHED, uploads with the user)
-- Modpack-tested by the user ("much better"), committed (6caabb0),
-  merged to main (e9ead01), tagged v1.7.0, pushed. UPLOADED BY THE
-  USER SAME DAY — LIVE ON ALL PLATFORMS. Listing description rewritten
-  for 1.7.0 (0af9f08, text-only; 📸 slots await the shoot). Test-debt
-  sweep (multiplayer, floor/ceiling, ponder regression, chunk-border)
-  DROPPED by user decision 2026-07-21: let the testers find bugs,
-  hotfix reactively — do not re-add this item.
-- Release gates cleared: TEMP "linktablet-surface" debug logging
-  STRIPPED (scanner + BE), CHANGELOG dated 1.7.0 — 2026-07-21.
-- Three additions this session (all uncommitted on `tablet-overlay`,
-  jar handed to the user for modpack testing):
-  1. **Overlay whitelist**: notes + mini-tablet only render/capture
-     input over containers, chat, our own screens, and JEI/EMI
-     (`NoteWindows.overlaysAllowedOn` gates all seven screen-scoped
-     handlers; suppression defocuses so no stale drags). Options menus
-     (vanilla/Sodium/etc.), pause menu, everything else: hidden.
-  2. **JEI + EMI ghost drag** into the edit screen's frequency slots:
-     `compat/jei/JeiCompat` + `compat/emi/EmiCompat`, discovered by the
-     viewers' own plugin scans (no ModList guards). Optional deps in
-     mods.toml; JEI 19.39.0.369 / EMI 1.1.24 pinned in
-     gradle.properties. NOTE: terraformers maven truncates big jars on
-     this connection — EMI dev-runtime jar comes from the Modrinth
-     maven instead.
-  3. **Solo screens** (user request: side-by-side tablets WITHOUT
-     merging): chain-link header button on placed tablets. Unlink on a
-     merged surface dissolves it and marks EVERY member solo; unlink on
-     a standalone pre-flags it; re-link rejoins. BE-only flag
-     (`solo_screen`, never on the item), scanner flood skips solo BEs,
-     `TabletSurfaceScanner.setLinked` is the server entry,
-     `SurfaceLinkPayload` added → registrar "12"→"13".
-- Dev boot checks clean both builds (JEI+EMI loaded, plugins register).
-- Remaining before release: user modpack + tester verdict, multiplayer
-  dev-server test, floor/ceiling orientation pass, ponder + held-item
-  regression, chunk-border surface; then commit, merge to main, tag
-  v1.7.0, push, upload.
+## Status (2026-07-21, end of day — v1.7.0 LIVE EVERYWHERE)
 
-## Status (2026-07-19, LATE night — 1.7.0 bundle on `tablet-overlay`)
-- **1.7.0 is feature-complete but UNRELEASED** (user call: hold the
-  send). Two features, both dev-tested live across long sessions:
-  1. **Pinned tablet overlay** (commit 511f862): mini-tablet window +
-     first keybinds (B = chat-style interact, Open Tablet unbound);
-     AppTarget slot mode, registrar "11"→"12". Tested "works great".
-  2. **Multiblock screens** (821ce45 + tonight's uncommitted-at-time
-     fix wave): merge coplanar tablets up to 4×3 into ONE continuous
-     display. Tonight's debug arc (all fixed): floor-facing mismatch →
-     placement auto-adopt; per-block panels → continuous raised panel
-     covering full block faces + case-tint bezel band + skirt; bulk
-     role-sync dropped by vanilla's batched BE path → explicit
-     per-player packets; stale roles → onLoad self-heal (parts AND
-     controllers); merged rotation (square=90° steps, oblong=180°) via
-     wrench ANYWHERE on the face (bezel = hidden trap, removed);
-     big-icon depth clipping → size-proportional lift; member
-     selection outline suppressed.
-- **Before release**: strip the TEMP "linktablet-surface" debug logging
-  (TabletSurfaceScanner + TabletBlockEntity.loadAdditional); one more
-  full polish pass by the user; CHANGELOG "Unreleased" → 1.7.0; user
-  modpack test; merge to main, tag v1.7.0, push, platform uploads.
-  Remaining test debt: multiplayer via dev server, floor/ceiling
-  orientation pass, ponder + held-item regression, chunk-border
-  surface.
+- **v1.7.0 is the current release**, shipped end-to-end in one day:
+  modpack-tested by the user ("much better"), committed (6caabb0),
+  merged to main (e9ead01), tagged, pushed, uploaded by the user, and
+  the rewritten listing description is PASTED AND LIVE on both
+  platforms. Registrar "13" — does not pair with 1.6.0 or older.
+- 1.7.0 contents: **multiblock screens** (coplanar tablets merge up to
+  4×3 into one continuous display; wrench rotation; +32 apps per
+  member), **pinned tablet overlay** (mini-tablet HUD window, B =
+  chat-style interact, "Open Tablet" keybind unbound by default),
+  **overlay whitelist** (notes + mini-tablet hidden on options/settings/
+  pause screens — `NoteWindows.overlaysAllowedOn` gates all seven
+  screen-scoped handlers), **JEI + EMI ghost drag** into the edit
+  screen's frequency slots (optional deps, viewer-discovered plugins;
+  JEI 19.39.0.369 / EMI 1.1.24 pinned in gradle.properties — NOTE: the
+  terraformers maven truncates big jars on this connection, so the EMI
+  dev-runtime jar comes from the Modrinth maven), and **solo screens**
+  (chain-link header button on placed tablets: unlink dissolves a
+  merged surface and marks every member solo; `solo_screen` BE flag,
+  `SurfaceLinkPayload`, scanner flood skips solo BEs).
+- Branches: `tablet-overlay` and `main` both pushed; tablet-overlay has
+  a few post-release doc commits main doesn't (merge on next touch or
+  keep working on tablet-overlay — either is fine).
 
-## Status (2026-07-19, evening)
-- **v1.6.0 is the current release** (tagged, pushed, uploaded): per-app
-  NOTE WINDOWS (floating/draggable/multi-open; editable over ANY screen
-  incl. inventory via the event-driven `client/screen/NoteWindows`
-  manager; read-only on the HUD; a note closes only via its own X) and
-  the TIMER app type (4th type in the edit screen's cycler; tap
-  transmits for 2t–600t set on a quadratic seconds+ticks slider; re-tap
-  restarts; world taps swing the arm, GUI taps get a ~300ms press
-  flash; migdzy credited). Registrar "9"→"11" — 1.6.0 does not pair
-  with 1.5.x. Dev-tested live by the user across the whole session.
-- **🎉 MODRINTH IS APPROVED AND PUBLIC** (confirmed via the public API
-  2026-07-19 evening): first-approval review cleared, all versions
-  visible, first download logged. CurseForge also updated. ALL sites
-  carry 1.6.0 — the platform-watching chore is officially over.
-- Earlier this arc: 1.5.3 (vanilla Redstone creative-tab listing +
-  listing icon restyled to the 1.5.x plaque+chip chrome, all three app
-  kinds shown), 1.5.2 (grid chip tiles, Avionics theme, one-item
-  frequencies), 1.5.0/1.5.1 (Create-style chrome overhaul, both
-  surfaces). Full details per release in CHANGELOG.md.
-- Minor known issue: Distant Horizons can't resolve the tablet's WALL
-  blockstate (omits `landscape`, falls back to default) — harmless
-  LOD-only fallback, low priority.
+## Next session
 
-## Next session (priority order)
-1. **Listing refresh — TEXT + IMAGES DONE** (2026-07-19 late session):
-   DESCRIPTION.md fully rewritten for 1.6.0 AND all image slots filled
-   from the user+wife shoot the same evening: hero4.png (GUI with
-   slider/timer/toggle variety + floating notes — triple-covers hero,
-   notes, and gui-home), mounted-factory2.png, themes.png (2×2 stitch
-   of Dark/Light/Parchment/Avionics from theme1–4.png raws; crop
-   705,325 510×440), dyed-cases2.png, reused recipe.png. The
-   click-and-slide slider action shot was SKIPPED on purpose (text
-   covers it). Description LIVE ON BOTH LISTINGS, galleries + restyled
-   icon uploaded, superseded images pruned — item 1 is FULLY DONE
-   (2026-07-19 evening). Next priority: the pinned tablet overlay
-   (item 2 below).
-2. **Pinned tablet overlay** — next feature. Much cheaper since 1.6.0:
-   `NoteWindows` already does event-driven windows over any screen,
-   HUD rendering, and input capture; a mini-tablet is "another window
-   type". Open design points: what the HUD (mouse-captured) state can
-   do, whether the parked open-tablet keybind ships with it, window
-   sizing vs. app count.
-3. ~~Icon-friendly defaults~~ — PARKED (user call 2026-07-21, after
-   1.7.0 shipped). Analysis stays in docs/ICON_DEFAULTS_SCOPING.md if
-   it ever comes back; don't propose it unless the user re-raises.
-4. **Multiblock screens** — SHIPPED in 1.7.0.
+1. **Screenshot shoot follow-up (the ONLY open work item)** — the user
+   + wife will shoot, timing theirs: (a) a merged tablet wall (3×2 or
+   4×3, dyed bezel, mid-tap — strong candidate to replace hero4 as
+   hero/social preview), (b) the pinned overlay during real gameplay
+   (hotbar visible). Checklist + exact slot placement live at the
+   bottom of `docs/DESCRIPTION.md` (two `<!-- 📸 -->` comments). When
+   shot: drop in docs/images/, swap the comments for embeds, push,
+   user re-pastes both listings.
+2. **Reactive hotfixes** — the tester crew is on 1.7.0 now. The
+   pre-release test-debt sweep (multiplayer dev-server, floor/ceiling
+   orientation, ponder + held-item regression, chunk-border surfaces)
+   was DROPPED by user decision 2026-07-21 ("let the testers find
+   bugs") — do NOT re-propose it; those areas are simply where to look
+   first if a report comes in.
 
-Parked (2026-07-21 vetting): icon-friendly defaults (above);
-first-person interactive GUI on the held tablet; the DH blockstate
-nit; any 1.20.1 backport (assessed 2026-07-19: possible but a big
-lift — Forge loader, no DataComponents/StreamCodec, a second codebase
-to maintain; wait for real demand signals now that the listings are
-public).
+## Parked (don't propose unless the user re-raises)
 
-## Active list (updated 2026-07-19 after the 1.6.0 cut)
-1. **Refresh listing screenshots — FULLY DONE 2026-07-19** (user +
-   wife shoot; description, galleries, and restyled icon live on both
-   platforms; superseded images pruned from docs/images/).
-2. **Icon-friendly defaults** — ON HOLD (2026-07-19): the user is
-   pinning down with testers what exactly renders poorly before picking
-   a direction. Options + analysis ready in
-   `docs/ICON_DEFAULTS_SCOPING.md`; don't build until the user reports
-   back.
-3. **Pinned tablet overlay** (tester request relayed 2026-07-17): keep
-   the tablet usable while playing — a floating mini-tablet window on
-   screen while mining/moving. Got much cheaper in 1.6.0: the
-   `NoteWindows` manager (event-driven windows over any screen + HUD
-   render + input capture) is exactly the infrastructure it needs; a
-   mini-tablet is "another window type", plus an interaction story for
-   the bare HUD (the parked open-tablet keybind is the natural
-   companion).
-4. **Multiblock screens**: designed, not scheduled — see
-   `docs/MULTIBLOCK_DESIGN.md` (open questions for the user at the
-   bottom). Large, multi-session.
-
-Shipped in 1.6.0 (2026-07-19): per-app note windows (persistent,
-multi-open, editable over any screen incl. inventory, read-only HUD
-pins; tester request) and the Timer app type (tap-for-a-set-time,
-2t–600t quadratic slider, restart-on-retap, arm swing + press flash;
-migdzy's request, credited in the changelog). Protocol "9"→"11".
-Shipped in 1.5.3: creative Redstone-tab listing; restyled listing icon.
-
-Platform approvals (Modrinth first review + CurseForge): the user is
-watching the dashboards personally — off Claude's list; both listings
-still 404 publicly as of 2026-07-17.
-
-Still parked (kept parked at the 2026-07-17 vetting): open-tablet
-keybind; far-future interactive GUI on the held tablet (first-person);
-the DH landscape-blockstate LOD nit above.
+- **Icon-friendly defaults** — parked 2026-07-21 (was on hold for
+  tester intel that never firmed up). Analysis in
+  `docs/ICON_DEFAULTS_SCOPING.md` if it comes back.
+- First-person interactive GUI on the held tablet.
+- Distant Horizons LOD nit (WALL blockstate `landscape` fallback —
+  harmless, LOD-only).
+- 1.20.1 backport — possible but a big lift (Forge loader, no
+  DataComponents/StreamCodec, second codebase); wait for real demand.
+- Declined tester items (vetted 2026-07-17, batch arrived via a
+  disavowed shared-keyboard message): the "blank white tablet in
+  ponder" report (if ever reproduced by a second person: ponder's
+  virtual level may skip block color handlers — check ponder-renderer
+  tinting first) and a PurpleFox easter egg (the suspect requested it
+  themselves).
 
 ## Release history (compressed)
-- 1.4.0: ItemStack frequencies (frequency-card mod compat), container-menu
-  editor with vanilla dragging, wrench rotation + landscape wall mounting,
-  dye wash, text fitting, slider apps with click-and-slide
-  (`client/BlockSliderDrag`). Registrar "5"→"7"; the interim
-  1.3.3/1.3.4 builds were test-only.
-- 1.3.x: dynamic screen tiles, list mode, quick-add, six themes (DARK never
-  persists; "PurpleFox" honors a tester), ponder scene, momentary buttons.
-  Registrar "4"→"5". v1.3.2 was the prior public version.
+
+- 1.7.0 (2026-07-21): multiblock screens, pinned overlay + keybinds,
+  overlay whitelist, JEI/EMI drag, solo screens. Registrar "11"→"13"
+  ("12" = AppTarget slot mode, "13" = SurfaceLinkPayload).
+- 1.6.0 (2026-07-19): per-app note windows (tester request), Timer app
+  type (migdzy, credited). Registrar "9"→"11". Modrinth first approval
+  cleared this day — all platforms live since.
+- 1.5.x (2026-07-16/17): Create-style chrome overhaul (GUI + placed
+  screens), Parchment + Avionics themes, slider ranges, one-item
+  frequencies, grid chip tiles, creative Redstone-tab listing,
+  restyled icon. Registrar "7"→"9".
+- 1.4.0: ItemStack frequencies (frequency-card compat), container-menu
+  editor, wrench rotation + landscape mounting, dye wash, slider apps
+  with click-and-slide. Registrar "5"→"7".
+- 1.3.x: dynamic screen tiles, list mode, quick-add, six themes
+  ("PurpleFox" honors a tester), ponder scene, momentary buttons.
+  Registrar "4"→"5".
+- Earlier public: v1.3.2, v1.2.1, v1.2.0, v1.1.1 (first upload).
 - Dev tooling in `tools/` (jar-excluded): `./gradlew nbtTool
   --args="gen|dump <path>"` (ponder schematic), `./gradlew iconTool
   --args="docs/icon.png"` (listing icon), `./gradlew chromeTool` (GUI
   chrome atlas). Relative, space-free args — Gradle splits on spaces.
-
-## Former "unconfirmed tester suggestions" — resolved 2026-07-17
-The batch arrived via a message the user later disavowed (someone else at
-the keyboard / a stray paste — see local Claude memory). The user vetted
-them personally on 2026-07-17:
-- APPROVED → moved to the active list above: creative-mode item tab;
-  app-icon-friendly defaults.
-- DECLINED — do not build/investigate unless the user re-raises them:
-  - The "blank white tablet in the ponder scene" report. (If a second
-    person ever reproduces it, the plausible cause is ponder's virtual
-    level skipping block color handlers, leaving the case untinted —
-    check tinting in the ponder renderer first.)
-  - A PurpleFox easter egg (the suspect requested it themselves).
