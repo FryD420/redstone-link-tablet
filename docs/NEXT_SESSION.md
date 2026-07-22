@@ -5,6 +5,11 @@ at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-21, end of day — v1.8.0 LIVE EVERYWHERE)
 
+- **v1.8.1 tagged 2026-07-22**: placeable Swivel Mount stand +
+  separate tablet/stand pickup (swap tablets between consoles:
+  sneak-grab the panel = tablet only, stand stays; stand region =
+  both). User-tested in their pack; platform upload is the user's
+  step. ADDS A BLOCK — 1.8.1 does not pair with 1.8.0 (or older).
 - **v1.8.0 is the current release** (three releases shipped this day:
   1.7.0 → 1.7.1 → 1.8.0, all live on both platforms + announced on
   Discord). 1.8.0 public contents: **Swivel Mount** (ball-joint stand
@@ -26,7 +31,18 @@ at the repo root (auto-loaded every Claude session).
 
 ## Next session
 
-1. **Sable / Create Aeronautics compat (investigate on demand)** —
+1. **Redstone follow mode (queued 2026-07-22, user-requested)** — a
+   POWERED mounted tablet tracks the nearest player like the
+   enchanting-table book. Design agreed: SERVER-driven (the mount
+   pitch/yaw feed renderer AND hit-test — a client-only cosmetic
+   follow would break tap accuracy), via `neighborChanged` power
+   sensing (BE flag, re-derived on load — no new blockstate) + a
+   server tick calling `aimAt(nearest non-spectator ≤~8 blocks)` at
+   ~3-4 tick cadence with a small angle threshold, + client lerp in
+   the BER so it glides. Power off = stays put. No new registries or
+   payloads → ships as 1.8.2, pairs with 1.8.1. ~Half session incl.
+   tuning range/cadence; needs a multiplayer feel-test.
+2. **Sable / Create Aeronautics compat (investigate on demand)** —
    tablets on Sable sublevels (Aeronautics ships): prediction from
    2026-07-21 analysis — rendering/transmit/flat-taps likely fine
    (real interactive blocks, remapped raycasts), but ALL eye-ray math
