@@ -1,6 +1,7 @@
 package com.modpack.linktablet.registry;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.block.SwivelMountBlock;
 import com.modpack.linktablet.block.TabletBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -24,6 +25,15 @@ public class ModBlocks {
                     .noOcclusion()
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(TabletBlock.LIT) ? 7 : 0)));
+
+    /** The empty swivel stand (1.8.1). Its BlockItem lives in ModItems. */
+    public static final DeferredBlock<SwivelMountBlock> SWIVEL_MOUNT =
+            BLOCKS.register("swivel_mount", () -> new SwivelMountBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_YELLOW)
+                    .strength(0.5F)
+                    .sound(SoundType.COPPER)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)));
 
     public static void register(IEventBus bus) {
         BLOCKS.register(bus);

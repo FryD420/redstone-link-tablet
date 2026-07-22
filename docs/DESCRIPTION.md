@@ -119,6 +119,26 @@ landscape.
 
 ![A shaded Create factory hall with a wall-mounted tablet showing its live switch list](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mounted-factory2.png)
 
+## Aim it anywhere
+
+Flat against the wall not doing it for you? Craft a **Swivel Mount** — an iron
+nugget atop two brass sheets — and place the empty stand on any floor, wall, or
+ceiling, then click a tablet onto it (or use the mount directly on a tablet
+that's already placed). Either way the tablet pops onto a little ball-joint
+stand. Wrench the glass and it **swings around to aim straight at your eyes**,
+wherever you're standing — walk to your favorite spot at the control desk, one
+click, perfect angle. Wrench the bezel to flip between portrait and landscape,
+and sneak-wrench the glass to rotate the screen content.
+
+Stands are furniture: sneak + right-click the tablet and it comes off **leaving
+the empty stand in place**, ready for the next tablet — swap dashboards between
+consoles like cartridges. Grab the stand itself to take everything.
+
+The tilted glass stays fully touchable — taps, holds, and click-and-slide all
+land exactly where you're looking. Mounted tablets keep to themselves (they
+never merge into a wall display), so they're perfect as angled standalone
+consoles in front of one.
+
 ## One screen, many tablets
 
 Mount tablets side by side — same wall, floor, or ceiling; new ones
@@ -151,6 +171,9 @@ build a bank of separate dashboards side by side.
 - **A full set of UI sounds** — toggle clicks with distinct on/off pitch, a save
   chime, frequency ticks, and a faint click nearby players hear when someone
   flips an app.
+- **Name your tablets** — rename one on an anvil and the name becomes its title
+  in the GUI and on the pinned overlay. "Smeltery", "Train Yard", "Base
+  Defense" — the name survives placing and picking up.
 
 ![The tablet GUI in four themes — Dark, Light, Parchment, and Avionics](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/themes.png)
 
@@ -202,12 +225,15 @@ Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-li
 
 ## Shooting checklist (not part of the description)
 
-### 1.7.0 refresh — TO SHOOT (text is done, slots are placeholders above)
+### 1.7.0 + 1.8.0 refresh — TO SHOOT (text is done through 1.8.0, slots are placeholders above)
 
 - ⬜ **multiblock wall** — a merged surface (3×2 or 4×3) in a factory
   setting: dyed bezel, good tile variety, ideally mid-tap on the glass.
   This is the flashiest shot the mod has ever had — strong candidate to
   REPLACE hero4 as the listing hero / social preview once shot.
+  BONUS: a swivel-mounted tablet angled in the foreground — that one
+  shot then covers the "Aim it anywhere" section too (no dedicated
+  mount slot; add one later only if the foreground doesn't read).
 - ⬜ **pinned overlay** — the mini-tablet on the HUD during real gameplay
   (mining / riding a train), slider mid-drag, hotbar visible so it clearly
   isn't a GUI screenshot.

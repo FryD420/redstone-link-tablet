@@ -4,6 +4,7 @@ import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.SignalApp;
 import com.modpack.linktablet.network.ModNetworking;
+import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModItems;
 import com.mojang.serialization.MapCodec;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
@@ -274,15 +275,25 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hitResult) {
         if (player.isSecondaryUseActive()) {
-            // Sneak + empty hand: pick the tablet back up, data intact
+            // Sneak + empty hand: pick the tablet back up, data intact.
+            // Mounted (1.8.1): grabbing the PANEL takes just the tablet
+            // and leaves the stand as its own block for the next tablet;
+            // grabbing the stand (or anywhere off-panel) takes both.
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 ItemStack stack = be.toItemStack();
                 boolean mounted = state.getValue(MOUNTED);
-                level.removeBlock(pos, false);
+                boolean tabletOnly = mounted && mountedOnPanel(TabletScreenMath.mountedUV(
+                        be.mountBasis(), player.getEyePosition(),
+                        hitResult.getLocation().subtract(player.getEyePosition())));
+                if (tabletOnly) {
+                    level.setBlock(pos, standState(state), 3);
+                } else {
+                    level.removeBlock(pos, false);
+                }
                 if (!player.addItem(stack)) {
                     popResource(level, pos, stack);
                 }
-                if (mounted) {
+                if (mounted && !tabletOnly) {
                     ItemStack mount = new ItemStack(ModItems.SWIVEL_MOUNT.get());
                     if (!player.addItem(mount)) {
                         popResource(level, pos, mount);
@@ -487,25 +498,47 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     }
 
     /**
-     * Mounted sneak-wrench (1.8.0): on the GLASS it rotates the screen
-     * content 90° — the one gesture the mounted wrench map had left
-     * (plain glass = aim, bezel = landscape). Sneak-wrench anywhere
-     * else keeps the IWrenchable default: pickup, tablet + mount.
+     * Mounted sneak-wrench (1.8.0, regions split in 1.8.1): on the GLASS
+     * it rotates the screen content 90° — the one gesture the mounted
+     * wrench map had left (plain glass = aim, bezel = landscape). On the
+     * BEZEL ring it pops just the tablet off, leaving the empty stand
+     * block for the next tablet (the easier big-target version of that
+     * detach is sneak + empty hand on the panel). Anywhere else — the
+     * stand — keeps the IWrenchable default: pickup, tablet + mount.
      */
     @Override
     public InteractionResult onSneakWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
         if (state.getValue(MOUNTED) && context.getPlayer() != null
-                && level.getBlockEntity(pos) instanceof TabletBlockEntity be
-                && mountedOnGlass(mountedWrenchUV(be, context))) {
-            if (!level.isClientSide) {
-                be.rotateScreen();
-                IWrenchable.playRotateSound(level, pos);
+                && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+            double[] uv = mountedWrenchUV(be, context);
+            if (mountedOnGlass(uv)) {
+                if (!level.isClientSide) {
+                    be.rotateScreen();
+                    IWrenchable.playRotateSound(level, pos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
             }
-            return InteractionResult.sidedSuccess(level.isClientSide);
+            if (mountedOnPanel(uv)) {
+                if (!level.isClientSide) {
+                    ItemStack tablet = be.toItemStack();
+                    level.setBlock(pos, standState(state), 3);
+                    context.getPlayer().getInventory().placeItemBackInInventory(tablet);
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK,
+                            SoundSource.BLOCKS, 0.8F, 1.1F);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
         }
         return IWrenchable.super.onSneakWrenched(state, context);
+    }
+
+    /** The empty stand left behind when only the tablet is taken (1.8.1). */
+    private static BlockState standState(BlockState state) {
+        return ModBlocks.SWIVEL_MOUNT.get().defaultBlockState()
+                .setValue(FACE, state.getValue(FACE))
+                .setValue(FACING, state.getValue(FACING));
     }
 
     /** Eye-ray screen texels under a wrench click on a mounted tablet. */
