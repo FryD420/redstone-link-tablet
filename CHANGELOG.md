@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.8.1 — 2026-07-22
+
+- The Swivel Mount is now **placeable on its own**: put the empty stand
+  on any floor, wall, or ceiling, then right-click it with a tablet to
+  mount the tablet on it — it aims at you automatically. Using the
+  mount item directly on an already-placed tablet still works exactly
+  like before.
+- Tablets and stands now come apart **separately**, so you can swap
+  tablets between fixed consoles: sneak + right-click (empty hand) on
+  the tablet takes just the tablet and leaves the stand in place;
+  sneak-wrench the bezel does the same. Grabbing or sneak-wrenching the
+  **stand** underneath still takes both, and breaking the block still
+  drops both. Sneak-wrench on the glass rotates the screen content,
+  unchanged.
+- Note for servers: 1.8.1 adds a block, so servers and clients need to
+  update together — 1.8.1 does not pair with 1.8.0.
+
 ## 1.8.0 — 2026-07-21
 
 - New item: the **Swivel Mount** — craft it from brass sheets and an

@@ -122,13 +122,17 @@ landscape.
 ## Aim it anywhere
 
 Flat against the wall not doing it for you? Craft a **Swivel Mount** — an iron
-nugget atop two brass sheets — and use it on any placed tablet: the tablet pops
-onto a little ball-joint stand, on floors, walls, and ceilings alike. Wrench the
-glass and it **swings around to aim straight at your eyes**, wherever you're
-standing — walk to your favorite spot at the control desk, one click, perfect
-angle. Wrench the bezel to flip between portrait and landscape, sneak-wrench
-the glass to rotate the screen content, and sneak-wrench anywhere else to pick
-the whole thing up again — tablet and mount both come back.
+nugget atop two brass sheets — and place the empty stand on any floor, wall, or
+ceiling, then click a tablet onto it (or use the mount directly on a tablet
+that's already placed). Either way the tablet pops onto a little ball-joint
+stand. Wrench the glass and it **swings around to aim straight at your eyes**,
+wherever you're standing — walk to your favorite spot at the control desk, one
+click, perfect angle. Wrench the bezel to flip between portrait and landscape,
+and sneak-wrench the glass to rotate the screen content.
+
+Stands are furniture: sneak + right-click the tablet and it comes off **leaving
+the empty stand in place**, ready for the next tablet — swap dashboards between
+consoles like cartridges. Grab the stand itself to take everything.
 
 The tilted glass stays fully touchable — taps, holds, and click-and-slide all
 land exactly where you're looking. Mounted tablets keep to themselves (they
