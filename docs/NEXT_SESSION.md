@@ -3,31 +3,34 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-21, end of day — v1.8.0 LIVE EVERYWHERE)
+## Status (2026-07-22 — v1.8.1 LIVE EVERYWHERE)
 
-- **v1.8.1 tagged 2026-07-22**: placeable Swivel Mount stand +
-  separate tablet/stand pickup (swap tablets between consoles:
-  sneak-grab the panel = tablet only, stand stays; stand region =
-  both). User-tested in their pack; platform upload is the user's
-  step. ADDS A BLOCK — 1.8.1 does not pair with 1.8.0 (or older).
-- **v1.8.0 is the current release** (three releases shipped this day:
-  1.7.0 → 1.7.1 → 1.8.0, all live on both platforms + announced on
-  Discord). 1.8.0 public contents: **Swivel Mount** (ball-joint stand
-  for placed tablets; wrench glass = aim-at-eyes, bezel = landscape
-  flip on ALL faces, sneak-wrench glass = content rotate, elsewhere =
-  pickup; mounted never merges; coarse hitbox outline hidden) and
-  **nameable tablets** (anvil name shows as GUI/overlay title,
-  survives place/pickup). UNADVERTISED and changelog-silent BY DESIGN:
-  the 19-title secret arcade (local memory `secret-games-backlog` has
-  the cheat sheet; trigger = Linked Controller icon + game name —
-  NEVER spoil in public text). Registrar "13" across all of 1.7.x and
-  1.8.0 — they all pair; nothing pairs with 1.6.0 or older.
-- 1.7.0 (same day) brought: multiblock screens (4×3 continuous
-  display), pinned overlay + keybinds, overlay whitelist, JEI/EMI
-  ghost drag (EMI dev-runtime jar comes from the Modrinth maven — the
-  terraformers maven truncates big jars on this connection), and solo
-  screens (chain-link header button). 1.7.1 = "a minor screen issue".
-- Branches: `tablet-overlay` and `main` both pushed and level.
+- **v1.8.1 is the current release** (tagged, pushed, uploaded to both
+  platforms 2026-07-22; Discord announcement text drafted in-session,
+  posting is the user's step): **placeable Swivel Mount stand** (empty
+  stand block on any face, right-click with a tablet to mount it,
+  auto-aimed at the clicker; mount item on a placed tablet still
+  works) + **separate tablet/stand pickup** (sneak-grab or
+  sneak-wrench the PANEL = tablet only, stand stays — swap tablets
+  between consoles; the STAND region = both; sneak-wrench GLASS is
+  still content rotate; breaking drops both). ADDS A BLOCK
+  (`linktablet:swivel_mount`) — 1.8.1 does not pair with 1.8.0 or
+  older, even though the payload registrar is still "13".
+- 1.8.0 (2026-07-21, also live): Swivel Mount item + nameable tablets
+  (anvil name → GUI/overlay title). UNADVERTISED and changelog-silent
+  BY DESIGN: the 19-title secret arcade (local memory
+  `secret-games-backlog` has the cheat sheet; trigger = Linked
+  Controller icon + game name — NEVER spoil in public text).
+- 1.7.0 highlights: multiblock screens (4×3), pinned overlay +
+  keybinds, overlay whitelist, JEI/EMI ghost drag (EMI dev-runtime jar
+  comes from the Modrinth maven — terraformers truncates big jars on
+  this connection), solo screens.
+- The FAMILYPACK now runs a dedicated server: server-side mods are
+  linktablet + bettercombat (+ Create deps). Punchy is CLIENT-ONLY
+  (crashes a dedicated server loading a client Screen class) — EMF,
+  ETF, Hold My Items, BetterThirdPerson client-only too.
+- Branches: `tablet-overlay` and `main` both pushed and level; tag
+  v1.8.1 on the release commit.
 
 ## Next session
 
@@ -58,10 +61,11 @@ at the repo root (auto-loaded every Claude session).
    swivel-mounted tablet angled in the foreground), (b) the pinned
    overlay during real gameplay (hotbar visible). Checklist + exact
    slot placement live at the bottom of `docs/DESCRIPTION.md` (two
-   `<!-- 📸 -->` comments). NOTE: the description hasn't been updated
-   for 1.8.0 yet — when doing the image swap, also add a short Swivel
-   Mount + nameable-tablets section (games stay unmentioned).
-3. **Reactive hotfixes** — the tester crew is on 1.7.x now. The
+   `<!-- 📸 -->` comments). The description TEXT is already current
+   through 1.8.1 ("Aim it anywhere" section, nameable bullet, stand
+   swapping; games stay unmentioned) and can be pasted to both
+   listings before the shoot — the slots render as nothing.
+3. **Reactive hotfixes** — the tester crew is on 1.7.x/1.8.x now. The
    pre-release test-debt sweep (multiplayer dev-server, floor/ceiling
    orientation, ponder + held-item regression, chunk-border surfaces)
    was DROPPED by user decision 2026-07-21 ("let the testers find
@@ -70,6 +74,16 @@ at the repo root (auto-loaded every Claude session).
 
 ## Parked (don't propose unless the user re-raises)
 
+- **Factory gauges / data apps** — parked 2026-07-22 ("just a
+  thought"). Scoped in-session, three tiers: (1) Gauge app type that
+  LISTENS on a link frequency and shows received 0–15 as a dial —
+  flips the existing transmitter compat, works held + overlay,
+  ~1-2 sessions, needs a lightweight value-sync payload → registrar
+  bump; (2) tablet BE as a Create Display Link TARGET — all of
+  Create's display sources for free on placed/merged screens,
+  ~1 session basic; (3) bespoke deep readouts (stress graphs, vault
+  browsing) — REJECTED, competes with Create's display system.
+  Client-only utility apps (clock, calculator) cost what a game costs.
 - **Icon-friendly defaults** — parked 2026-07-21 (was on hold for
   tester intel that never firmed up). Analysis in
   `docs/ICON_DEFAULTS_SCOPING.md` if it comes back.
@@ -87,6 +101,10 @@ at the repo root (auto-loaded every Claude session).
 
 ## Release history (compressed)
 
+- 1.8.0 (2026-07-21) / 1.8.1 (2026-07-22): Swivel Mount item, then
+  the placeable stand + separate pickup; nameable tablets; the silent
+  19-game arcade. Registrar "13" throughout, but 1.8.1's new block
+  registration means only 1.8.1 pairs with 1.8.1.
 - 1.7.0 (2026-07-21): multiblock screens, pinned overlay + keybinds,
   overlay whitelist, JEI/EMI drag, solo screens. Registrar "11"→"13"
   ("12" = AppTarget slot mode, "13" = SurfaceLinkPayload).
