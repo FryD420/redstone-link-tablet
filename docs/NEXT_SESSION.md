@@ -3,40 +3,29 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-21, end of day — v1.7.0 LIVE EVERYWHERE)
+## Status (2026-07-21, end of day — v1.8.0 LIVE EVERYWHERE)
 
-- **v1.7.0 is the current release**, shipped end-to-end in one day:
-  modpack-tested by the user ("much better"), committed (6caabb0),
-  merged to main (e9ead01), tagged, pushed, uploaded by the user, and
-  the rewritten listing description is PASTED AND LIVE on both
-  platforms. Registrar "13" — does not pair with 1.6.0 or older.
-- 1.7.0 contents: **multiblock screens** (coplanar tablets merge up to
-  4×3 into one continuous display; wrench rotation; +32 apps per
-  member), **pinned tablet overlay** (mini-tablet HUD window, B =
-  chat-style interact, "Open Tablet" keybind unbound by default),
-  **overlay whitelist** (notes + mini-tablet hidden on options/settings/
-  pause screens — `NoteWindows.overlaysAllowedOn` gates all seven
-  screen-scoped handlers), **JEI + EMI ghost drag** into the edit
-  screen's frequency slots (optional deps, viewer-discovered plugins;
-  JEI 19.39.0.369 / EMI 1.1.24 pinned in gradle.properties — NOTE: the
-  terraformers maven truncates big jars on this connection, so the EMI
-  dev-runtime jar comes from the Modrinth maven), and **solo screens**
-  (chain-link header button on placed tablets: unlink dissolves a
-  merged surface and marks every member solo; `solo_screen` BE flag,
-  `SurfaceLinkPayload`, scanner flood skips solo BEs).
-- Branches: `tablet-overlay` and `main` both pushed; tablet-overlay has
-  a few post-release doc commits main doesn't (merge on next touch or
-  keep working on tablet-overlay — either is fine).
+- **v1.8.0 is the current release** (three releases shipped this day:
+  1.7.0 → 1.7.1 → 1.8.0, all live on both platforms + announced on
+  Discord). 1.8.0 public contents: **Swivel Mount** (ball-joint stand
+  for placed tablets; wrench glass = aim-at-eyes, bezel = landscape
+  flip on ALL faces, sneak-wrench glass = content rotate, elsewhere =
+  pickup; mounted never merges; coarse hitbox outline hidden) and
+  **nameable tablets** (anvil name shows as GUI/overlay title,
+  survives place/pickup). UNADVERTISED and changelog-silent BY DESIGN:
+  the 19-title secret arcade (local memory `secret-games-backlog` has
+  the cheat sheet; trigger = Linked Controller icon + game name —
+  NEVER spoil in public text). Registrar "13" across all of 1.7.x and
+  1.8.0 — they all pair; nothing pairs with 1.6.0 or older.
+- 1.7.0 (same day) brought: multiblock screens (4×3 continuous
+  display), pinned overlay + keybinds, overlay whitelist, JEI/EMI
+  ghost drag (EMI dev-runtime jar comes from the Modrinth maven — the
+  terraformers maven truncates big jars on this connection), and solo
+  screens (chain-link header button). 1.7.1 = "a minor screen issue".
+- Branches: `tablet-overlay` and `main` both pushed and level.
 
 ## Next session
 
-0. **1.8.0 SHIPPED 2026-07-21** ("It works. lets send this"): Swivel
-   Mount (the headline: ball-joint stand, face-me aiming, full wrench
-   map, landscape on all faces) + nameable tablets (anvil name shows
-   in GUI/overlay, survives place/pickup) + — unadvertised, changelog
-   silent BY DESIGN — the full 19-title secret arcade (see local
-   memory secret-games-backlog; trigger = Linked Controller icon +
-   game name). No protocol change, pairs with 1.7.x.
 1. **Sable / Create Aeronautics compat (investigate on demand)** —
    tablets on Sable sublevels (Aeronautics ships): prediction from
    2026-07-21 analysis — rendering/transmit/flat-taps likely fine
@@ -47,14 +36,15 @@ at the repo root (auto-loaded every Claude session).
    transforms the eye into sublevel space at the three eye-ray call
    sites (optional-dep pattern like JEI/EMI). Wait for a real tester
    report from an Aeronautics pack before building.
-2. **Screenshot shoot follow-up** — the user
-   + wife will shoot, timing theirs: (a) a merged tablet wall (3×2 or
-   4×3, dyed bezel, mid-tap — strong candidate to replace hero4 as
-   hero/social preview), (b) the pinned overlay during real gameplay
-   (hotbar visible). Checklist + exact slot placement live at the
-   bottom of `docs/DESCRIPTION.md` (two `<!-- 📸 -->` comments). When
-   shot: drop in docs/images/, swap the comments for embeds, push,
-   user re-pastes both listings.
+2. **Screenshot shoot follow-up** — the user + wife will shoot, timing
+   theirs: (a) a merged tablet wall (3×2 or 4×3, dyed bezel, mid-tap —
+   strong candidate to replace hero4 as hero/social preview; bonus: a
+   swivel-mounted tablet angled in the foreground), (b) the pinned
+   overlay during real gameplay (hotbar visible). Checklist + exact
+   slot placement live at the bottom of `docs/DESCRIPTION.md` (two
+   `<!-- 📸 -->` comments). NOTE: the description hasn't been updated
+   for 1.8.0 yet — when doing the image swap, also add a short Swivel
+   Mount + nameable-tablets section (games stay unmentioned).
 3. **Reactive hotfixes** — the tester crew is on 1.7.x now. The
    pre-release test-debt sweep (multiplayer dev-server, floor/ceiling
    orientation, ponder + held-item regression, chunk-border surfaces)
