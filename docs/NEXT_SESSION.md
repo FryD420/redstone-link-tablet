@@ -92,6 +92,19 @@ at the repo root (auto-loaded every Claude session).
   harmless, LOD-only).
 - 1.20.1 backport — possible but a big lift (Forge loader, no
   DataComponents/StreamCodec, second codebase); wait for real demand.
+- **Fabric port — BLOCKED upstream** (scoped 2026-07-23): Create
+  Fabric's last stable is 0.5.1 on 1.20.1; their 6.x port for 1.21.x
+  is unstable/not recommended, so there's nothing to build against.
+  Revisit only when Create Fabric 6 goes stable on 1.21.x, then it's
+  ~1-2 weeks: ~23/79 files touch NeoForge — registries/networking/
+  mods.toml are mechanical (payloads are vanilla CustomPacketPayload
+  already), the real work is ClientSetup render plumbing (no BEWLR/
+  IClientItemExtensions → BuiltinItemRendererRegistry, ModelEvent →
+  ModelLoadingPlugin) plus re-verifying the batch-ordering invariants
+  and the compat/ classes against Create Fabric's divergent
+  internals. Targeting 1.20.1 Create 0.5.1 instead = rewrite, ruled
+  out. Structure call if it happens: plain fork over multiloader
+  refactor, and only with real demand.
 - Declined tester items (vetted 2026-07-17, batch arrived via a
   disavowed shared-keyboard message): the "blank white tablet in
   ponder" report (if ever reproduced by a second person: ponder's
