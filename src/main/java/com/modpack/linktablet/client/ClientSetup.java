@@ -77,7 +77,19 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> PonderIndex.addPlugin(new LinkTabletPonderPlugin()));
+        event.enqueueWork(() -> {
+            PonderIndex.addPlugin(new LinkTabletPonderPlugin());
+            // Stage-aware incomplete-tablet art: Create advances the
+            // transitional stack's progress component 1/3 per deploy, so
+            // >= 0.5 flips the model override to the board+cell texture.
+            net.minecraft.client.renderer.item.ItemProperties.register(
+                    ModItems.INCOMPLETE_TABLET.get(),
+                    net.minecraft.resources.ResourceLocation
+                            .fromNamespaceAndPath(LinkTabletMod.MOD_ID, "assembly_progress"),
+                    (stack, level, entity, seed) ->
+                            ((com.simibubi.create.content.processing.sequenced.SequencedAssemblyItem)
+                                    stack.getItem()).getProgress(stack));
+        });
     }
 
     @SubscribeEvent

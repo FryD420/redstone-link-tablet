@@ -20,6 +20,11 @@ public class ModCreativeTabs {
                 .displayItems((params, output) -> {
                     output.accept(ModItems.TABLET.get());
                     output.accept(ModItems.SWIVEL_MOUNT.get());
+                    // Assembly order: case, then the deploy sequence
+                    output.accept(ModItems.TABLET_CASE.get());
+                    output.accept(ModItems.LOGIC_BOARD.get());
+                    output.accept(ModItems.CLOCKWORK_CELL.get());
+                    output.accept(ModItems.QUARTZ_DISPLAY.get());
                 })
                 .build());
     }

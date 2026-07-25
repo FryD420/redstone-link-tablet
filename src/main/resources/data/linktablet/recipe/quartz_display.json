@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "Q",
+    "G",
+    "Q"
+  ],
+  "key": {
+    "Q": {
+      "item": "create:polished_rose_quartz"
+    },
+    "G": {
+      "item": "minecraft:tinted_glass"
+    }
+  },
+  "result": {
+    "id": "linktablet:quartz_display",
+    "count": 1
+  }
+}

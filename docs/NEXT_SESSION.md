@@ -3,19 +3,28 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-22 — v1.8.1 LIVE EVERYWHERE)
+## Status (2026-07-25 — v1.9.0 TAGGED, upload = user's next step)
 
-- **v1.8.1 is the current release** (tagged, pushed, uploaded to both
-  platforms 2026-07-22; Discord announcement text drafted in-session,
-  posting is the user's step): **placeable Swivel Mount stand** (empty
-  stand block on any face, right-click with a tablet to mount it,
-  auto-aimed at the clicker; mount item on a placed tablet still
-  works) + **separate tablet/stand pickup** (sneak-grab or
-  sneak-wrench the PANEL = tablet only, stand stays — swap tablets
-  between consoles; the STAND region = both; sneak-wrench GLASS is
-  still content rotate; breaking drops both). ADDS A BLOCK
-  (`linktablet:swivel_mount`) — 1.8.1 does not pair with 1.8.0 or
-  older, even though the payload registrar is still "13".
+- **v1.9.0 tagged 2026-07-25** (commit + tag pushed; user modpack-
+  tested the deployer line and approved; CurseForge/Modrinth upload
+  is the user's step): **deployer-manufactured tablet** — brass
+  Tablet Case ("P P"/"PPP"), then `create:sequenced_assembly`:
+  logic board → clockwork cell → quartz display LAST. Old crafting
+  recipe DELETED (deployer-only, user decision). Transitional
+  Incomplete Link Tablet swaps art per stage (`assembly_progress`
+  item property in ClientSetup reads Create's progress component;
+  override threshold 0.5 in `models/item/incomplete_tablet.json`).
+  5 new items → does NOT pair with 1.8.x (registrar still "13").
+  Textures: string-map pixel art, generator was session-scratch
+  (regen = rewrite the tool or edit PNGs directly; brass/quartz
+  shades were sampled from Create's own sprites).
+- BEFORE UPLOAD or right after: DESCRIPTION.md "recipe" section
+  (~lines 184-194) + recipe.png still show the old crafting grid —
+  rewrite text to the manufacturing story; new image wants an
+  assembly-line/JEI-chain shot (fits the planned screenshot shoot).
+- v1.8.1 (2026-07-22, live on both platforms): placeable Swivel
+  Mount stand + separate tablet/stand pickup. ADDS A BLOCK — does
+  not pair with 1.8.0 or older.
 - 1.8.0 (2026-07-21, also live): Swivel Mount item + nameable tablets
   (anvil name → GUI/overlay title). UNADVERTISED and changelog-silent
   BY DESIGN: the 19-title secret arcade (local memory
@@ -30,7 +39,7 @@ at the repo root (auto-loaded every Claude session).
   (crashes a dedicated server loading a client Screen class) — EMF,
   ETF, Hold My Items, BetterThirdPerson client-only too.
 - Branches: `tablet-overlay` and `main` both pushed and level; tag
-  v1.8.1 on the release commit.
+  v1.9.0 on the release commit.
 
 ## Next session
 
@@ -43,9 +52,31 @@ at the repo root (auto-loaded every Claude session).
    server tick calling `aimAt(nearest non-spectator ≤~8 blocks)` at
    ~3-4 tick cadence with a small angle threshold, + client lerp in
    the BER so it glides. Power off = stays put. No new registries or
-   payloads → ships as 1.8.2, pairs with 1.8.1. ~Half session incl.
+   payloads → ships as 1.9.1, pairs with 1.9.0. ~Half session incl.
    tuning range/cadence; needs a multiplayer feel-test.
-2. **Sable / Create Aeronautics compat (investigate on demand)** —
+2. **Listing refresh for 1.9.0 (text can go anytime, image needs the
+   shoot)** — rewrite DESCRIPTION.md's "recipe" section (~184-194) to
+   the manufacturing story and replace recipe.png with an
+   assembly-line or JEI-chain shot; then paste to both listings.
+3. **App links — apps toggling other apps (scoped 2026-07-25)** —
+   state-level linking: tapping app A also flips B (tile lights,
+   transmits B's own strength/freqs). NOTE apps are already
+   multi-frequency scene buttons (8 freqs) — shared freqs cover
+   "one tap, many outputs" today; this feature is the visible state
+   sync. Design: stable per-app id + link list (target id + mode
+   on/off/follow) — two new SignalApp fields (optionalFieldOf,
+   extend the HAND-ROLLED stream codec) → registrar bump = its own
+   pairing break (missed the 1.9.0 window; batch with the next
+   registry/payload-breaking release).
+   Propagation: one shared helper at the two mutation sites
+   (ModNetworking toggle handler ~:508, TabletBlock tap ~:413),
+   single pass + visited set (kills loops, allows chains). v1
+   targets: toggles + timers only (momentary transient, sliders
+   excluded or "on = max"). UI is half the cost: edit screen has NO
+   vertical room (240 budget) → "Links" chip opens a PickerOverlay
+   listing other apps, cycling none/on/off/follow; tiny procedural
+   chain glyph on linked tiles. ~1-2 sessions.
+4. **Sable / Create Aeronautics compat (investigate on demand)** —
    tablets on Sable sublevels (Aeronautics ships): prediction from
    2026-07-21 analysis — rendering/transmit/flat-taps likely fine
    (real interactive blocks, remapped raycasts), but ALL eye-ray math
@@ -55,7 +86,7 @@ at the repo root (auto-loaded every Claude session).
    transforms the eye into sublevel space at the three eye-ray call
    sites (optional-dep pattern like JEI/EMI). Wait for a real tester
    report from an Aeronautics pack before building.
-2. **Screenshot shoot follow-up** — the user + wife will shoot, timing
+5. **Screenshot shoot follow-up** — the user + wife will shoot, timing
    theirs: (a) a merged tablet wall (3×2 or 4×3, dyed bezel, mid-tap —
    strong candidate to replace hero4 as hero/social preview; bonus: a
    swivel-mounted tablet angled in the foreground), (b) the pinned
@@ -65,7 +96,7 @@ at the repo root (auto-loaded every Claude session).
    through 1.8.1 ("Aim it anywhere" section, nameable bullet, stand
    swapping; games stay unmentioned) and can be pasted to both
    listings before the shoot — the slots render as nothing.
-3. **Reactive hotfixes** — the tester crew is on 1.7.x/1.8.x now. The
+6. **Reactive hotfixes** — the tester crew is on 1.7.x/1.8.x now. The
    pre-release test-debt sweep (multiplayer dev-server, floor/ceiling
    orientation, ponder + held-item regression, chunk-border surfaces)
    was DROPPED by user decision 2026-07-21 ("let the testers find
@@ -92,6 +123,19 @@ at the repo root (auto-loaded every Claude session).
   harmless, LOD-only).
 - 1.20.1 backport — possible but a big lift (Forge loader, no
   DataComponents/StreamCodec, second codebase); wait for real demand.
+- **Fabric port — BLOCKED upstream** (scoped 2026-07-23): Create
+  Fabric's last stable is 0.5.1 on 1.20.1; their 6.x port for 1.21.x
+  is unstable/not recommended, so there's nothing to build against.
+  Revisit only when Create Fabric 6 goes stable on 1.21.x, then it's
+  ~1-2 weeks: ~23/79 files touch NeoForge — registries/networking/
+  mods.toml are mechanical (payloads are vanilla CustomPacketPayload
+  already), the real work is ClientSetup render plumbing (no BEWLR/
+  IClientItemExtensions → BuiltinItemRendererRegistry, ModelEvent →
+  ModelLoadingPlugin) plus re-verifying the batch-ordering invariants
+  and the compat/ classes against Create Fabric's divergent
+  internals. Targeting 1.20.1 Create 0.5.1 instead = rewrite, ruled
+  out. Structure call if it happens: plain fork over multiloader
+  refactor, and only with real demand.
 - Declined tester items (vetted 2026-07-17, batch arrived via a
   disavowed shared-keyboard message): the "blank white tablet in
   ponder" report (if ever reproduced by a second person: ponder's
@@ -101,6 +145,10 @@ at the repo root (auto-loaded every Claude session).
 
 ## Release history (compressed)
 
+- 1.9.0 (2026-07-25): deployer-manufactured tablet — sequenced
+  assembly (case → board → cell → display), 5 new items, stage-aware
+  incomplete art, crafting recipe removed. Registrar "13"; pairs
+  with nothing older.
 - 1.8.0 (2026-07-21) / 1.8.1 (2026-07-22): Swivel Mount item, then
   the placeable stand + separate pickup; nameable tablets; the silent
   19-game arcade. Registrar "13" throughout, but 1.8.1's new block
