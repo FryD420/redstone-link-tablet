@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "P P",
+    "PPP"
+  ],
+  "key": {
+    "P": {
+      "item": "create:brass_sheet"
+    }
+  },
+  "result": {
+    "id": "linktablet:tablet_case",
+    "count": 1
+  }
+}

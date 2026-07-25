@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "linktablet:item/incomplete_tablet"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "linktablet:assembly_progress": 0.5
+      },
+      "model": "linktablet:item/incomplete_tablet_cell"
+    }
+  ]
+}

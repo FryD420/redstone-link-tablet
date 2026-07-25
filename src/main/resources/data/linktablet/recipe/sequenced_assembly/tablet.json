@@ -1,0 +1,65 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "linktablet:tablet_case"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "id": "linktablet:tablet"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "linktablet:incomplete_tablet"
+        },
+        {
+          "item": "linktablet:logic_board"
+        }
+      ],
+      "results": [
+        {
+          "id": "linktablet:incomplete_tablet"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "linktablet:incomplete_tablet"
+        },
+        {
+          "item": "linktablet:clockwork_cell"
+        }
+      ],
+      "results": [
+        {
+          "id": "linktablet:incomplete_tablet"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "linktablet:incomplete_tablet"
+        },
+        {
+          "item": "linktablet:quartz_display"
+        }
+      ],
+      "results": [
+        {
+          "id": "linktablet:incomplete_tablet"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "linktablet:incomplete_tablet"
+  }
+}

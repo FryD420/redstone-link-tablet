@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.9.0 — 2026-07-25
+
+- The Link Tablet is now **manufactured, not crafted**: build a Tablet
+  Case from brass sheets, then run it down a Deployer line — logic
+  board, clockwork cell, quartz display last — Create sequenced assembly,
+  shown step-by-step in JEI/EMI. The old crafting-table recipe is
+  gone; the three components absorb its ingredients, so the total
+  cost is about the same.
+- The in-progress tablet **visibly gains its parts** on the belt: the
+  logic board appears after the first Deployer, the clockwork cell
+  after the second — the screen goes on last.
+- New items: Tablet Case, Link Logic Board (redstone link + linked
+  controller + electron tube), Quartz Display (rose quartz + tinted
+  glass), Clockwork Cell (iron nugget + rose quartz + cogwheel), and
+  the in-progress Incomplete Link Tablet.
+- Note for servers: this version adds items, so servers and clients
+  need to update together — it does not pair with 1.8.x.
+
 ## 1.8.1 — 2026-07-22
 
 - The Swivel Mount is now **placeable on its own**: put the empty stand

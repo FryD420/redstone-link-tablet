@@ -2,17 +2,11 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "pattern": [
-    "PGP",
-    "LCL",
-    "PEP"
+    "L",
+    "C",
+    "E"
   ],
   "key": {
-    "P": {
-      "item": "create:brass_sheet"
-    },
-    "G": {
-      "item": "minecraft:tinted_glass"
-    },
     "L": {
       "item": "create:redstone_link"
     },
@@ -24,7 +18,7 @@
     }
   },
   "result": {
-    "id": "linktablet:tablet",
+    "id": "linktablet:logic_board",
     "count": 1
   }
 }
