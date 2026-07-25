@@ -5,9 +5,9 @@ at the repo root (auto-loaded every Claude session).
 
 ## Status (2026-07-25 — v1.9.0 TAGGED, upload = user's next step)
 
-- **v1.9.0 tagged 2026-07-25** (commit + tag pushed; user modpack-
-  tested the deployer line and approved; CurseForge/Modrinth upload
-  is the user's step): **deployer-manufactured tablet** — brass
+- **v1.9.0 LIVE EVERYWHERE 2026-07-25** (tagged, pushed, uploaded to
+  both platforms, Discord announcement posted — all same day):
+  **deployer-manufactured tablet** — brass
   Tablet Case ("P P"/"PPP"), then `create:sequenced_assembly`:
   logic board → clockwork cell → quartz display LAST. Old crafting
   recipe DELETED (deployer-only, user decision). Transitional
@@ -18,10 +18,10 @@ at the repo root (auto-loaded every Claude session).
   Textures: string-map pixel art, generator was session-scratch
   (regen = rewrite the tool or edit PNGs directly; brass/quartz
   shades were sampled from Create's own sprites).
-- BEFORE UPLOAD or right after: DESCRIPTION.md "recipe" section
-  (~lines 184-194) + recipe.png still show the old crafting grid —
-  rewrite text to the manufacturing story; new image wants an
-  assembly-line/JEI-chain shot (fits the planned screenshot shoot).
+- DESCRIPTION.md rewritten for 1.9.0 (manufacturing story, recipe.png
+  embed RETIRED, 📸 assembly-line slot added). Remaining for the
+  listings: paste the refreshed text, and the screenshot shoot
+  (assembly-line shot joins the merged-wall + overlay shots).
 - v1.8.1 (2026-07-22, live on both platforms): placeable Swivel
   Mount stand + separate tablet/stand pickup. ADDS A BLOCK — does
   not pair with 1.8.0 or older.

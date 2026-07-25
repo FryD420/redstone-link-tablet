@@ -8,8 +8,9 @@ transmit on Create's Redstone Link network.
   still named `signaltablet-mod` — old name, intentional, do not rename.
 - GitHub: https://github.com/FryD420/redstone-link-tablet (author FryD42; the
   GitHub account is FryD420). License MIT.
-- Published on CurseForge and Modrinth (slug `redstone-link-tablet`). Listing
-  text lives in `docs/DESCRIPTION.md`, listing images in `docs/images/`.
+- Published on CurseForge (slug `create-redstone-link-tablet`) and Modrinth
+  (slug `redstone-link-tablet` — note the slugs differ). Listing text lives in
+  `docs/DESCRIPTION.md`, listing images in `docs/images/`.
 - Current status and roadmap: `docs/NEXT_SESSION.md`.
 
 ## Build and run
