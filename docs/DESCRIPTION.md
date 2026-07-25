@@ -181,17 +181,22 @@ build a bank of separate dashboards side by side.
 
 ## Getting started
 
-Craft the tablet from brass-age Create parts — a Linked Controller rehoused in a
-brass shell with a proper screen and a signal amplifier (it's in the vanilla
-Redstone creative tab too):
+The tablet comes off a real assembly line — this is brass-age manufacturing,
+not crafting. Shape a **Tablet Case** from five brass sheets, then send it down
+a belt past three Deployers:
 
-![Crafting recipe: brass sheets, tinted glass, redstone links, electron tube around a linked controller](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/recipe.png)
+- **Link Logic Board** — a Redstone Link and Linked Controller rehoused with an
+  electron tube. The radio.
+- **Clockwork Cell** — cogwheel, polished rose quartz, and a winding key. The
+  power.
+- **Quartz Display** — tinted glass backed with rose quartz, screwed on last.
+  The screen.
 
-| | | |
-|---|---|---|
-| Brass Sheet | Tinted Glass | Brass Sheet |
-| Redstone Link | Linked Controller | Redstone Link |
-| Brass Sheet | Electron Tube | Brass Sheet |
+The in-progress tablet visibly gains each part as it moves down the line, and
+JEI/EMI shows the whole sequence on the tablet's page. (The finished tablet
+lives in the vanilla Redstone creative tab too.)
+
+<!-- 📸 SCREENSHOT: the assembly line in action — belt with three deployers, an in-progress tablet mid-line showing the seated board/cell, finished tablet coming off the end -->
 
 Then:
 
@@ -254,14 +259,16 @@ Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-li
   `theme1–4.png`, same framing, GUI crop at 705,325 510×440 — safe to delete
   the four raws once happy with the stitch).
 - ✅ **dyed-cases2.png** — 16-color wall with lit screens.
-- ✅ **recipe.png** — unchanged since 1.1.1, reused (3× upscale crop of
-  `recipe-full.png`).
+- ❌ **recipe.png** — RETIRED with 1.9.0 (the crafting recipe it showed no
+  longer exists; embed removed from the text 2026-07-25). Its slot is now the
+  assembly-line 📸 comment in "Getting started" — shoot the belt + three
+  deployers with an in-progress tablet mid-line. Prune `recipe.png` and
+  `recipe-full.png` from the listings/`docs/images/` once the new shot lands.
 
 Refresh COMPLETE (2026-07-19): every slot filled (a click-and-slide action
 shot was considered and skipped; the text covers it), description pasted to
 both listings, galleries + restyled icon uploaded, superseded images pruned.
-`recipe-full.png` and `icon-bg.png` stay — they're sources for `recipe.png`
-and the iconTool. For the next refresh: shoot, drop files in `docs/images/`,
+`icon-bg.png` stays — it's a source for the iconTool. For the next refresh: shoot, drop files in `docs/images/`,
 embed at
 `https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/<file>.png`,
 push, then paste everything below the divider into both listing editors.
