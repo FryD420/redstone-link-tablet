@@ -13,7 +13,7 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * Container menu behind the app edit screen: the full player inventory
+ * Container menu behind the signal edit screen: the full player inventory
  * as real slots plus two GHOST slots for the staged frequency pair —
  * vanilla drag/click mechanics via Create's {@link GhostItemMenu}
  * (ghost placement copies the carried stack, count 1, never consumes).
@@ -23,11 +23,11 @@ import net.neoforged.neoforge.items.SlotItemHandler;
  * hardcodes ghost indices as {@code 36 + slot}.
  * <p>
  * The menu itself saves nothing ({@link #saveData} is empty): the
- * authoritative save stays the screen's {@code UpsertAppPayload}.
+ * authoritative save stays the screen's {@code UpsertSignalPayload}.
  */
-public class AppEditMenu extends GhostItemMenu<AppEditMenu.EditContext> {
+public class SignalEditMenu extends GhostItemMenu<SignalEditMenu.EditContext> {
 
-    // Screen-local slot coordinates (shared with AppEditScreen's layout)
+    // Screen-local slot coordinates (shared with SignalEditScreen's layout)
     public static final int PLAYER_SLOTS_X = 8;
     public static final int PLAYER_SLOTS_Y = 146;
     public static final int GHOST_Y = 60;
@@ -35,33 +35,33 @@ public class AppEditMenu extends GhostItemMenu<AppEditMenu.EditContext> {
     public static final int GHOST2_X = 34;
 
     /** What the editor is pointed at, plus optional link-click prefill. */
-    public record EditContext(ModNetworking.AppTarget target, int index,
+    public record EditContext(ModNetworking.SignalTarget target, int index,
                               ItemStack prefill1, ItemStack prefill2, String prefillName) {
 
         public static final StreamCodec<RegistryFriendlyByteBuf, EditContext> STREAM_CODEC =
                 StreamCodec.composite(
-                        ModNetworking.AppTarget.STREAM_CODEC, EditContext::target,
+                        ModNetworking.SignalTarget.STREAM_CODEC, EditContext::target,
                         ByteBufCodecs.VAR_INT, EditContext::index,
                         ItemStack.OPTIONAL_STREAM_CODEC, EditContext::prefill1,
                         ItemStack.OPTIONAL_STREAM_CODEC, EditContext::prefill2,
                         ByteBufCodecs.STRING_UTF8, EditContext::prefillName,
                         EditContext::new);
 
-        public static EditContext plain(ModNetworking.AppTarget target, int index) {
+        public static EditContext plain(ModNetworking.SignalTarget target, int index) {
             return new EditContext(target, index, ItemStack.EMPTY, ItemStack.EMPTY, "");
         }
     }
 
-    public AppEditMenu(MenuType<?> type, int id, Inventory inv, RegistryFriendlyByteBuf buf) {
+    public SignalEditMenu(MenuType<?> type, int id, Inventory inv, RegistryFriendlyByteBuf buf) {
         super(type, id, inv, buf);
     }
 
-    public AppEditMenu(MenuType<?> type, int id, Inventory inv, EditContext context) {
+    public SignalEditMenu(MenuType<?> type, int id, Inventory inv, EditContext context) {
         super(type, id, inv, context);
     }
 
-    public static AppEditMenu create(int id, Inventory inv, RegistryFriendlyByteBuf buf) {
-        return new AppEditMenu(ModMenus.APP_EDIT.get(), id, inv, buf);
+    public static SignalEditMenu create(int id, Inventory inv, RegistryFriendlyByteBuf buf) {
+        return new SignalEditMenu(ModMenus.SIGNAL_EDIT.get(), id, inv, buf);
     }
 
     @Override

@@ -13,7 +13,7 @@ import net.minecraft.world.item.ItemStack;
 /**
  * A two-item "frequency", identical in spirit to Create's Redstone Link
  * network: two items, order-independent, define a channel. A Tablet
- * "app" and a Signal Receiver block that share a frequency are linked.
+ * "signal" and a Signal Receiver block that share a frequency are linked.
  * <p>
  * Since 1.4.0 the frequency carries full {@link ItemStack}s (count
  * forced to 1) so component-bearing items — frequency cards and the

@@ -27,7 +27,7 @@ public class UISounds {
         play(SoundEvents.AMETHYST_BLOCK_HIT, 1.0F, 0.4F);
     }
 
-    /** App toggled on/off. */
+    /** Signal toggled on/off. */
     public static void toggle(boolean nowActive) {
         if (nowActive) {
             play(SoundEvents.STONE_BUTTON_CLICK_ON, 1.6F, 0.5F);
@@ -36,17 +36,17 @@ public class UISounds {
         }
     }
 
-    /** Navigated to the edit screen (edit or new app). */
+    /** Navigated to the edit screen (edit or new signal). */
     public static void page() {
         play(SoundEvents.BOOK_PAGE_TURN, 1.2F, 0.6F);
     }
 
-    /** App saved. */
+    /** Signal saved. */
     public static void confirm() {
         play(SoundEvents.AMETHYST_BLOCK_PLACE, 1.3F, 0.6F);
     }
 
-    /** App removed. */
+    /** Signal removed. */
     public static void delete() {
         play(SoundEvents.AMETHYST_BLOCK_BREAK, 0.9F, 0.5F);
     }

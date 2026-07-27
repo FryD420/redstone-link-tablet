@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased
+
+- The tablet now boots to a **Home screen** (the start of the tablet
+  "OS"): a launcher with the **Signals** app — today's whole toggle
+  grid — as its first program, with more to come. Opening a held
+  tablet resumes whatever you had open last; the new house button
+  (top-left) takes you Home.
+- The things on the grid are now called **signals** everywhere ("Add
+  Signal", "New Signal", ...) — "app" now means the programs on the
+  launcher. Purely naming: your configured tablets carry over
+  untouched.
+- Placed, mounted, and merged tablets get the same Home screen on
+  their in-world displays: they boot to the launcher (tap the Signals
+  tile to open your grid), and **tapping the bezel ring** on a running
+  screen takes it back Home. Existing placed tablets show the launcher
+  after updating — your signals are one tap away, exactly as you left
+  them. Wrench gestures are unchanged.
+- The launcher carries the tablet's standard controls — theme picker,
+  overlay pin, merge link, and grid/list view — so device settings
+  live on the Home screen. Tapping a kiosk's bezel while it shows the
+  launcher opens that menu.
+- **Your Home screen is yours**: the **App Store** — the permanent
+  last tile on every Home screen — shelves every program with a
+  description and a Get/Remove button; "getting" an app puts its tile
+  on that tablet's Home. Right-click a Home tile to remove it. New
+  tablets start with just Signals. The Home screen also honors the
+  grid/list toggle now.
+- **Placed screens follow your navigation**: opening an app (or going
+  Home) in a placed tablet's GUI switches the wall screen to match —
+  the kiosk and the menu always show the same thing.
+- A placed tablet showing the **Calculator** displays its live tape on
+  the wall — your own running sum, big on the glass.
+- New app: **Clock** — alarms (daily, with a toggle per alarm), a
+  world clock with every real timezone (searchable), a countdown
+  timer, and a stopwatch. Alarms and timers ring even with the tablet
+  closed — a chime plus an on-screen note — and keep real wall-clock
+  time across sessions. A placed tablet showing the Clock becomes a
+  wall clock: big digital time and date on the screen, merged walls
+  included.
+- New app: **Calculator** — a proper four-function calculator with
+  click buttons and full keyboard entry. It remembers where you were
+  if you close it mid-sum.
+- New app: **Gauges** — live dials that LISTEN on Redstone Link
+  frequencies and show the received signal strength, the reverse of
+  what Signals does. Name each dial, pick its channel (same two-item
+  frequencies) and color. Dials work on the held screen, on placed
+  tablets (the block hears what a real link at that spot would), and
+  on the pinned overlay.
+- The **overlay pin is now per-app** — the pin button pins whatever
+  screen you're on: Clock pins a clock overlay, Gauges a live dial
+  HUD (pin a gauges tablet and you have a vehicle dashboard while
+  driving), Calculator a working mini pad, and the launcher pins an
+  app dock — one click on the dock opens that app. Signals pins work
+  exactly as before, and existing pins carry over.
+- Note for servers: the network protocol grew (renamed payloads plus
+  the new gauges traffic), so servers and clients need to update
+  together — this version does not pair with 1.9.x. Worlds and tablet
+  data are unaffected.
+
 ## 1.9.1 — 2026-07-26
 
 - The app **icon slot now accepts JEI/EMI drags**: drag any item from

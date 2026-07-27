@@ -1,7 +1,7 @@
 package com.modpack.linktablet.registry;
 
 import com.modpack.linktablet.LinkTabletMod;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
@@ -19,11 +19,11 @@ public class ModDataComponents {
     public static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, LinkTabletMod.MOD_ID);
 
-    /** The list of apps stored on a tablet. */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<SignalApp>>> TABLET_APPS =
-            DATA_COMPONENTS.register("tablet_apps", () -> DataComponentType.<List<SignalApp>>builder()
-                    .persistent(SignalApp.CODEC.listOf())
-                    .networkSynchronized(SignalApp.STREAM_CODEC.apply(ByteBufCodecs.list()))
+    /** The list of signals stored on a tablet. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<Signal>>> TABLET_SIGNALS =
+            DATA_COMPONENTS.register("tablet_apps", () -> DataComponentType.<List<Signal>>builder()
+                    .persistent(Signal.CODEC.listOf())
+                    .networkSynchronized(Signal.STREAM_CODEC.apply(ByteBufCodecs.list()))
                     .build());
 
     /** Dyed case color; absent = the default dark case. */
@@ -45,6 +45,22 @@ public class ModDataComponents {
             DATA_COMPONENTS.register("theme", () -> DataComponentType.<ScreenTheme>builder()
                     .persistent(ScreenTheme.CODEC)
                     .networkSynchronized(ScreenTheme.STREAM_CODEC)
+                    .build());
+
+    /** Ordered home-screen program ids (1.10.0 settable roster);
+     * absent = Signals only ({@code Program.DEFAULT_HOME}, never written). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<Integer>>> HOME_APPS =
+            DATA_COMPONENTS.register("home_apps", () -> DataComponentType.<List<Integer>>builder()
+                    .persistent(Codec.INT.listOf())
+                    .networkSynchronized(ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()))
+                    .build());
+
+    /** The list of gauges stored on a tablet (1.10.0 OS suite);
+     * absent = none (never written empty). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<com.modpack.linktablet.frequency.Gauge>>> TABLET_GAUGES =
+            DATA_COMPONENTS.register("tablet_gauges", () -> DataComponentType.<List<com.modpack.linktablet.frequency.Gauge>>builder()
+                    .persistent(com.modpack.linktablet.frequency.Gauge.CODEC.listOf())
+                    .networkSynchronized(com.modpack.linktablet.frequency.Gauge.STREAM_CODEC.apply(ByteBufCodecs.list()))
                     .build());
 
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */

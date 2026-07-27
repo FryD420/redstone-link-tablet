@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -29,7 +29,7 @@ public class CrossingScreen extends ArcadeScreen {
     private boolean newBest;
     private double speedScale;
 
-    public CrossingScreen(AppView view, boolean returnToTablet) {
+    public CrossingScreen(SignalView view, boolean returnToTablet) {
         super("crossing", view, returnToTablet);
         reset();
     }

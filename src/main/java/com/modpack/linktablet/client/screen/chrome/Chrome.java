@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
  *
  * <p>Tinting is a shader-color multiply ({@link GuiGraphics#setColor}):
  * the atlas surfaces are authored near-white grayscale so a theme role
- * or app color multiplied in becomes the surface color. Multiplying can
+ * or signal color multiplied in becomes the surface color. Multiplying can
  * only darken — "light" accents in the art are pure white so they take
  * the tint exactly. Rail frames tint with {@code theme.bodyOuter} (the
  * pre-1.5.0 border role), so borders match the theme like they always
@@ -46,12 +46,12 @@ public final class Chrome {
         tinted(g, theme.bodyOuter, () -> NineSlice.blit(g, ChromeAtlas.RAIL_FRAME, x, y, w, h));
     }
 
-    /** Flat parchment plaque; tint = theme role or app color. */
+    /** Flat parchment plaque; tint = theme role or signal color. */
     public static void plaque(GuiGraphics g, int x, int y, int w, int h, int argbTint) {
         tinted(g, argbTint, () -> NineSlice.blit(g, ChromeAtlas.PLAQUE, x, y, w, h));
     }
 
-    /** Raised plaque for grid app tiles; tint = app color. */
+    /** Raised plaque for grid signal tiles; tint = signal color. */
     public static void tile(GuiGraphics g, int x, int y, int w, int h, int argbTint) {
         tinted(g, argbTint, () -> NineSlice.blit(g, ChromeAtlas.TILE, x, y, w, h));
     }

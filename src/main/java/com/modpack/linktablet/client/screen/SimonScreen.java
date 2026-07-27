@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -32,7 +32,7 @@ public class SimonScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public SimonScreen(AppView view, boolean returnToTablet) {
+    public SimonScreen(SignalView view, boolean returnToTablet) {
         super("simon", view, returnToTablet);
         reset();
     }

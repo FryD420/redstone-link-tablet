@@ -1,8 +1,14 @@
 # Create: Redstone Link Tablet
 
 NeoForge 1.21.1 (21.1.233) addon for Create 6.0.10. Adds the "Link Tablet"
-(`linktablet:tablet`) — a handheld/placeable device with app-style toggles that
-transmit on Create's Redstone Link network.
+(`linktablet:tablet`) — a handheld/placeable device whose "signals"
+(app-style toggles, class `Signal`) transmit on Create's Redstone Link
+network. Since 1.10.0 the tablet is an "OS": a launcher home screen of
+programs (`Program` enum), with the signal grid as the first program —
+"app" means launcher program, "signal" means a grid entry. The
+apps→signals rename (2026-07-27) covered code, wire ids (registrar
+"13"→"14"), and UI; the DISK keys are frozen forever: component
+`tablet_apps`, BE NBT `"apps"`.
 
 - Mod id `linktablet`, package `com.modpack.linktablet`. The project folder is
   still named `signaltablet-mod` — old name, intentional, do not rename.
@@ -28,8 +34,9 @@ transmit on Create's Redstone Link network.
 
 - Block models with transparent overlay textures NEED `"render_type": "minecraft:cutout"`.
 - Tablet textures occupy sprite cols 2–13, rows 1–14; row 0 and cols 0–1 are transparent.
-- `StreamCodec.composite` maxes out around 6 fields — `SignalApp` uses a
-  hand-rolled stream codec; extend that, don't switch back to composite.
+- `StreamCodec.composite` maxes out around 6 fields — `Signal` (pre-1.10
+  name `SignalApp`) uses a hand-rolled stream codec; extend that, don't
+  switch back to composite.
 - GUI vertical budget is 240 units (dev window at GUI scale 2); the edit screen
   already uses all of it.
 - Create 6.x import quirk: `Couple` is `net.createmod.catnip.data.Couple`
@@ -112,7 +119,7 @@ transmit on Create's Redstone Link network.
   `ChromeAtlas` (shared with the generator — regen the atlas with
   `./gradlew chromeTool`, F3+T reloads it in a running client). Tinting is
   shader-color multiply (`GuiGraphics.setColor`): surfaces are authored
-  near-white so theme/app colors multiply in; wood rails are full-color and
+  near-white so theme/signal colors multiply in; wood rails are full-color and
   NEVER tinted. Mechanisms (switches, pips, glyphs, value bars, swatches)
   stay procedural `fill()` on purpose. NineSlice TILES edges/centers (never
   stretches). ChromeEditBox callers construct inset by (4,5)/(w-8,h-10) so
@@ -148,11 +155,11 @@ transmit on Create's Redstone Link network.
   `gridLayout(count, rot)`, and the inverse swizzle inside `hitPip` — and the
   renderer's center-pivot pose rotation must stay in lockstep with it. Held
   items always render rotation 0.
-- Slider apps (1.4.0): `active` is DERIVED from `strength > 0` and never
+- Slider signals (1.4.0): `active` is DERIVED from `strength > 0` and never
   user-toggled — that's what keeps the transmitter collectors'
   `active && !momentary` rule working unchanged. `sanitized()` enforces it.
   1.5.0 adds `sliderMin`/`sliderMax` (defaults 0/15, optionalFieldOf so old
-  NBT and untouched sliders serialize unchanged): `SignalApp.
+  NBT and untouched sliders serialize unchanged): `Signal.
   valueFromFraction`/`fillFraction` are the ONLY drag→value and
   value→bar-position mapping sites — every consumer (GUI drags,
   BlockSliderDrag, TabletBlock click-to-set, both renderers) goes through

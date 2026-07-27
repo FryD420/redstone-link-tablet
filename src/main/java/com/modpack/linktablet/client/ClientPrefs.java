@@ -18,6 +18,11 @@ public class ClientPrefs {
     private static boolean loaded = false;
     private static boolean listView = false;
 
+    /** Resume target for held/slot tablets (1.10.0): the {@link
+     * com.modpack.linktablet.Program} key last shown. Kiosk GUIs never
+     * write it — their nav lives on the block entity. */
+    private static String lastProgram = "launcher";
+
     // Pinned overlay (1.7.0): "" = no pin, "slot:<n>" = inventory slot,
     // "block:<x>,<y>,<z>" = placed tablet. Position is the window's
     // last-dragged top-left corner (-1 = never moved, use default).
@@ -30,7 +35,12 @@ public class ClientPrefs {
      * "snakeHigh" key migrates on load). Zero = never played. */
     private static final java.util.Map<String, Integer> GAME_BESTS = new java.util.HashMap<>();
 
-    /** Whether the tablet home screen shows the app list instead of the icon grid. */
+    /** Clock app state (1.10.0): alarms/timer/stopwatch/zones, keyed
+     * "clock.<key>" on disk (the "best.<id>" precedent). ClockService
+     * owns the value formats; this just stores strings. */
+    private static final java.util.Map<String, String> CLOCK = new java.util.HashMap<>();
+
+    /** Whether the tablet home screen shows the signal list instead of the icon grid. */
     public static boolean listView() {
         load();
         return listView;
@@ -75,6 +85,31 @@ public class ClientPrefs {
         save();
     }
 
+    /** Program key to resume on the next held/slot open. */
+    public static String lastProgram() {
+        load();
+        return lastProgram;
+    }
+
+    public static void setLastProgram(String value) {
+        load();
+        if (lastProgram.equals(value)) return;
+        lastProgram = value;
+        save();
+    }
+
+    /** Clock app value for a key, or the fallback when never written. */
+    public static String clock(String key, String fallback) {
+        load();
+        return CLOCK.getOrDefault(key, fallback);
+    }
+
+    public static void setClock(String key, String value) {
+        load();
+        String old = value.isEmpty() ? CLOCK.remove(key) : CLOCK.put(key, value);
+        if (!value.equals(old == null ? "" : old)) save();
+    }
+
     public static int gameBest(String id) {
         load();
         return GAME_BESTS.getOrDefault(id, 0);
@@ -96,12 +131,15 @@ public class ClientPrefs {
             return; // first run: keep defaults
         }
         listView = Boolean.parseBoolean(props.getProperty("listView", "false"));
+        lastProgram = props.getProperty("lastProgram", "launcher");
         overlayPin = props.getProperty("overlayPin", "");
         overlayX = parseInt(props.getProperty("overlayX"), -1);
         overlayY = parseInt(props.getProperty("overlayY"), -1);
         for (String key : props.stringPropertyNames()) {
             if (key.startsWith("best.")) {
                 GAME_BESTS.put(key.substring(5), parseInt(props.getProperty(key), 0));
+            } else if (key.startsWith("clock.")) {
+                CLOCK.put(key.substring(6), props.getProperty(key));
             }
         }
         // 1.7.1 shipped snake's best under its own key
@@ -122,10 +160,12 @@ public class ClientPrefs {
     private static void save() {
         Properties props = new Properties();
         props.setProperty("listView", Boolean.toString(listView));
+        props.setProperty("lastProgram", lastProgram);
         props.setProperty("overlayPin", overlayPin);
         props.setProperty("overlayX", Integer.toString(overlayX));
         props.setProperty("overlayY", Integer.toString(overlayY));
         GAME_BESTS.forEach((id, best) -> props.setProperty("best." + id, Integer.toString(best)));
+        CLOCK.forEach((key, value) -> props.setProperty("clock." + key, value));
         try (var out = java.nio.file.Files.newOutputStream(FILE)) {
             props.store(out, "Link Tablet client display preferences");
         } catch (IOException ignored) {

@@ -2,7 +2,7 @@ package com.modpack.linktablet.block;
 
 import com.modpack.linktablet.compat.VirtualTransmitter;
 import com.modpack.linktablet.frequency.Frequency;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.registry.ModBlockEntities;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.registry.ModItems;
@@ -30,15 +30,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A mounted tablet. Stores the same app list and case color as the item,
+ * A mounted tablet. Stores the same signal list and case color as the item,
  * and keeps {@link VirtualTransmitter}s registered on Create's link
- * network for every toggled-ON app — broadcasting from the block's own
+ * network for every toggled-ON signal — broadcasting from the block's own
  * position, for as long as the chunk is loaded. The LIT blockstate (and
- * with it the glowing screen model) tracks whether any app is on.
+ * with it the glowing screen model) tracks whether any signal is on.
  */
 public class TabletBlockEntity extends BlockEntity {
 
-    private List<SignalApp> apps = List.of();
+    private List<Signal> signals = List.of();
     @Nullable
     private DyeColor caseColor;
     /** Physical mini-screen layout: true = switch list, false = pip grid. */
@@ -51,6 +51,22 @@ public class TabletBlockEntity extends BlockEntity {
     private boolean soloScreen;
     /** UI theme; DARK is the default and is never persisted. */
     private ScreenTheme theme = ScreenTheme.DARK;
+    /**
+     * Kiosk nav (1.10.0): id of the {@link com.modpack.linktablet.Program}
+     * this screen is showing. 0 (launcher) is the default and is never
+     * persisted — an absent tag boots to Home, including every pre-1.10
+     * kiosk (user decision). Controller-only on merged surfaces, synced
+     * via the update tag like everything else; never travels on the item.
+     */
+    private byte screenProgram;
+    /**
+     * Settable roster (1.10.0): the programs on this tablet's home
+     * screen, in tile order. {@code Program.DEFAULT_HOME} (Signals
+     * only) is the default and is never persisted; travels item↔block
+     * like the theme.
+     */
+    private List<com.modpack.linktablet.Program> homeApps =
+            com.modpack.linktablet.Program.DEFAULT_HOME;
     /** Screen content rotation, quarter turns CW; 0 is never persisted. */
     private int screenRotation;
     /** Custom (anvil) item name (1.8.0); survives the place/pickup trip. */
@@ -76,6 +92,24 @@ public class TabletBlockEntity extends BlockEntity {
     private final Map<Frequency, VirtualTransmitter> transmitters = new HashMap<>();
 
     /**
+     * Gauges (1.10.0 OS suite): read-only dials with their own data
+     * model. Item↔block round-trip like signals; parts stay dormant —
+     * the controller listens for the whole surface.
+     */
+    private List<com.modpack.linktablet.frequency.Gauge> gauges = List.of();
+
+    /** Server-side receivers keyed by listened frequency (1.10.0). */
+    private final Map<Frequency, com.modpack.linktablet.compat.VirtualReceiver> receivers = new HashMap<>();
+
+    /**
+     * Latest received strength per listened frequency. Transient like
+     * the held pips: synced via the update tag (as a per-gauge array),
+     * never written to disk — a fresh load re-registers receivers and
+     * Create pushes current values straight back in.
+     */
+    private final Map<Frequency, Integer> gaugeValues = new HashMap<>();
+
+    /**
      * Momentary pips currently held down, purely for the screen visual.
      * Transient: synced to clients via the update tag but never written
      * to disk, so a crash can't leave a pip stuck lit.
@@ -86,8 +120,8 @@ public class TabletBlockEntity extends BlockEntity {
         super(ModBlockEntities.TABLET.get(), pos, state);
     }
 
-    public List<SignalApp> getApps() {
-        return apps;
+    public List<Signal> getSignals() {
+        return signals;
     }
 
     @Nullable
@@ -131,7 +165,7 @@ public class TabletBlockEntity extends BlockEntity {
         if (changed) syncHeldPips();
     }
 
-    /** Drops every held-pip visual (app reorder invalidates indices). */
+    /** Drops every held-pip visual (signal reorder invalidates indices). */
     public void clearHeldPips() {
         if (heldPips.isEmpty()) return;
         heldPips.clear();
@@ -140,6 +174,35 @@ public class TabletBlockEntity extends BlockEntity {
 
     private void syncHeldPips() {
         // No setChanged: nothing to persist, only clients care
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /** The program this kiosk screen is showing (1.10.0). */
+    public com.modpack.linktablet.Program currentProgram() {
+        return com.modpack.linktablet.Program.byId(screenProgram);
+    }
+
+    /** Kiosk nav: taps mutate this on BOTH sides (vanilla replays the
+     * use-packet), so routing always derives from agreed state. */
+    public void setCurrentProgram(com.modpack.linktablet.Program program) {
+        if (screenProgram == program.id()) return;
+        screenProgram = program.id();
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public List<com.modpack.linktablet.Program> getHomeApps() {
+        return homeApps;
+    }
+
+    public void setHomeApps(List<com.modpack.linktablet.Program> homeApps) {
+        if (this.homeApps.equals(homeApps)) return;
+        this.homeApps = List.copyOf(homeApps);
+        setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
@@ -235,8 +298,8 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
-    public void setApps(List<SignalApp> newApps) {
-        this.apps = List.copyOf(newApps);
+    public void setSignals(List<Signal> newSignals) {
+        this.signals = List.copyOf(newSignals);
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -250,21 +313,102 @@ public class TabletBlockEntity extends BlockEntity {
         return customName;
     }
 
-    /** Copies apps, case color, screen layout, theme, and rotation from the placed item. */
+    // ---- Gauges (1.10.0) ---------------------------------------------
+
+    public List<com.modpack.linktablet.frequency.Gauge> getGauges() {
+        return gauges;
+    }
+
+    public void setGauges(List<com.modpack.linktablet.frequency.Gauge> newGauges) {
+        this.gauges = List.copyOf(newGauges);
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+        refreshReceivers();
+    }
+
+    /**
+     * Reading for one gauge, 0–15. Server: live receiver state. Client:
+     * the last update-tag sync. Non-LINK sources (future) read 0 here.
+     */
+    public int gaugeReading(int index) {
+        if (index < 0 || index >= gauges.size()) return 0;
+        Frequency freq = gauges.get(index).frequency();
+        return gaugeValues.getOrDefault(freq, 0);
+    }
+
+    /** Keeps one receiver per listened frequency (controller only). */
+    private void refreshReceivers() {
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        if (isSurfacePart()) {
+            clearReceivers();
+            return;
+        }
+        Set<Frequency> wanted = new HashSet<>();
+        for (com.modpack.linktablet.frequency.Gauge gauge : gauges) {
+            if (gauge.source() == com.modpack.linktablet.frequency.Gauge.Source.LINK
+                    && !gauge.frequency().isEmpty()) {
+                wanted.add(gauge.frequency());
+            }
+        }
+        Iterator<Map.Entry<Frequency, com.modpack.linktablet.compat.VirtualReceiver>> it =
+                receivers.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            if (!wanted.contains(entry.getKey())) {
+                entry.getValue().removeFromNetwork();
+                gaugeValues.remove(entry.getKey());
+                it.remove();
+            }
+        }
+        for (Frequency freq : wanted) {
+            if (receivers.containsKey(freq)) continue;
+            var receiver = new com.modpack.linktablet.compat.VirtualReceiver(
+                    freq, serverLevel, worldPosition,
+                    power -> onGaugeReading(freq, power));
+            Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(serverLevel, receiver);
+            receivers.put(freq, receiver);
+            // addToNetwork re-evaluates the channel, so the initial
+            // value arrives through the change hook right away
+            gaugeValues.put(freq, receiver.getReceivedStrength());
+        }
+    }
+
+    /** Change hook from a receiver: store + sync (no disk write —
+     * readings are transient, like the held pips). */
+    private void onGaugeReading(Frequency freq, int power) {
+        Integer old = gaugeValues.put(freq, power);
+        if (old != null && old == power) return;
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    private void clearReceivers() {
+        receivers.values().forEach(com.modpack.linktablet.compat.VirtualReceiver::removeFromNetwork);
+        receivers.clear();
+        gaugeValues.clear();
+    }
+
+    /** Copies signals, case color, screen layout, theme, and rotation from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
         this.customName = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
         this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         this.theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         this.screenRotation = stack.getOrDefault(ModDataComponents.SCREEN_ROTATION.get(), 0) & 3;
-        setApps(stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of()));
+        this.homeApps = com.modpack.linktablet.Program.fromIds(
+                stack.get(ModDataComponents.HOME_APPS.get()));
+        setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
+        setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
     }
 
     /** Builds the tablet item this block turns back into. */
     public ItemStack toItemStack() {
         ItemStack stack = new ItemStack(ModItems.TABLET.get());
-        if (!apps.isEmpty()) {
-            stack.set(ModDataComponents.TABLET_APPS.get(), apps);
+        if (!signals.isEmpty()) {
+            stack.set(ModDataComponents.TABLET_SIGNALS.get(), signals);
         }
         if (caseColor != null) {
             stack.set(ModDataComponents.CASE_COLOR.get(), caseColor);
@@ -280,6 +424,13 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (screenRotation != 0) {
             stack.set(ModDataComponents.SCREEN_ROTATION.get(), screenRotation);
+        }
+        if (!homeApps.equals(com.modpack.linktablet.Program.DEFAULT_HOME)) {
+            stack.set(ModDataComponents.HOME_APPS.get(),
+                    com.modpack.linktablet.Program.ids(homeApps));
+        }
+        if (!gauges.isEmpty()) {
+            stack.set(ModDataComponents.TABLET_GAUGES.get(), gauges);
         }
         return stack;
     }
@@ -322,9 +473,9 @@ public class TabletBlockEntity extends BlockEntity {
         return surfaceW * surfaceH;
     }
 
-    /** App cap: every merged member adds a full tablet's worth. */
-    public int maxApps() {
-        return com.modpack.linktablet.network.ModNetworking.MAX_APPS * memberCount();
+    /** Signal cap: every merged member adds a full tablet's worth. */
+    public int maxSignals() {
+        return com.modpack.linktablet.network.ModNetworking.MAX_SIGNALS * memberCount();
     }
 
     /**
@@ -414,8 +565,10 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (isSurfacePart()) {
             clearTransmitters();
+            clearReceivers();
         } else {
             refreshTransmitters();
+            refreshReceivers();
             updateLit();
         }
     }
@@ -433,11 +586,11 @@ public class TabletBlockEntity extends BlockEntity {
         }
 
         Map<Frequency, Integer> wanted = new HashMap<>();
-        for (SignalApp app : apps) {
-            if (!app.active() || app.momentary()) continue;
-            for (Frequency freq : app.frequencies()) {
+        for (Signal signal : signals) {
+            if (!signal.active() || signal.momentary()) continue;
+            for (Frequency freq : signal.frequencies()) {
                 if (!freq.isEmpty()) {
-                    wanted.merge(freq, app.strength(), Math::max);
+                    wanted.merge(freq, signal.strength(), Math::max);
                 }
             }
         }
@@ -472,7 +625,7 @@ public class TabletBlockEntity extends BlockEntity {
         // Parts never own the lit computation; the controller lights
         // the whole surface at once.
         if (isSurfacePart()) return;
-        boolean lit = apps.stream().anyMatch(a -> a.active() && !a.momentary());
+        boolean lit = signals.stream().anyMatch(a -> a.active() && !a.momentary());
         if (isSurfaceController()) {
             BlockState state = getBlockState();
             for (int dx = 0; dx < surfaceW; dx++) {
@@ -506,6 +659,7 @@ public class TabletBlockEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         refreshTransmitters();
+        refreshReceivers();
         // Load-time self-heal against stale roles, whatever their
         // origin (missed removal hooks, lost scheduled ticks): a part
         // whose loaded controller no longer claims it, or a CONTROLLER
@@ -544,12 +698,14 @@ public class TabletBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         clearTransmitters();
+        clearReceivers();
         super.setRemoved();
     }
 
     @Override
     public void onChunkUnloaded() {
         clearTransmitters();
+        clearReceivers();
         super.onChunkUnloaded();
     }
 
@@ -560,9 +716,16 @@ public class TabletBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        if (!apps.isEmpty()) {
-            SignalApp.CODEC.listOf().encodeStart(NbtOps.INSTANCE, apps)
+        if (!signals.isEmpty()) {
+            // NBT key predates the 1.10.0 apps→signals rename and is
+            // FROZEN — renaming it wipes every placed tablet's config
+            Signal.CODEC.listOf().encodeStart(NbtOps.INSTANCE, signals)
                     .result().ifPresent(t -> tag.put("apps", t));
+        }
+        if (!gauges.isEmpty()) {
+            com.modpack.linktablet.frequency.Gauge.CODEC.listOf()
+                    .encodeStart(NbtOps.INSTANCE, gauges)
+                    .result().ifPresent(t -> tag.put("gauges", t));
         }
         if (caseColor != null) {
             tag.putString("case_color", caseColor.getName());
@@ -578,6 +741,14 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (screenRotation != 0) {
             tag.putInt("screen_rotation", screenRotation);
+        }
+        if (screenProgram != 0) {
+            tag.putByte("screen_program", screenProgram);
+        }
+        if (!homeApps.equals(com.modpack.linktablet.Program.DEFAULT_HOME)) {
+            tag.putIntArray("home_apps",
+                    com.modpack.linktablet.Program.ids(homeApps).stream()
+                            .mapToInt(Integer::intValue).toArray());
         }
         if (mountPitch != 0 || mountYaw != 0) {
             tag.putFloat("mount_pitch", mountPitch);
@@ -600,14 +771,23 @@ public class TabletBlockEntity extends BlockEntity {
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        Tag appsTag = tag.get("apps");
-        this.apps = appsTag == null ? List.of()
-                : SignalApp.CODEC.listOf().parse(NbtOps.INSTANCE, appsTag).result().orElse(List.of());
+        Tag signalsTag = tag.get("apps"); // frozen pre-rename key
+        this.signals = signalsTag == null ? List.of()
+                : Signal.CODEC.listOf().parse(NbtOps.INSTANCE, signalsTag).result().orElse(List.of());
+        Tag gaugesTag = tag.get("gauges");
+        this.gauges = gaugesTag == null ? List.of()
+                : com.modpack.linktablet.frequency.Gauge.CODEC.listOf()
+                        .parse(NbtOps.INSTANCE, gaugesTag).result().orElse(List.of());
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
+        this.screenProgram = tag.getByte("screen_program");
+        this.homeApps = tag.contains("home_apps")
+                ? com.modpack.linktablet.Program.fromIds(
+                        java.util.Arrays.stream(tag.getIntArray("home_apps")).boxed().toList())
+                : com.modpack.linktablet.Program.DEFAULT_HOME;
         this.mountPitch = tag.getFloat("mount_pitch");
         this.mountYaw = tag.getFloat("mount_yaw");
         this.customName = tag.contains("custom_name")
@@ -624,6 +804,13 @@ public class TabletBlockEntity extends BlockEntity {
         for (int index : tag.getIntArray("held_pips")) {
             heldPips.add(index);
         }
+        // Gauge readings ride sync tags only (transient like held pips):
+        // a per-gauge int array, mapped back onto the frequencies
+        gaugeValues.clear();
+        int[] readings = tag.getIntArray("gauge_readings");
+        for (int i = 0; i < readings.length && i < gauges.size(); i++) {
+            gaugeValues.put(gauges.get(i).frequency(), readings[i]);
+        }
     }
 
     @Override
@@ -631,6 +818,13 @@ public class TabletBlockEntity extends BlockEntity {
         CompoundTag tag = saveWithoutMetadata(registries);
         if (!heldPips.isEmpty()) {
             tag.putIntArray("held_pips", heldPips.stream().mapToInt(Integer::intValue).toArray());
+        }
+        if (!gauges.isEmpty()) {
+            int[] readings = new int[gauges.size()];
+            for (int i = 0; i < gauges.size(); i++) {
+                readings[i] = gaugeReading(i);
+            }
+            tag.putIntArray("gauge_readings", readings);
         }
         return tag;
     }

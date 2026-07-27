@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -62,7 +62,7 @@ public class CratesScreen extends ArcadeScreen {
     private boolean levelDone;
     private boolean allDone;
 
-    public CratesScreen(AppView view, boolean returnToTablet) {
+    public CratesScreen(SignalView view, boolean returnToTablet) {
         super("crates", view, returnToTablet);
         loadLevel(0);
     }

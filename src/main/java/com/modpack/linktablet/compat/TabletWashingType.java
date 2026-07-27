@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.List;
 
 /**
- * Bulk-washing a dyed tablet strips the case dye but keeps the apps.
+ * Bulk-washing a dyed tablet strips the case dye but keeps the signals.
  * Splashing recipes can't do this — Create's {@code RecipeApplier} rolls
  * fixed recipe outputs without ever seeing the input stack, so a
  * data-driven recipe would wipe the tablet's components.

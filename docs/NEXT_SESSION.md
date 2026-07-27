@@ -48,9 +48,255 @@ at the repo root (auto-loaded every Claude session).
 - Branches: `tablet-overlay` and `main` both pushed and level; tag
   v1.9.0 on the release commit.
 
+## In progress
+
+- **Launcher / tablet OS (1.10.0, session 1 of ~2 done 2026-07-27)** —
+  scope pivot from side-chat handoff, jumped ahead of follow mode by
+  user decision. Plan approved same day (decisions: launcher before
+  follow mode; held GUI RESUMES last program; existing kiosks boot to the
+  LAUNCHER — deliberate tester disruption; kiosk Home = bezel tap;
+  secret games stay off the launcher). SHIPPED IN CODE (session 1
+  verified in dev by the user 2026-07-27 — launcher, resume, Home
+  button, add flow all work): `Program` enum (root pkg, byte ids
+  append-only, 0=launcher never persisted; constant SIGNALS(1,
+  "signals")), `LauncherScreen` (tile label "Signals"),
+  `SignalTilePainter` (tile base extracted from renderSignalTile),
+  ClientHooks nav helpers (openProgram/returnToProgram/openHome/
+  returnHome/openResumed) + all held-GUI call sites rerouted,
+  `ClientPrefs.lastProgram` resume pref, Home house-button on
+  TabletScreen (held/slot views only), lang keys, changelog.
+  PLUS the same-day **apps→signals rename** (user decision, all three
+  layers): code identifiers (SignalApp→Signal, AppView→SignalView,
+  AppEdit*→SignalEdit*, payloads *App*→*Signal*), wire ids
+  (toggle_app→toggle_signal etc., menu app_edit→signal_edit,
+  registrar "13"→"14" — 1.10.0 is now a PAIRING BREAK, user-approved),
+  UI text + DESCRIPTION.md. DISK KEYS FROZEN: component `tablet_apps`,
+  BE NBT `"apps"` (see comments at the write sites). Launcher stays
+  programs-only (no signal pinning — user decision). The open
+  registrar-break window means signal-links (item 3) could batch into
+  1.10.0 — flagged to the user, no decision yet.
+  **Session 2 (kiosk side) IN CODE same day** (build + boot clean,
+  awaiting the user's in-world pass): BE `screen_program` byte
+  (controller-only, 0=launcher never persisted → pre-1.10 kiosks boot
+  Home; synced free via update tag; never on the item), tap routing
+  in `useWithoutItem` right after `resolveController()` — launcher
+  face hit-tests via the EXISTING pip pipeline with
+  `Program.roster().size()` (no separate launcher table; renderer
+  draws synthetic roster tiles through `TabletScreenRenderer.
+  launcherTiles()`, list forced off, held pips suppressed), off-tile
+  launcher taps MUST return to the GUI (falling through would
+  hit-test the invisible signals — guarded, see comment), bezel-tap
+  Home via new `TabletScreenMath.hitBezel` (member UV → continuous
+  coords, outer band only on merged) + `mountedOnBezel` (panel minus
+  wrench-inset glass, same band as the wrench flip). Program switches
+  play the toggle click both ways. Wrench paths untouched.
+  **Settings parity follow-up (same day, from the user's first kiosk
+  test)**: launcher owns the DEVICE features — `HeaderGlyphs` painter
+  extracted (glyphs + theme popup, pixel-shared with TabletScreen),
+  LauncherScreen gained theme/pin/link/grid-list header row (same
+  payloads and sounds; no reorder — that's signals-specific), kiosk
+  launcher-face off-tile taps open the launcher GUI via
+  `ClientHooks.openBlockHome` (NEVER the signals grid), and the
+  signals GUI's Home button now shows on block views too.
+
+## ▶ NEXT SESSION: START HERE — App addon API (user-approved 2026-07-27)
+
+Goal: addon mods register their own tablet programs into the App
+Store. Design points settled in advance (from the 2026-07-27
+exploration; refine before coding):
+
+- **Identity**: addon programs persist by STABLE STRING KEY, not int
+  id — the int-id space (0–6 used) stays this mod's. Implication: the
+  `home_apps` component/NBT (int list) needs a parallel string list
+  (or a v2 format with the int form decoded forever — the frequency
+  LEGACY_CODEC precedent). The kiosk `screen_program` byte likewise
+  (string key alongside, byte kept for built-ins).
+- **Registration**: a `ProgramProvider`-style interface (key, name,
+  description, tile chip color + icon, screen factory, optional
+  overlay-content factory, optional kiosk-face renderer) + a
+  registration event or registry. `Program` enum stays for built-ins;
+  a wrapper table unifies enum + addons for launcher/store/roster
+  code (today's `Program.apps()` call sites become the seam).
+- **Store**: addon rows appear automatically (they're the point);
+  store gains scrolling once the shelf outgrows the 240 budget.
+- **Kiosk**: addon faces default to the label face; the face renderer
+  hook must respect the three-pass batching rule — DOCUMENT it in the
+  API javadoc or every addon will crash the shared buffer.
+- **Overlay**: addon OverlayContent slots into the `@<key>` pin
+  descriptor for free (parse already falls back gracefully).
+- **Nav sync**: SetProgramPayload carries an int id — needs the
+  string-key variant for addons.
+- API = public commitment: put it in a dedicated `api/` package,
+  document append-only rules, and version it in the jar manifest or a
+  constant. Half the session is design review with the user before
+  code.
+
+## OS suite S6 (in-world regression pass — still owed)
+
+- **EVERYTHING IS UNCOMMITTED on `tablet-overlay`** — two huge days
+  (2026-07-27): launcher held+kiosk, apps→signals rename (wire ids
+  renamed, disk keys "apps"/"tablet_apps" FROZEN — comments at the
+  write sites), settings parity, roster S1, **and the whole OS suite
+  S2–S5 (Clock, Calculator, program-aware overlay, Gauges
+  server+client)** — registrar now "15". Commit only when the user
+  asks; if asked, suggest logical splits (launcher+rename / roster /
+  clock / calc+overlay / gauges / docs).
+- **S1–S5 are IN CODE, build clean, NOT user-tested in-world.**
+  What S2–S5 added (all `./gradlew build` green 2026-07-27):
+  - **Clock (S2)**: `client/ClockService` (client-tick manager —
+    alarms/timer/stopwatch ring with no GUI open, wall-clock epochs in
+    ClientPrefs `clock.*`), `ClockScreen` (tabs Alarm|Clock|Timer|
+    Stopwatch + per-app pin button), `ZonePickerOverlay` (searchable
+    ~600 ZoneIds), kiosk digital face (`renderClockFace`, text pass
+    only; the shared background lives in `beginScreen`, extracted).
+    Kiosk glass tap on ANY non-signals program face opens its screen
+    client-side (generic branch in TabletBlock right after the bezel
+    check — MUST return, or the invisible signals get hit-tested).
+  - **Calculator (S3)**: `CalculatorScreen` — BigDecimal immediate
+    execution, chrome pad + keyboard entry, session-static state.
+    Kiosk face = generic `renderLabelFace` (program name as the door
+    label; also covers any future program without a bespoke face).
+  - **Program-aware overlay (S3)**: `OverlayContent` interface;
+    MiniTabletWindow is now chrome-only and hosts
+    `SignalsOverlayContent` (classic rows, interaction state migrated
+    verbatim) / `ClockOverlayContent` / `GaugesOverlayContent`. Pin
+    descriptor grew `@<programKey>` (`slot:3@clock`; absent = signals,
+    so pre-1.10 pins restore untouched); `OverlayPin.pin/isPinned`
+    take a Program (signals shorthands kept for the old call sites).
+    Right-click the window opens the pinned program's screen.
+  - **Gauges (S4+S5)**: `frequency/Gauge` (SOURCE enum append-only,
+    LINK first; hand-rolled stream codec from day one),
+    `tablet_gauges` component + BE NBT `gauges` + item↔block
+    round-trip, `compat/VirtualReceiver` (isListening=true, Create
+    pushes strength in, range-gated by position) +
+    `compat/TabletReceiverHandler` (player-inventory scan, receivers
+    ride the player, full-snapshot **GaugeReadingsPayload — the mod's
+    FIRST playToClient**, 4-tick cadence + change guard, never on item
+    components). The BE runs its own receivers (controller-only;
+    readings sync via update-tag `gauge_readings` int array, transient
+    like held pips — kiosk dials show what a link AT THE BLOCK hears).
+    Client: `ClientGaugeReadings` store, `GaugesScreen` (dial grid +
+    modal editor: name box, two 18px ghost slots via PickerOverlay,
+    the signal editor's 16-swatch palette, save/delete →
+    Upsert/RemoveGaugePayload), `GaugeDialPainter` (GUI fills) and
+    `renderGaugesFace` (world quads: tick arc + rotated needle quad,
+    then text — three-pass rule holds).
+- **Feedback round 1 (same day, from the user's first test pass) —
+  IN CODE, build clean**: (a) kiosk follows GUI navigation —
+  `SetProgramPayload` (registrar "15"→"16"), sent from
+  `ClientHooks.showProgram` on Block views; (b) the pin pins the
+  screen you're on — launcher pin pins a LAUNCHER app-dock overlay
+  (`LauncherOverlayContent`), calculator got a pin + working mini-pad
+  overlay (`CalculatorOverlayContent`; model extracted to
+  `CalcEngine`, session-static, shared by screen/overlay/kiosk);
+  (c) the Home screen honors the grid/list toggle; (d) the kiosk
+  calculator face shows the LIVE tape (`renderCalcFace` — the bare
+  label face read as "nothing renders"; label face stays as the
+  fallback for future programs); (e) **the app drawer is GONE**,
+  replaced by the **App Store**: `Program.STORE(5)` (GUI-only door —
+  never on the roster, never on the kiosk launcher face), permanent
+  last tile on the launcher, `StoreScreen` shelves `Program.apps()`
+  with descriptions (`program.linktablet.<key>.desc`) and Get/Remove
+  over the same SetHomeAppsPayload. **User loves the ADDON API idea**
+  — other mods shelving programs into the store — parked as a roadmap
+  item below.
+- **Feedback round 2 (same day, second test pass) — IN CODE, build
+  clean**: (a) kiosk LAUNCHER faces honor list mode — new
+  `plainRows` flag on TabletScreenRenderer.render (rows without the
+  switch mechanism; text runs full width) + the TabletBlock launcher
+  hit-test now passes `isScreenList()` (both sides synced; ≤5 roster
+  apps fit the 5-row standalone list exactly); (b) **the Arcade went
+  public**: `Program.ARCADE(6)` (Linked Controller icon, teal chip),
+  `ArcadeHubScreen` (scrollable 19-game shelf with best scores; hub
+  launches set `ArcadeScreen.setReturnProgram(ARCADE)` so ESC returns
+  to the shelf — secret-pip launches still return to the signals
+  grid, the easter egg lives), shelved in the App Store. Game titles
+  stay literals; CHANGELOG deliberately stays silent about the games
+  (the store row is the in-game announcement) — the user can overrule.
+- **Round 3 (same day; user: "everything works" after pass 2, then
+  asked for this before committing) — IN CODE, build+boot clean**:
+  **every game is its OWN app.** The Arcade hub (Program id 6,
+  ArcadeHubScreen) was DELETED — id 6 is RETIRED, never reuse
+  (dev-world rosters may carry it; fromIds drops it gracefully).
+  19 game Programs, ids 7–25, `game=true` flag (key == SecretGames
+  dispatch id == best-score pref key — frozen); launched via
+  `SecretGames.createApp` (ESC → Home; secret-pip launches still
+  return to the signals grid). Each has a public lang name + store
+  description now (cabinet titles stay literals). LauncherScreen and
+  StoreScreen both gained SCROLLING (24-program catalog);
+  SetHomeAppsPayload's sanity cap 16→64. CHANGELOG still says nothing
+  about the games (policy; user can overrule).
+- **S6 user test matrix** (also re-verify both feedback rounds):
+  - Launcher/roster: drawer shows Clock+Calculator+Gauges, add/remove
+    tiles, right-click remove, kiosk roster face + tile taps.
+  - Clock: alarm rings with GUI closed, timer rings after a game
+    restart (wall-clock end stamp), stopwatch keeps running across
+    relog, zone search + right-click remove, kiosk wall clock incl.
+    merged + mounted, clock overlay pin.
+  - Calculator: pad + keyboard, divide-by-zero → Error, reopen keeps
+    the sum.
+  - Gauges: create a dial (needs ≥1 frequency item), value follows a
+    real Redstone Link transmitter, range gating (walk away), kiosk
+    dials show the BLOCK's reception not the player's, overlay HUD
+    pin, dedicated-server pass (first playToClient!), two accounts.
+  - Regressions: signals grid/list/reorder/sliders/momentary/timer,
+    merged surfaces, mounted taps, secret games, JEI/EMI drags,
+    pre-1.10 world upgrade (kiosks boot to launcher, old pins fine).
+- CHANGELOG "Unreleased" already covers the whole suite. Listing text
+  (DESCRIPTION.md) still describes 1.9.0 — refresh it before release.
+
+## OS suite (1.10.0 — HELD until the whole suite is in; approved plan
+## 2026-07-27, decisions locked)
+
+User decisions: settable per-tablet roster (Android home + app drawer,
+default = Signals only); Clock app WITH alarms + world clock (all real
+timezones, searchable) + timer + stopwatch; Calculator; **Gauges as a
+SEPARATE app** (own data model — future sources: velocity etc., custom
+vehicle HUDs); pin option 3 = program-aware overlay (per-app pin;
+pinned gauges = the vehicle HUD). Launcher tile dress lives ON the
+Program enum (chipColor/iconItem). Reserved ids: 2=clock,
+3=calculator, 4=gauges.
+
+- **S1 settable roster — IN CODE 2026-07-27** (build+boot clean,
+  awaiting user pass): `home_apps` component (INT list, absent =
+  DEFAULT_HOME=[SIGNALS], never written at default) + BE NBT int array
+  + item↔block round-trip; `SetHomeAppsPayload` (fromIds sanitizes:
+  unknown/LAUNCHER dropped, dedupe, empty→default; handler mirrors
+  handleSetTheme's both-target shape); `SignalView.homeApps()` per
+  view; LauncherScreen: drawer button (3×3 dots glyph, leftmost) +
+  drawer modal (rows with on-home checkmark, taps toggle + drawer
+  stays open, last app can't be removed) + right-click tile removes
+  (actionbar toast); kiosk face + hit-test read the home list
+  (launcherTiles(home) synthetic signals).
+- **S2 Clock — IN CODE 2026-07-27** (build clean, awaiting user pass):
+  ClockService, ClockScreen, ZonePickerOverlay, kiosk digital face,
+  rings with GUI closed.
+- **S3 Calculator + program-aware overlay — IN CODE 2026-07-27**:
+  CalculatorScreen; OverlayContent split (Signals/Clock/Gauges
+  contents), `@program` pin descriptor suffix, per-app pin buttons.
+- **S4 Gauges server — IN CODE 2026-07-27**: Gauge model,
+  `tablet_gauges` component + BE NBT, VirtualReceiver +
+  TabletReceiverHandler, GaugeReadingsPayload (first playToClient),
+  registrar "15".
+- **S5 Gauges client — IN CODE 2026-07-27**: GaugesScreen + modal
+  editor, GaugeDialPainter, kiosk dial face, overlay HUD content.
+- **S6 suite regression — NEXT** (full matrix incl. pre-1.10 world,
+  dedicated server, two accounts) + listing docs; release stays
+  user-gated. See the START HERE section for the test matrix.
+
 ## Next session
 
-1. **Redstone follow mode (queued 2026-07-22, user-requested)** — a
+0. **App addon API (user-approved idea 2026-07-27, timing open)** —
+   let addon mods register their own tablet programs into the App
+   Store. Sketch: a registration hook (Program moves from enum to a
+   registry-ish table, or a parallel `ProgramProvider` interface the
+   enum delegates to), stable string ids for addon programs (the
+   int-id space stays ours; addon roster entries persist by KEY not
+   id), a client API for screen/overlay/kiosk-face providers, and
+   store metadata (name/desc/icon). Big design surface — own session,
+   and it cements public API, so design carefully before shipping.
+1. **Redstone follow mode (queued 2026-07-22, user-requested; now ships
+   AFTER the launcher, user decision 2026-07-27)** — a
    POWERED mounted tablet tracks the nearest player like the
    enchanting-table book. Design agreed: SERVER-driven (the mount
    pitch/yaw feed renderer AND hit-test — a client-only cosmetic
@@ -65,23 +311,24 @@ at the repo root (auto-loaded every Claude session).
    shoot)** — rewrite DESCRIPTION.md's "recipe" section (~184-194) to
    the manufacturing story and replace recipe.png with an
    assembly-line or JEI-chain shot; then paste to both listings.
-3. **App links — apps toggling other apps (scoped 2026-07-25)** —
-   state-level linking: tapping app A also flips B (tile lights,
-   transmits B's own strength/freqs). NOTE apps are already
+3. **Signal links — signals toggling other signals (scoped
+   2026-07-25 as "app links", renamed with the 1.10.0 rename)** —
+   state-level linking: tapping signal A also flips B (tile lights,
+   transmits B's own strength/freqs). NOTE signals are already
    multi-frequency scene buttons (8 freqs) — shared freqs cover
    "one tap, many outputs" today; this feature is the visible state
-   sync. Design: stable per-app id + link list (target id + mode
-   on/off/follow) — two new SignalApp fields (optionalFieldOf,
-   extend the HAND-ROLLED stream codec) → registrar bump = its own
-   pairing break (missed the 1.9.0 window; batch with the next
-   registry/payload-breaking release).
+   sync. Design: stable per-signal id + link list (target id + mode
+   on/off/follow) — two new Signal fields (optionalFieldOf,
+   extend the HAND-ROLLED stream codec) → registrar bump = pairing
+   break. **1.10.0 is already a break (registrar "14") — batching
+   this into 1.10.0 is free**; flagged to the user, no decision yet.
    Propagation: one shared helper at the two mutation sites
    (ModNetworking toggle handler ~:508, TabletBlock tap ~:413),
    single pass + visited set (kills loops, allows chains). v1
    targets: toggles + timers only (momentary transient, sliders
    excluded or "on = max"). UI is half the cost: edit screen has NO
    vertical room (240 budget) → "Links" chip opens a PickerOverlay
-   listing other apps, cycling none/on/off/follow; tiny procedural
+   listing other signals, cycling none/on/off/follow; tiny procedural
    chain glyph on linked tiles. ~1-2 sessions.
 4. **Sable / Create Aeronautics compat (investigate on demand)** —
    tablets on Sable sublevels (Aeronautics ships): prediction from
@@ -112,8 +359,8 @@ at the repo root (auto-loaded every Claude session).
 
 ## Parked (don't propose unless the user re-raises)
 
-- **Factory gauges / data apps** — parked 2026-07-22 ("just a
-  thought"). Scoped in-session, three tiers: (1) Gauge app type that
+- **Factory gauges / data programs** — parked 2026-07-22 ("just a
+  thought"). Scoped in-session, three tiers: (1) Gauge signal type that
   LISTENS on a link frequency and shows received 0–15 as a dial —
   flips the existing transmitter compat, works held + overlay,
   ~1-2 sessions, needs a lightweight value-sync payload → registrar
@@ -121,7 +368,7 @@ at the repo root (auto-loaded every Claude session).
   Create's display sources for free on placed/merged screens,
   ~1 session basic; (3) bespoke deep readouts (stress graphs, vault
   browsing) — REJECTED, competes with Create's display system.
-  Client-only utility apps (clock, calculator) cost what a game costs.
+  Client-only utility programs (clock, calculator) cost what a game costs.
 - **Icon-friendly defaults** — parked 2026-07-21 (was on hold for
   tester intel that never firmed up). Analysis in
   `docs/ICON_DEFAULTS_SCOPING.md` if it comes back.

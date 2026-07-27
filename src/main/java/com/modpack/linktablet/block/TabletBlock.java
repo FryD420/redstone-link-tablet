@@ -1,8 +1,9 @@
 package com.modpack.linktablet.block;
 
+import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.compat.TabletTransmitterHandler;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModBlocks;
 import com.modpack.linktablet.registry.ModItems;
@@ -45,9 +46,9 @@ import java.util.List;
 
 /**
  * A tablet mounted on a wall, floor (table), or ceiling. Right-click to
- * open the same app GUI as the item; sneak + right-click with an empty
+ * open the same signal GUI as the item; sneak + right-click with an empty
  * hand to pick it back up with all its data. Transmits from its own
- * position while any app is on (LIT blockstate lights the screen).
+ * position while any signal is on (LIT blockstate lights the screen).
  */
 public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implements EntityBlock, IWrenchable {
 
@@ -303,8 +304,8 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
-        // Tap directly on an app's pip on the screen: toggle it without
-        // opening the GUI. Runs identically on both sides (apps are
+        // Tap directly on a signal's pip on the screen: toggle it without
+        // opening the GUI. Runs identically on both sides (signals are
         // synced and the server receives the client's exact hit vec),
         // so client and server always agree on pip-vs-GUI.
         if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
@@ -317,26 +318,91 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 return InteractionResult.CONSUME;
             }
             BlockPos controllerPos = target.getBlockPos();
-            List<SignalApp> apps = target.getApps();
+
+            // Kiosk launcher (1.10.0): the screen's current program
+            // routes the tap, derived ONLY from synced BE state so both
+            // sides route identically (the pip invariant, extended).
+            // The launcher face renders through the exact signal-grid
+            // pipeline with the roster as its entries, so its hit test
+            // IS the pip hit test with the roster count — one layout
+            // table, nothing to drift.
+            if (target.currentProgram() == Program.LAUNCHER) {
+                // The tile grid is the TABLET's home roster (1.10.0
+                // settable roster) — synced BE data, so both sides
+                // compute the same layout
+                // List mode counts here too (test pass 2): the renderer
+                // draws roster rows through the same list table
+                java.util.List<Program> home = target.getHomeApps();
+                TabletScreenMath.PipHit tile = be.isMounted()
+                        ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
+                                hitResult.getLocation(), home.size(), target.isScreenList(),
+                                target.effectiveRotation())
+                        : TabletScreenMath.hitPipDetailed(state, pos, hitResult,
+                                home.size(), target.isScreenList(), target.effectiveRotation(),
+                                be.getSurfaceDx(), be.getSurfaceDy(),
+                                target.getSurfaceW(), target.getSurfaceH());
+                if (tile != null) {
+                    if (!level.isClientSide) {
+                        target.setCurrentProgram(home.get(tile.index()));
+                        ModNetworking.playToggleClick(level, null, pos, true);
+                    }
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
+                // Off-tile launcher taps (bezel, glass margins) open the
+                // LAUNCHER GUI — the device settings menu, never the
+                // signals grid (user decision after the first kiosk
+                // test). MUST return here: falling through would
+                // hit-test the INVISIBLE signals.
+                if (level.isClientSide) {
+                    ClientHooks.openBlockHome(controllerPos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            } else if (be.isMounted()
+                    ? mountedOnBezel(be, player, hitResult)
+                    : TabletScreenMath.hitBezel(state, pos, hitResult,
+                            be.getSurfaceDx(), be.getSurfaceDy(),
+                            target.getSurfaceW(), target.getSurfaceH())) {
+                // A program showing: a bezel tap goes Home (1.10.0
+                // gesture — glass is content, the ring is nav). Wrench
+                // paths are separate methods and keep their bezel
+                // meanings.
+                if (!level.isClientSide) {
+                    target.setCurrentProgram(Program.LAUNCHER);
+                    ModNetworking.playToggleClick(level, null, pos, false);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            } else if (target.currentProgram() != Program.SIGNALS) {
+                // Non-signals program face (1.10.0 suite — clock etc.):
+                // the glass is a window into a client-side program, so a
+                // tap opens its screen client-side (the secret-game
+                // precedent) — MUST return here, or the tap would
+                // hit-test the INVISIBLE signals underneath.
+                if (level.isClientSide) {
+                    ClientHooks.openBlockProgram(target.currentProgram(), controllerPos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
+
+            List<Signal> signals = target.getSignals();
             // Mounted tablets (1.8.0): the hit location sits on the
             // COARSE voxel box, so re-intersect the eye ray with the
             // actual angled glass plane instead (both sides derive the
             // basis from the same synced pitch/yaw).
             TabletScreenMath.PipHit pipHit = be.isMounted()
                     ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
-                            hitResult.getLocation(), apps.size(), target.isScreenList(),
+                            hitResult.getLocation(), signals.size(), target.isScreenList(),
                             target.effectiveRotation())
                     : TabletScreenMath.hitPipDetailed(state, pos, hitResult,
-                            apps.size(), target.isScreenList(), target.effectiveRotation(),
+                            signals.size(), target.isScreenList(), target.effectiveRotation(),
                             be.getSurfaceDx(), be.getSurfaceDy(),
                             target.getSurfaceW(), target.getSurfaceH());
 
             // 🕹️ Secret-game shortcuts are client-side programs, not
             // signals: their pip is inert on the server, and the client
-            // opens the game GUI. Checked before every app type so the
-            // disguise works whatever shape the app was saved in.
+            // opens the game GUI. Checked before every signal type so the
+            // disguise works whatever shape the signal was saved in.
             if (pipHit != null) {
-                String game = apps.get(pipHit.index()).secretGameId();
+                String game = signals.get(pipHit.index()).secretGameId();
                 if (game != null) {
                     if (level.isClientSide) {
                         ClientHooks.openSecretGame(game, controllerPos);
@@ -351,23 +417,23 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             // drives the drag (BlockSliderDrag), projecting the look-ray
             // onto the screen plane every tick so sliding keeps working
             // past the tablet's edge. CONSUME: no arm swing.
-            if (pipHit != null && apps.get(pipHit.index()).slider()) {
+            if (pipHit != null && signals.get(pipHit.index()).slider()) {
                 int index = pipHit.index();
                 if (level.isClientSide) {
                     ClientHooks.startBlockSliderDrag(pos, controllerPos, index);
                 } else {
-                    SignalApp app = apps.get(index);
-                    float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
+                    Signal signal = signals.get(index);
+                    float[] bar = TabletScreenMath.surfaceSliderBarU(index, signals.size(),
                             target.isScreenList(), target.effectiveRotation(),
                             target.getSurfaceW(), target.getSurfaceH());
                     float frac = net.minecraft.util.Mth.clamp(
                             (pipHit.logicalU() - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
-                    SignalApp updated = app.withSliderValue(app.valueFromFraction(frac));
-                    if (updated.strength() != app.strength()) {
-                        boolean wasOn = app.strength() > 0;
-                        List<SignalApp> updatedApps = new ArrayList<>(apps);
-                        updatedApps.set(index, updated);
-                        target.setApps(updatedApps);
+                    Signal updated = signal.withSliderValue(signal.valueFromFraction(frac));
+                    if (updated.strength() != signal.strength()) {
+                        boolean wasOn = signal.strength() > 0;
+                        List<Signal> updatedSignals = new ArrayList<>(signals);
+                        updatedSignals.set(index, updated);
+                        target.setSignals(updatedSignals);
                         if (wasOn != (updated.strength() > 0)) {
                             ModNetworking.playToggleClick(level, null, pos, updated.strength() > 0);
                         }
@@ -378,8 +444,8 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
 
             if (pipHit != null) {
                 int index = pipHit.index();
-                SignalApp app = apps.get(index);
-                if (app.timed()) {
+                Signal signal = signals.get(index);
+                if (signal.timed()) {
                     // Tap starts (or restarts) the timed pulse; the
                     // expiry loop ends it and plays the off-click.
                     // SUCCESS (unlike momentary's CONSUME) so the tap
@@ -388,12 +454,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     // keeps the clock topped up.
                     if (!level.isClientSide) {
                         TabletTransmitterHandler.startTimed(player, true, controllerPos, index,
-                                app.frequencies(), app.strength(), app.pulseTicks());
+                                signal.frequencies(), signal.strength(), signal.pulseTicks());
                         ModNetworking.playToggleClick(level, null, pos, true);
                     }
                     return InteractionResult.sidedSuccess(level.isClientSide);
                 }
-                if (app.momentary()) {
+                if (signal.momentary()) {
                     // Tap-and-hold: holding right-click repeats the use
                     // action, refreshing a self-expiring hold — the
                     // signal drops shortly after letting go. CONSUME
@@ -401,7 +467,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     // feedback is the click sound and the lit pip.
                     if (!level.isClientSide) {
                         boolean newPress = TabletTransmitterHandler.pressBlockPip(player, controllerPos,
-                                index, app.frequencies(), app.strength(), level.getGameTime());
+                                index, signal.frequencies(), signal.strength(), level.getGameTime());
                         if (newPress) {
                             ModNetworking.playToggleClick(level, null, pos, true);
                         }
@@ -409,12 +475,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     return InteractionResult.CONSUME;
                 }
                 if (!level.isClientSide) {
-                    List<SignalApp> updated = new ArrayList<>(apps);
-                    updated.set(index, app.withActive(!app.active()));
-                    target.setApps(updated);
+                    List<Signal> updated = new ArrayList<>(signals);
+                    updated.set(index, signal.withActive(!signal.active()));
+                    target.setSignals(updated);
                     // Unlike the GUI path, the clicker has no UI sound
                     // here, so nobody is excluded.
-                    ModNetworking.playToggleClick(level, null, pos, !app.active());
+                    ModNetworking.playToggleClick(level, null, pos, !signal.active());
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
             }
@@ -558,6 +624,16 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         return uv != null
                 && uv[0] >= TabletScreenMath.GLASS_U0 + 1 && uv[0] < TabletScreenMath.GLASS_U1 - 1
                 && uv[1] >= TabletScreenMath.GLASS_V0 + 1 && uv[1] < TabletScreenMath.GLASS_V1 - 1;
+    }
+
+    /** Mounted bezel ring for the bare-hand Home tap (1.10.0): on the
+     * panel but off the (wrench-inset) glass — the same band the wrench
+     * uses for its landscape flip, so the two gestures agree on edges. */
+    private static boolean mountedOnBezel(TabletBlockEntity be, Player player,
+                                          BlockHitResult hitResult) {
+        double[] uv = TabletScreenMath.mountedUV(be.mountBasis(), player.getEyePosition(),
+                hitResult.getLocation().subtract(player.getEyePosition()));
+        return mountedOnPanel(uv) && !mountedOnGlass(uv);
     }
 
     @Override

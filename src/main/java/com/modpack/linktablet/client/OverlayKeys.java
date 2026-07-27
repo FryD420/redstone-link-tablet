@@ -4,7 +4,6 @@ import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.client.screen.MiniTabletWindow;
 import com.modpack.linktablet.client.screen.NoteWindows;
 import com.modpack.linktablet.client.screen.OverlayFocusScreen;
-import com.modpack.linktablet.client.screen.TabletScreen;
 import com.modpack.linktablet.item.TabletItem;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
@@ -65,8 +64,7 @@ public final class OverlayKeys {
             } else {
                 int slot = firstTabletSlot();
                 if (slot >= 0) {
-                    UISounds.open();
-                    mc.setScreen(new TabletScreen(new AppView.Slot(slot)));
+                    ClientHooks.openResumed(new SignalView.Slot(slot));
                 } else {
                     player.displayClientMessage(
                             Component.translatable("message.linktablet.no_tablet"), true);

@@ -17,15 +17,15 @@ from one screen, anywhere in link range. Mount tablets side by side and they mer
 into one **wall-sized display**; pin a **mini-tablet to your HUD** and flip switches
 without ever opening a GUI.
 
-![The tablet GUI over a floating-island vista — a slider, a timer, and toggle apps in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
+![The tablet GUI over a floating-island vista — a slider, a timer, and toggle signals in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
 
-## Apps, not levers
+## Signals, not levers
 
-- **Up to 32 apps per tablet** (and 32 more per tablet on merged multi-tablet
+- **Up to 32 signals per tablet** (and 32 more per tablet on merged multi-tablet
   screens), each with a name, color, an optional item icon, and its own state —
   shown as an icon grid or a list of toggle switches, with drag-to-rearrange in
   both layouts.
-- **Four app types**, cycled right in the editor:
+- **Four signal types**, cycled right in the editor:
   - **Toggle** — classic on/off with a persistent state.
   - **Hold** — transmits only while you hold the button. Doorbells, dispensers,
     one-shot pulses — a disconnect can never leave the signal stuck on.
@@ -33,9 +33,9 @@ without ever opening a GUI.
     trains, meter item flow.
   - **Timer** — tap it and it transmits for a set time (0.1 s to 30 s), then
     switches off by itself. Tap again to restart the clock.
-- **Scenes** — one app can drive up to 8 frequencies at once ("Shut down the
+- **Scenes** — one signal can drive up to 8 frequencies at once ("Shut down the
   factory", "Open all doors").
-- **Per-app signal strength** — when several apps drive the same frequency, the
+- **Per-signal strength** — when several signals drive the same frequency, the
   strongest wins, exactly like stacked Redstone Links.
 
 You can see all of them working in the screenshot above — a slider mid-drag, a
@@ -43,10 +43,10 @@ timer, and toggles side by side.
 
 ## Real Create frequencies
 
-Apps tune to Create's item-pair frequencies — anything a Redstone Link or Linked
+Signals tune to Create's item-pair frequencies — anything a Redstone Link or Linked
 Controller can trigger, the tablet can too:
 
-- The app editor includes **your real inventory** with vanilla drag mechanics:
+- The signal editor includes **your real inventory** with vanilla drag mechanics:
   drop an item on the frequency slots (they take a copy — nothing is consumed),
   or use the searchable all-items picker for things you don't carry.
 - Running **JEI or EMI**? Drag an item straight from the ingredient panel onto
@@ -69,7 +69,7 @@ that machine never fully turns off.
 
 ## Sticky notes for your factory
 
-Every app can carry a free-text note, opened from a little glyph on its tile.
+Every signal can carry a free-text note, opened from a little glyph on its tile.
 Notes are **floating windows**: drag them by the title bar, open several at once,
 and they stay with you — over the tablet, over your inventory and other screens
 (fully editable there), and pinned read-only on your HUD while you play. They
@@ -80,7 +80,7 @@ you can see two of them pinned in the screenshot up top.
 ## Pin it to your HUD
 
 The pin button in the tablet GUI keeps a **floating mini-tablet on your screen
-while you play** — live app rows with real switches, draggable anywhere, and it
+while you play** — live signal rows with real switches, draggable anywhere, and it
 remembers its spot and pin across sessions. Press the **"Use Pinned Tablet" key
 (default B)** to free your mouse chat-style and tap toggles, drag sliders, or
 hold buttons — mid-mining, mid-flight, no GUI ever opens. It's also clickable
@@ -96,13 +96,13 @@ carried one and it follows the item around your inventory.
 
 ## The screen is real
 
-The tablet's physical screen isn't a texture — it renders your actual apps,
-live, on both the held and the placed tablet. Tiles size themselves to the app
-count (one app fills the whole glass; a full tablet converges on a dense grid),
-active apps glow, timers glow for as long as their pulse runs, and each tablet
+The tablet's physical screen isn't a texture — it renders your actual signals,
+live, on both the held and the placed tablet. Tiles size themselves to the signal
+count (one signal fills the whole glass; a full tablet converges on a dense grid),
+active signals glow, timers glow for as long as their pulse runs, and each tablet
 remembers whether you last used it in grid or list view.
 
-And on a placed tablet, **the screen is touchable**: tap an app right on the
+And on a placed tablet, **the screen is touchable**: tap a signal right on the
 glass to toggle it, hold a Hold button, slide a slider — no GUI needed. Tap the
 bezel for the full interface.
 
@@ -110,7 +110,7 @@ bezel for the full interface.
 
 Sneak + right-click any surface to mount the tablet on a wall, floor, or
 ceiling — it becomes a block that transmits from its own position while the
-chunk is loaded, and its screen glows whenever an app is running. Sneak +
+chunk is loaded, and its screen glows whenever a signal is running. Sneak +
 right-click with an empty hand picks it back up; everything survives the trip.
 
 Got a Create wrench? Wrench the glass to rotate the screen content 90°, wrench
@@ -144,20 +144,20 @@ consoles in front of one.
 Mount tablets side by side — same wall, floor, or ceiling; new ones
 auto-match their neighbor's orientation — and they **merge into one big
 display, up to 4 wide by 3 tall**: a single continuous glass panel with a
-case-colored bezel frame and no seams. Your apps spread across the whole
+case-colored bezel frame and no seams. Your signals spread across the whole
 surface at bigger tiles, taps and click-and-slide work anywhere on the
 glass, list rows run its full width, the entire wall lights up together —
-and every merged tablet raises the app cap by another 32. Dye the lead
+and every merged tablet raises the signal cap by another 32. Dye the lead
 tablet and the whole frame dyes; wrench the glass and the whole screen's
 content rotates.
 
-Merging is always safe: every tablet keeps its own apps dormant and gets
+Merging is always safe: every tablet keeps its own signals dormant and gets
 them back the moment it's split off. And it's always your choice — a
 **chain-link button** in the screen header breaks a merged surface back
 into independent tablets, or keeps a single tablet standalone so you can
 build a bank of separate dashboards side by side.
 
-<!-- 📸 SCREENSHOT: a merged tablet wall (3×2 or 4×3) in a factory setting, dyed bezel, a good mix of app tiles — the new hero candidate; bonus if a hand is mid-tap on the glass -->
+<!-- 📸 SCREENSHOT: a merged tablet wall (3×2 or 4×3) in a factory setting, dyed bezel, a good mix of signal tiles — the new hero candidate; bonus if a hand is mid-tap on the glass -->
 
 ## Make it yours
 
@@ -165,12 +165,12 @@ build a bank of separate dashboards side by side.
   and Avionics — stored per tablet, recoloring the GUI and the physical screen
   for everyone. The whole interface is styled in Create's own visual language:
   wooden rails, parchment plaques, beveled buttons.
-- **16 dyed cases** — craft the tablet with any dye to recolor it, apps
+- **16 dyed cases** — craft the tablet with any dye to recolor it, signals
   preserved, re-dye whenever. Dunk it in a water cauldron (or an encased fan's
   washing stream) to strip the dye again.
 - **A full set of UI sounds** — toggle clicks with distinct on/off pitch, a save
   chime, frequency ticks, and a faint click nearby players hear when someone
-  flips an app.
+  flips a signal.
 - **Name your tablets** — rename one on an anvil and the name becomes its title
   in the GUI and on the pinned overlay. "Smeltery", "Train Yard", "Base
   Defense" — the name survives placing and picking up.
@@ -200,7 +200,7 @@ lives in the vanilla Redstone creative tab too.)
 
 Then:
 
-1. **Right-click** to open the tablet, tap **+** to create an app.
+1. **Right-click** to open the tablet, tap **+** to create a signal.
 2. Pick the frequency items (exactly like tuning a Redstone Link) and hit
    **Add** — repeat to stack a scene — then **Save**.
 3. Set your receiving Redstone Links to the same frequency.
@@ -209,7 +209,7 @@ Then:
 There's also a **Ponder scene** — hold W over the tablet item — that walks
 through mounting, linking, and the quick-add shortcut.
 
-While an app is on and the tablet is anywhere in your inventory, you are the
+While a signal is on and the tablet is anywhere in your inventory, you are the
 transmitter — range and chunk behavior match Create's handheld Linked
 Controller. Mounted tablets transmit from the block instead.
 
@@ -251,9 +251,9 @@ Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-li
 ### 1.6.0 shoot — done (2026-07-19, FryD42 + wife), embedded above:
 
 - ✅ **hero4.png** — GUI + floating notes over the island vista; the list shows
-  a slider (with numeric readout), a timer, a hold app, and an active toggle,
+  a slider (with numeric readout), a timer, a hold signal, and an active toggle,
   so it covers the notes AND gui-home slots too. (`hero3.png` was the earlier
-  take without the app-type variety — prune it.)
+  take without the signal-type variety — prune it.)
 - ✅ **mounted-factory2.png** — shaded factory hall, wall tablet in list mode.
 - ✅ **themes.png** — 2×2 stitch of Dark/Light/Parchment/Avionics (sources:
   `theme1–4.png`, same framing, GUI crop at 705,325 510×440 — safe to delete

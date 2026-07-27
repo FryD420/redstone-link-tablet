@@ -127,7 +127,7 @@ public final class IconTool {
         g.fill(new RoundRectangle2D.Double(-22, 254, 44, 28, 12, 12));
 
         // Three list rows, centered vertically in the screen — 1.5.x
-        // plaque+chip look, one row per app kind (toggle / slider /
+        // plaque+chip look, one row per signal kind (toggle / slider /
         // momentary button; mirrors TabletScreenRenderer's raisedBevel
         // and the GUI's control shapes).
         double rowW = 348, rowH = 92, gap = 22;
@@ -144,7 +144,7 @@ public final class IconTool {
                 g.draw(new RoundRectangle2D.Double(x - 2, y - 2, rowW + 4, rowH + 4, 20, 20));
             }
 
-            // Chip: recessed well with the app color inset behind the icon
+            // Chip: recessed well with the signal color inset behind the icon
             chip(g, x + 10, y + 10, 72, CHIPS[i]);
 
             g.setColor(on ? NAME_ON : NAME_OFF);
@@ -210,7 +210,7 @@ public final class IconTool {
         g.fill(new RoundRectangle2D.Double(x + w - bw * 1.5, y + bw * 0.5, bw, h - bw, 8, 8));
     }
 
-    /** Recessed chip well with the app color inset (1.5.2 tile look). */
+    /** Recessed chip well with the signal color inset (1.5.2 tile look). */
     private static void chip(Graphics2D g, double x, double y, double size, Color color) {
         g.setColor(shade(ROW_BG, 0.55f));
         g.fill(new RoundRectangle2D.Double(x, y, size, size, 14, 14));

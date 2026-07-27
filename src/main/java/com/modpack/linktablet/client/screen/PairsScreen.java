@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -33,7 +33,7 @@ public class PairsScreen extends ArcadeScreen {
     private boolean solved;
     private boolean newBest;
 
-    public PairsScreen(AppView view, boolean returnToTablet) {
+    public PairsScreen(SignalView view, boolean returnToTablet) {
         super("memory", view, returnToTablet);
         deal();
     }

@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -13,8 +13,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 🐍 (1.7.1, unadvertised): opens from any app named "Snake" whose icon
- * is a Linked Controller — see {@code SignalApp.secretGameId()}.
+ * 🐍 (1.7.1, unadvertised): opens from any signal named "Snake" whose icon
+ * is a Linked Controller — see {@code Signal.secretGameId()}.
  * Entirely client-side: no payloads, high score in {@link ClientPrefs}.
  */
 public class SnakeScreen extends ArcadeScreen {
@@ -41,7 +41,7 @@ public class SnakeScreen extends ArcadeScreen {
     private boolean newBest;
     private int tickCount;
 
-    public SnakeScreen(AppView view, boolean returnToTablet) {
+    public SnakeScreen(SignalView view, boolean returnToTablet) {
         super("snake", view, returnToTablet);
         reset();
     }

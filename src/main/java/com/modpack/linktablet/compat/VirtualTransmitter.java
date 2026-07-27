@@ -10,7 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 
 /**
  * A transmit-only participant in Create's Redstone Link network,
- * representing one active tablet app held by a player.
+ * representing one active tablet signal held by a player.
  * <p>
  * VERSION NOTE: the {@code Couple} import is
  * {@code net.createmod.catnip.data.Couple} on Create 6.x (MC 1.21.1).

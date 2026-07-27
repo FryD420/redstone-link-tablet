@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -35,7 +35,7 @@ public class SweeperScreen extends ArcadeScreen {
     private boolean newBest;
     private int ticks;
 
-    public SweeperScreen(AppView view, boolean returnToTablet) {
+    public SweeperScreen(SignalView view, boolean returnToTablet) {
         super("sweeper", view, returnToTablet);
     }
 

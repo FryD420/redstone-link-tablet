@@ -21,10 +21,10 @@ import net.neoforged.neoforge.registries.RegisterEvent;
 import net.minecraft.world.item.CreativeModeTabs;
 
 /**
- * Link Tablet — a handheld tablet whose "apps" transmit on Create's
- * Redstone Link network. Each app stores a two-item frequency pair
+ * Link Tablet — a handheld tablet whose "signals" transmit on Create's
+ * Redstone Link network. Each signal stores a two-item frequency pair
  * (identical to tuning a Redstone Link), an optional custom icon item,
- * a tile color, and an on/off state. While an app is ON and the tablet
+ * a tile color, and an on/off state. While a signal is ON and the tablet
  * is in someone's inventory, a virtual transmitter broadcasts signal
  * strength 15 on that frequency from the player's position — any
  * receiving Redstone Link on the same frequency powers up.
@@ -62,7 +62,7 @@ public class LinkTabletMod {
     }
 
     private void onRegister(RegisterEvent event) {
-        // Bulk-washing support: strips case dye while keeping the apps
+        // Bulk-washing support: strips case dye while keeping the signals
         // (a create:splashing recipe can't preserve components).
         event.register(CreateRegistries.FAN_PROCESSING_TYPE,
                 ResourceLocation.fromNamespaceAndPath(MOD_ID, "tablet_washing"),

@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -34,7 +34,7 @@ public class RunnerScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public RunnerScreen(AppView view, boolean returnToTablet) {
+    public RunnerScreen(SignalView view, boolean returnToTablet) {
         super("runner", view, returnToTablet);
         reset();
     }

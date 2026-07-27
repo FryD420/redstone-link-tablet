@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,7 +29,7 @@ public class LightsOutScreen extends ArcadeScreen {
     private boolean solved;
     private boolean newBest;
 
-    public LightsOutScreen(AppView view, boolean returnToTablet) {
+    public LightsOutScreen(SignalView view, boolean returnToTablet) {
         super("lights", view, returnToTablet);
         scramble();
     }

@@ -12,7 +12,7 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 
 /**
- * Shapeless: one tablet + one dye → the same tablet (apps and all) with
+ * Shapeless: one tablet + one dye → the same tablet (signals and all) with
  * a dyed case. Re-dye any time; the new color simply replaces the old.
  */
 public class TabletDyeRecipe extends CustomRecipe {

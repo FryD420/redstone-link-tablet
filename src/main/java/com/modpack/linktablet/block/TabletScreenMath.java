@@ -26,7 +26,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class TabletScreenMath {
 
-    /** Densest pip grid; the list layout shows one app per grid row. */
+    /** Densest pip grid; the list layout shows one signal per grid row. */
     public static final int COLS = 4;
     public static final int ROWS = 5;
     public static final int MAX_PIPS = COLS * ROWS;
@@ -69,18 +69,18 @@ public final class TabletScreenMath {
     }
 
     /**
-     * Logical-u span {from, to} of a slider app's value bar — the drag
+     * Logical-u span {from, to} of a slider signal's value bar — the drag
      * maps the crosshair against exactly this span so the bar's end
      * tracks the crosshair 1:1. MUST stay in lockstep with the
      * renderer's slider art (which draws through these same helpers).
      */
-    public static float[] sliderBarU(int index, int appCount, boolean list, int rot) {
-        return surfaceSliderBarU(index, appCount, list, rot, 1, 1);
+    public static float[] sliderBarU(int index, int signalCount, boolean list, int rot) {
+        return surfaceSliderBarU(index, signalCount, list, rot, 1, 1);
     }
 
-    /** Apps visible on the physical screen in the given layout. */
-    public static int visibleApps(int appCount, boolean list) {
-        return visibleApps(appCount, list, 1, 1);
+    /** Signals visible on the physical screen in the given layout. */
+    public static int visibleSignals(int signalCount, boolean list) {
+        return visibleSignals(signalCount, list, 1, 1);
     }
 
     /**
@@ -88,8 +88,8 @@ public final class TabletScreenMath {
      * screen's worth of pips. List: rows run the full surface width, so
      * only the HEIGHT adds rows (a 4×3 wall is 15 long rows, not 60).
      */
-    public static int visibleApps(int appCount, boolean list, int w, int h) {
-        return Math.min(appCount, list ? LIST_ROWS * h : MAX_PIPS * w * h);
+    public static int visibleSignals(int signalCount, boolean list, int w, int h) {
+        return Math.min(signalCount, list ? LIST_ROWS * h : MAX_PIPS * w * h);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class TabletScreenMath {
         return (GLASS_V1 - GLASS_V0) + 16f * (h - 1);
     }
 
-    /** Grid dimensions for a given app count. */
+    /** Grid dimensions for a given signal count. */
     public record GridLayout(int cols, int rows) {
         public int cells() {
             return cols * rows;
@@ -117,7 +117,7 @@ public final class TabletScreenMath {
     /**
      * Density ladder for the per-block sub-grid — the ONE table both the
      * single-block grid and merged surfaces walk (in order, first entry
-     * whose cell count covers the visible apps).
+     * whose cell count covers the visible signals).
      */
     private static final int[][] DENSITY_LADDER = {
             {1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 4}, {4, 4}, {COLS, ROWS}};
@@ -126,7 +126,7 @@ public final class TabletScreenMath {
      * Grid density for a w×h merged surface: (k·w)×(m·h) UNIFORM cells
      * over the continuous glass span ({@link #surfaceGlassW}) — the
      * raised surface panel covers interior bezels (1.7.0), so tiles flow
-     * straight across block seams like one big screen. App indices are
+     * straight across block seams like one big screen. Signal indices are
      * plain row-major over {@link #cols}×{@link #rows}.
      */
     public record SurfaceLayout(int blocksW, int blocksH, int k, int m) {
@@ -145,11 +145,11 @@ public final class TabletScreenMath {
 
     /**
      * Cell density for a surface: smallest ladder entry whose total cell
-     * count covers the visible apps — the merged-surface generalization
+     * count covers the visible signals — the merged-surface generalization
      * of {@link #gridLayout} (which delegates here).
      */
-    public static SurfaceLayout surfaceLayout(int appCount, int w, int h, int rot) {
-        int visible = Math.max(1, visibleApps(appCount, false, w, h));
+    public static SurfaceLayout surfaceLayout(int signalCount, int w, int h, int rot) {
+        int visible = Math.max(1, visibleSignals(signalCount, false, w, h));
         int k = COLS;
         int m = ROWS;
         for (int[] step : DENSITY_LADDER) {
@@ -169,14 +169,14 @@ public final class TabletScreenMath {
     }
 
     /**
-     * The pip grid sizes itself to the app count — one app fills the
-     * whole glass, few apps get big tiles, converging on the densest
+     * The pip grid sizes itself to the signal count — one signal fills the
+     * whole glass, few signals get big tiles, converging on the densest
      * {@link #COLS}×{@link #ROWS} grid. Renderer and click hit-test both
      * derive their geometry from this table (via {@link #surfaceLayout});
      * never duplicate it.
      */
-    public static GridLayout gridLayout(int appCount) {
-        SurfaceLayout sl = surfaceLayout(appCount, 1, 1, 0);
+    public static GridLayout gridLayout(int signalCount) {
+        SurfaceLayout sl = surfaceLayout(signalCount, 1, 1, 0);
         return new GridLayout(sl.k(), sl.m());
     }
 
@@ -200,11 +200,11 @@ public final class TabletScreenMath {
 
     /**
      * Layout for a rotated screen: odd quarter-turns swap cols and rows
-     * so tiles keep their portrait/landscape sense (2 apps sit
+     * so tiles keep their portrait/landscape sense (2 signals sit
      * side-by-side on a landscape screen instead of stacked).
      */
-    public static GridLayout gridLayout(int appCount, int rot) {
-        GridLayout grid = gridLayout(appCount);
+    public static GridLayout gridLayout(int signalCount, int rot) {
+        GridLayout grid = gridLayout(signalCount);
         return (rot & 1) == 0 ? grid : new GridLayout(grid.rows(), grid.cols());
     }
 
@@ -414,7 +414,7 @@ public final class TabletScreenMath {
     }
 
     /**
-     * App index of the entry under a block click, or -1 for a miss
+     * Signal index of the entry under a block click, or -1 for a miss
      * (wrong face, off the glass, or beyond the visible entries). Grid
      * hit cells are each pip expanded a quarter texel per side (making
      * the grid contiguous but leaving the bezel ring a GUI target);
@@ -425,14 +425,14 @@ public final class TabletScreenMath {
      *            match the rotation the renderer draws with
      */
     public static int hitPip(BlockState state, BlockPos pos, BlockHitResult hit,
-                             int appCount, boolean list, int rot) {
-        PipHit detailed = hitPipDetailed(state, pos, hit, appCount, list, rot);
+                             int signalCount, boolean list, int rot) {
+        PipHit detailed = hitPipDetailed(state, pos, hit, signalCount, list, rot);
         return detailed == null ? -1 : detailed.index();
     }
 
     /**
      * A hit entry plus the logical-u texel it landed on (content space) —
-     * slider apps map it against their bar span ({@link #sliderBarU}) so
+     * slider signals map it against their bar span ({@link #sliderBarU}) so
      * the bar's end tracks the click point exactly.
      */
     public record PipHit(int index, float logicalU) {
@@ -440,8 +440,8 @@ public final class TabletScreenMath {
 
     /** Like {@link #hitPip}, but null for a miss and with the along-fraction. */
     public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
-                                        int appCount, boolean list, int rot) {
-        return hitPipDetailed(state, pos, hit, appCount, list, rot, 0, 0, 1, 1);
+                                        int signalCount, boolean list, int rot) {
+        return hitPipDetailed(state, pos, hit, signalCount, list, rot, 0, 0, 1, 1);
     }
 
     /**
@@ -455,17 +455,37 @@ public final class TabletScreenMath {
      * slider drag adds the member offset the same way.
      */
     public static PipHit hitPipDetailed(BlockState state, BlockPos pos, BlockHitResult hit,
-                                        int appCount, boolean list, int rot,
+                                        int signalCount, boolean list, int rot,
                                         int bx, int by, int w, int h) {
-        if (appCount <= 0) return null;
+        if (signalCount <= 0) return null;
         double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
         if (uv == null) return null;
-        return pipAtSurfaceUV(uv[0] + 16.0 * bx, uv[1] + 16.0 * by, appCount, list, rot, w, h);
+        return pipAtSurfaceUV(uv[0] + 16.0 * bx, uv[1] + 16.0 * by, signalCount, list, rot, w, h);
+    }
+
+    /**
+     * True when the tap lies on the screen FACE but outside the glass
+     * content rect — the bezel band (1.10.0 kiosk Home gesture). Surface
+     * offsets convert the member UV into continuous coordinates first,
+     * so on a merged wall only the OUTER band reads as bezel: interior
+     * seams sit inside the continuous glass span and stay content.
+     * Rotation never moves the physical glass rect, so it isn't needed.
+     */
+    public static boolean hitBezel(BlockState state, BlockPos pos, BlockHitResult hit,
+                                   int bx, int by, int w, int h) {
+        double[] uv = screenUV(state, pos, hit.getDirection(), hit.getLocation());
+        if (uv == null) return false;
+        double cu = uv[0] + 16.0 * bx;
+        double cv = uv[1] + 16.0 * by;
+        double spanW = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
+        double spanH = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
+        return cu < GLASS_U0 || cu >= GLASS_U0 + spanW
+                || cv < GLASS_V0 || cv >= GLASS_V0 + spanH;
     }
 
     /** Shared tail of the hit-test paths (quantized and mounted). */
     private static PipHit pipAtSurfaceUV(double cu, double cv,
-                                         int appCount, boolean list, int rot, int w, int h) {
+                                         int signalCount, boolean list, int rot, int w, int h) {
         double spanW = w * h == 1 ? GLASS_U1 - GLASS_U0 : surfaceGlassW(w);
         double spanH = w * h == 1 ? GLASS_V1 - GLASS_V0 : surfaceGlassH(h);
         if (cu < GLASS_U0 || cu >= GLASS_U0 + spanW) return null;
@@ -492,12 +512,12 @@ public final class TabletScreenMath {
         if (list) {
             index = (int) (pv * LIST_ROWS * h / gh);
         } else {
-            SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+            SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
             int row = (int) (pv * sl.rows() / gh);
             int col = (int) (pu * sl.cols() / gw);
             index = row * sl.cols() + col;
         }
-        if (index >= visibleApps(appCount, list, w, h)) return null;
+        if (index >= visibleSignals(signalCount, list, w, h)) return null;
         return new PipHit(index, (float) (GLASS_U0 + pu));
     }
 
@@ -507,7 +527,7 @@ public final class TabletScreenMath {
      * maps with). The single-block form ({@link #sliderBarU}) delegates
      * here with a 1×1 surface.
      */
-    public static float[] surfaceSliderBarU(int surfaceIndex, int appCount, boolean list,
+    public static float[] surfaceSliderBarU(int surfaceIndex, int signalCount, boolean list,
                                             int rot, int w, int h) {
         // Logical span: odd (square-only) rotations swap the axes
         float gw = w * h == 1 ? glassW(rot)
@@ -516,7 +536,7 @@ public final class TabletScreenMath {
             float su1 = GLASS_U0 + gw - SPACE - LIST_SWITCH_MARGIN;
             return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
         }
-        SurfaceLayout sl = surfaceLayout(appCount, w, h, rot);
+        SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
         float tileW = tileSize(gw, sl.cols());
         float u0 = tileU0(surfaceIndex % sl.cols(), tileW);
         float inset = sliderInset(tileW);
@@ -603,11 +623,11 @@ public final class TabletScreenMath {
 
     /** Mounted tap: {@link #hitPipDetailed} for the ball-joint frame. */
     public static PipHit mountedHitPip(MountBasis basis, Vec3 eye, Vec3 hitLocation,
-                                       int appCount, boolean list, int rot) {
-        if (appCount <= 0) return null;
+                                       int signalCount, boolean list, int rot) {
+        if (signalCount <= 0) return null;
         double[] uv = mountedUV(basis, eye, hitLocation.subtract(eye));
         if (uv == null) return null;
-        return pipAtSurfaceUV(uv[0], uv[1], appCount, list, rot, 1, 1);
+        return pipAtSurfaceUV(uv[0], uv[1], signalCount, list, rot, 1, 1);
     }
 
     /** Mounted drag: {@link #logicalUFromRay} for the ball-joint frame. */

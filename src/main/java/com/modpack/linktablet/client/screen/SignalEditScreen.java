@@ -1,13 +1,13 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.client.screen.chrome.ChromeButton;
 import com.modpack.linktablet.client.screen.chrome.ChromeEditBox;
 import com.modpack.linktablet.frequency.Frequency;
-import com.modpack.linktablet.frequency.SignalApp;
-import com.modpack.linktablet.menu.AppEditMenu;
+import com.modpack.linktablet.frequency.Signal;
+import com.modpack.linktablet.menu.SignalEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.simibubi.create.foundation.gui.menu.GhostItemSubmitPacket;
@@ -31,11 +31,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Add/edit screen for a single app: name, a list of two-item frequencies
+ * Add/edit screen for a single signal: name, a list of two-item frequencies
  * (all toggled together — a "scene"), an optional custom icon item, and a
  * tile color.
  * <p>
- * Backed by {@link AppEditMenu}, so the player inventory is real slots
+ * Backed by {@link SignalEditMenu}, so the player inventory is real slots
  * with vanilla drag mechanics; the two staging frequency slots are GHOST
  * slots (dropping copies the item, count 1, nothing is consumed).
  * Committed frequencies show as chips; clicking a chip removes it. The
@@ -46,7 +46,7 @@ import java.util.Optional;
  * tracks) blit the chrome atlas; mechanisms and the color swatches stay
  * procedural fill() — see {@link Chrome}. Hit-test geometry unchanged.
  */
-public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
+public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     /** Preset tile colors (ARGB). */
     private static final int[] COLORS = {
@@ -85,21 +85,21 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private static final int BTN_X = 176;
     private static final int BTN_W = 76;
 
-    private final int index; // -1 = new app
+    private final int index; // -1 = new signal
 
     private EditBox nameBox;
     private PickerOverlay picker;
     private final List<Frequency> frequencies = new ArrayList<>();
     private Optional<net.minecraft.world.item.Item> iconItem = Optional.empty();
-    private int color = SignalApp.DEFAULT_COLOR;
+    private int color = Signal.DEFAULT_COLOR;
     private boolean wasActive = false;
     private boolean momentary = false;
     private boolean slider = false;
-    private int strength = SignalApp.MAX_STRENGTH;
+    private int strength = Signal.MAX_STRENGTH;
     private int sliderMin = 0;
-    private int sliderMax = SignalApp.MAX_STRENGTH;
+    private int sliderMax = Signal.MAX_STRENGTH;
     private boolean timed = false;
-    private int pulseTicks = SignalApp.DEFAULT_PULSE_TICKS;
+    private int pulseTicks = Signal.DEFAULT_PULSE_TICKS;
     /** Carried through unchanged — notes are edited from the home screen. */
     private String note = "";
     private boolean draggingStrength = false;
@@ -111,14 +111,14 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     private Button saveButton;
     private Button addFreqButton;
 
-    public AppEditScreen(AppEditMenu menu, Inventory playerInventory, Component title) {
+    public SignalEditScreen(SignalEditMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = PANEL_WIDTH;
         this.imageHeight = PANEL_HEIGHT;
         this.index = menu.contentHolder.index();
-        List<SignalApp> apps = view().apps();
-        if (index >= 0 && index < apps.size()) {
-            SignalApp existing = apps.get(index);
+        List<Signal> signals = view().signals();
+        if (index >= 0 && index < signals.size()) {
+            Signal existing = signals.get(index);
             this.frequencies.addAll(existing.frequencies());
             this.iconItem = existing.icon().map(BuiltInRegistries.ITEM::get);
             this.color = existing.color();
@@ -137,11 +137,11 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         }
     }
 
-    private AppView view() {
-        ModNetworking.AppTarget target = menu.contentHolder.target();
+    private SignalView view() {
+        ModNetworking.SignalTarget target = menu.contentHolder.target();
         return target.pos().isPresent()
-                ? new AppView.Block(target.pos().get())
-                : new AppView.Hand(target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+                ? new SignalView.Block(target.pos().get())
+                : new SignalView.Hand(target.mainHand() ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
     }
 
     private ScreenTheme theme() {
@@ -159,13 +159,13 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         // Inset by (4,5)/(w-8,h-10): painted ink-well footprint = the old
         // bordered box's (left+8, top+26, 150, 18) rect (ChromeEditBox rule)
         nameBox = new ChromeEditBox(font, left + 12, top + 31, 142, 8,
-                Component.translatable("gui.linktablet.edit_app.name"));
-        nameBox.setMaxLength(SignalApp.MAX_NAME_LENGTH);
+                Component.translatable("gui.linktablet.edit_signal.name"));
+        nameBox.setMaxLength(Signal.MAX_NAME_LENGTH);
         if (previousName != null) {
             nameBox.setValue(previousName);
         } else if (index != -1) {
-            List<SignalApp> apps = view().apps();
-            if (index < apps.size()) nameBox.setValue(apps.get(index).name());
+            List<Signal> signals = view().signals();
+            if (index < signals.size()) nameBox.setValue(signals.get(index).name());
         } else if (!menu.contentHolder.prefillName().isEmpty()) {
             nameBox.setValue(menu.contentHolder.prefillName());
         }
@@ -174,7 +174,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
         // Commit the staged ghost pair to the frequency list
         addFreqButton = new ChromeButton(left + 60, top + 58, 40, 20,
-                Component.translatable("gui.linktablet.edit_app.add_frequency"),
+                Component.translatable("gui.linktablet.edit_signal.add_frequency"),
                 b -> commitStagedFrequency(), this::theme);
         addRenderableWidget(addFreqButton);
 
@@ -194,18 +194,18 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
         // Save / Cancel / Remove, right of the inventory block
         saveButton = new ChromeButton(left + BTN_X, top + 146, BTN_W, 20,
-                Component.translatable("gui.linktablet.edit_app.save"), b -> save(), this::theme);
+                Component.translatable("gui.linktablet.edit_signal.save"), b -> save(), this::theme);
         addRenderableWidget(saveButton);
 
         addRenderableWidget(new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
-                Component.translatable("gui.linktablet.edit_app.cancel"), b -> onClose(), this::theme));
+                Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme));
 
         if (index != -1) {
             addRenderableWidget(new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
-                    Component.translatable("gui.linktablet.edit_app.remove"), b -> {
+                    Component.translatable("gui.linktablet.edit_signal.remove"), b -> {
                 UISounds.delete();
                 PacketDistributor.sendToServer(
-                        new ModNetworking.RemoveAppPayload(menu.contentHolder.target(), index));
+                        new ModNetworking.RemoveSignalPayload(menu.contentHolder.target(), index));
                 onClose();
             }, this::theme));
         }
@@ -228,8 +228,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
      * the drop targets for the JEI/EMI drag handlers in {@code compat/}.
      */
     public Rect2i frequencySlotArea(int slot) {
-        int x = leftPos + (slot == 0 ? AppEditMenu.GHOST1_X : AppEditMenu.GHOST2_X) - 1;
-        return new Rect2i(x, topPos + AppEditMenu.GHOST_Y - 1, 18, 18);
+        int x = leftPos + (slot == 0 ? SignalEditMenu.GHOST1_X : SignalEditMenu.GHOST2_X) - 1;
+        return new Rect2i(x, topPos + SignalEditMenu.GHOST_Y - 1, 18, 18);
     }
 
     /** Stages a viewer-dragged ingredient into a frequency slot (count 1). */
@@ -247,7 +247,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         return new Rect2i(leftPos + RIGHT_COL, topPos + 26, 24, 24);
     }
 
-    /** Sets a viewer-dragged ingredient as the app's custom icon. */
+    /** Sets a viewer-dragged ingredient as the signal's custom icon. */
     public void stageIconItem(ItemStack stack) {
         if (stack.isEmpty()) return;
         iconItem = Optional.of(stack.getItem());
@@ -269,7 +269,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     }
 
     private void commitStagedFrequency() {
-        if (!stagedValid() || frequencies.size() >= SignalApp.MAX_FREQUENCIES) return;
+        if (!stagedValid() || frequencies.size() >= Signal.MAX_FREQUENCIES) return;
         Frequency freq = Frequency.of(staged(0), staged(1));
         if (!frequencies.contains(freq)) {
             frequencies.add(freq);
@@ -283,28 +283,30 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         // Classic flow: staged items count without pressing Add
         commitStagedFrequency();
         if (frequencies.isEmpty()) return;
-        String name = nameBox.getValue().isBlank() ? "App" : nameBox.getValue().strip();
+        String name = nameBox.getValue().isBlank() ? "Signal" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
-        SignalApp app = new SignalApp(name, List.copyOf(frequencies), wasActive, momentary, strength,
+        Signal signal = new Signal(name, List.copyOf(frequencies), wasActive, momentary, strength,
                 color, icon, slider, sliderMin, sliderMax, note, timed, pulseTicks);
         UISounds.confirm();
         PacketDistributor.sendToServer(
-                new ModNetworking.UpsertAppPayload(menu.contentHolder.target(), index, app));
+                new ModNetworking.UpsertSignalPayload(menu.contentHolder.target(), index, signal));
         onClose();
     }
 
-    /** Closing the container returns to the tablet home screen. */
+    /** Closing the container returns to the signal grid it was opened from
+     * (the redstone program — not the launcher). */
     @Override
     public void onClose() {
         super.onClose();
-        minecraft.setScreen(new TabletScreen(view()));
+        com.modpack.linktablet.client.ClientHooks.returnToProgram(
+                com.modpack.linktablet.Program.SIGNALS, view());
     }
 
     @Override
     protected void containerTick() {
         // Need at least one committed or staged frequency to save
         saveButton.active = !frequencies.isEmpty() || stagedValid();
-        addFreqButton.active = stagedValid() && frequencies.size() < SignalApp.MAX_FREQUENCIES;
+        addFreqButton.active = stagedValid() && frequencies.size() < Signal.MAX_FREQUENCIES;
     }
 
     private int chipX(int i) {
@@ -356,7 +358,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             return true;
         }
 
-        // App type row: click cycles Toggle → Hold → Slider
+        // Signal type row: click cycles Toggle → Hold → Slider
         if (mouseX >= rightX && mouseX < rightX + 90
                 && mouseY >= topPos + MOMENTARY_Y - 2 && mouseY < topPos + MOMENTARY_Y + CHECKBOX_SIZE + 2) {
             // Cycle: Toggle -> Hold -> Timer -> Slider -> Toggle
@@ -377,7 +379,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             return true;
         }
 
-        // Strength slider (toggle/hold) or min/max range row (slider apps)
+        // Strength slider (toggle/hold) or min/max range row (slider signals)
         if (mouseX >= rightX - 2 && mouseX < rightX + TRACK_W + 4
                 && mouseY >= topPos + TRACK_Y - 6 && mouseY < topPos + TRACK_Y + 12) {
             if (slider) {
@@ -468,23 +470,23 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     /** Toggle/hold strength: 1..15 along the track. */
     private void setStrengthFromMouse(double mouseX) {
         double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
-        strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (SignalApp.MAX_STRENGTH - 1)),
-                1, SignalApp.MAX_STRENGTH);
+        strength = net.minecraft.util.Mth.clamp((int) Math.round(1 + rel * (Signal.MAX_STRENGTH - 1)),
+                1, Signal.MAX_STRENGTH);
     }
 
     /** Track → pulse ticks, quadratic: half the track covers 0..7.5s. */
     private void setPulseFromMouse(double mouseX) {
         double rel = net.minecraft.util.Mth.clamp(
                 (mouseX - (leftPos + RIGHT_COL)) / TRACK_W, 0.0, 1.0);
-        int span = SignalApp.MAX_PULSE_TICKS - SignalApp.MIN_PULSE_TICKS;
-        pulseTicks = SignalApp.MIN_PULSE_TICKS + (int) Math.round(rel * rel * span);
+        int span = Signal.MAX_PULSE_TICKS - Signal.MIN_PULSE_TICKS;
+        pulseTicks = Signal.MIN_PULSE_TICKS + (int) Math.round(rel * rel * span);
     }
 
     /** Pulse ticks → track fraction (inverse of the quadratic map). */
     private float pulseFraction() {
-        int span = SignalApp.MAX_PULSE_TICKS - SignalApp.MIN_PULSE_TICKS;
+        int span = Signal.MAX_PULSE_TICKS - Signal.MIN_PULSE_TICKS;
         return (float) Math.sqrt(
-                (pulseTicks - SignalApp.MIN_PULSE_TICKS) / (double) span);
+                (pulseTicks - Signal.MIN_PULSE_TICKS) / (double) span);
     }
 
     /** "1.5s (30t)" — seconds for everyone, ticks for redstone work. */
@@ -499,8 +501,8 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
     /** Track position → absolute level 0..15 (the range row spans the full scale). */
     private int trackValueFromMouse(double mouseX) {
         double rel = (mouseX - (leftPos + RIGHT_COL)) / TRACK_W;
-        return net.minecraft.util.Mth.clamp((int) Math.round(rel * SignalApp.MAX_STRENGTH),
-                0, SignalApp.MAX_STRENGTH);
+        return net.minecraft.util.Mth.clamp((int) Math.round(rel * Signal.MAX_STRENGTH),
+                0, Signal.MAX_STRENGTH);
     }
 
     /** Drags the grabbed range knob; min stays below max, live value stays inside. */
@@ -516,7 +518,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
 
     /** Range-knob left edge on the track for an absolute level. */
     private int rangeKnobX(int value) {
-        return leftPos + RIGHT_COL + value * (TRACK_W - 4) / SignalApp.MAX_STRENGTH;
+        return leftPos + RIGHT_COL + value * (TRACK_W - 4) / Signal.MAX_STRENGTH;
     }
 
     // ---- Rendering -------------------------------------------------------
@@ -535,9 +537,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             Chrome.slot(graphics, leftPos + slot.x - 1, topPos + slot.y - 1, theme.rowBg);
         }
         // Staging slot accents (red/blue, like the Redstone Link's slots)
-        Chrome.ghostRing(graphics, leftPos + AppEditMenu.GHOST1_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+        Chrome.ghostRing(graphics, leftPos + SignalEditMenu.GHOST1_X - 2, topPos + SignalEditMenu.GHOST_Y - 2,
                 TabletScreen.FREQ1_COLOR);
-        Chrome.ghostRing(graphics, leftPos + AppEditMenu.GHOST2_X - 2, topPos + AppEditMenu.GHOST_Y - 2,
+        Chrome.ghostRing(graphics, leftPos + SignalEditMenu.GHOST2_X - 2, topPos + SignalEditMenu.GHOST_Y - 2,
                 TabletScreen.FREQ2_COLOR);
     }
 
@@ -548,14 +550,14 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         boolean shadow = theme.textShadow;
         graphics.drawString(font, title, imageWidth / 2 - font.width(title) / 2, 5,
                 theme.textPrimary, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.name"), 8, 15, theme.textMuted, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.frequencies"), 8, 48, theme.textMuted, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.icon"), RIGHT_COL, 15, theme.textMuted, shadow);
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.color"), RIGHT_COL, 57, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.name"), 8, 15, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.frequencies"), 8, 48, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.icon"), RIGHT_COL, 15, theme.textMuted, shadow);
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.color"), RIGHT_COL, 57, theme.textMuted, shadow);
         graphics.drawString(font, Component.translatable("gui.linktablet.picker.inventory"), 8, 134, theme.textMuted, shadow);
         if (frequencies.isEmpty()) {
             graphics.drawString(font,
-                    Component.translatable("gui.linktablet.edit_app.no_frequencies"),
+                    Component.translatable("gui.linktablet.edit_signal.no_frequencies"),
                     8, CHIPS_Y + 6, theme.textFaint, shadow);
         }
     }
@@ -607,23 +609,23 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
 
-        // App type row (click cycles): inset checkbox + current type
+        // Signal type row (click cycles): inset checkbox + current type
         int momY = top + MOMENTARY_Y;
         Chrome.checkbox(graphics, rightX, momY, momentary || slider || timed, theme);
-        String typeKey = slider ? "gui.linktablet.edit_app.type.slider"
-                : momentary ? "gui.linktablet.edit_app.type.momentary"
-                : timed ? "gui.linktablet.edit_app.type.timed"
-                : "gui.linktablet.edit_app.type.toggle";
-        graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.type", Component.translatable(typeKey)),
+        String typeKey = slider ? "gui.linktablet.edit_signal.type.slider"
+                : momentary ? "gui.linktablet.edit_signal.type.momentary"
+                : timed ? "gui.linktablet.edit_signal.type.timed"
+                : "gui.linktablet.edit_signal.type.toggle";
+        graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
 
         // Strength slider (toggle/hold) or the min/max range row (slider
-        // apps: two knobs on the full 0..15 scale, fill between them).
+        // signals: two knobs on the full 0..15 scale, fill between them).
         // Chrome track is 6px tall centered on the old 4px fill's rect;
         // the hit-test rect is untouched.
         int trackY = top + TRACK_Y;
         if (slider) {
-            Component rangeLabel = Component.translatable("gui.linktablet.edit_app.range");
+            Component rangeLabel = Component.translatable("gui.linktablet.edit_signal.range");
             graphics.drawString(font, rangeLabel, rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
             // Readout beside the label — right of the track there is no room
             graphics.drawString(font, sliderMin + "-" + sliderMax,
@@ -638,7 +640,7 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         } else if (timed) {
             // Timer: the track sets the pulse length (quadratic scale —
             // fine control at short durations). Label reads both units.
-            Component timeLabel = Component.translatable("gui.linktablet.edit_app.pulse");
+            Component timeLabel = Component.translatable("gui.linktablet.edit_signal.pulse");
             graphics.drawString(font, timeLabel, rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
             graphics.drawString(font, pulseReadout(),
                     rightX + font.width(timeLabel) + 6, top + STRENGTH_LABEL_Y,
@@ -648,9 +650,9 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
             Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, rightX, handleX + 2 - rightX, theme.accentDim);
             Chrome.sliderKnob(graphics, handleX - 2, trackY - 4, theme.textPrimary);
         } else {
-            graphics.drawString(font, Component.translatable("gui.linktablet.edit_app.strength"),
+            graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.strength"),
                     rightX, top + STRENGTH_LABEL_Y, theme.textMuted, shadow);
-            int handleX = rightX + (strength - 1) * (TRACK_W - 4) / (SignalApp.MAX_STRENGTH - 1);
+            int handleX = rightX + (strength - 1) * (TRACK_W - 4) / (Signal.MAX_STRENGTH - 1);
             Chrome.sliderTrack(graphics, rightX, trackY - 1, TRACK_W, theme.switchOff);
             Chrome.sliderFill(graphics, rightX, trackY - 1, TRACK_W, rightX, handleX + 2 - rightX, theme.accentDim);
             Chrome.sliderKnob(graphics, handleX - 2, trackY - 4, theme.textPrimary);
@@ -678,16 +680,16 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         if (!picker.isOpen() && !colorPopupOpen) {
             if (hoveredChip) {
                 graphics.renderTooltip(font,
-                        Component.translatable("gui.linktablet.edit_app.chip_remove"), mouseX, mouseY);
+                        Component.translatable("gui.linktablet.edit_signal.chip_remove"), mouseX, mouseY);
             } else if (mouseX >= rightX && mouseX < rightX + 90
                     && mouseY >= momY - 2 && mouseY < momY + CHECKBOX_SIZE + 2) {
                 graphics.renderTooltip(font, Component.translatable(slider
-                        ? "gui.linktablet.edit_app.type.slider.tooltip"
+                        ? "gui.linktablet.edit_signal.type.slider.tooltip"
                         : momentary
-                        ? "gui.linktablet.edit_app.momentary.tooltip"
+                        ? "gui.linktablet.edit_signal.momentary.tooltip"
                         : timed
-                        ? "gui.linktablet.edit_app.type.timed.tooltip"
-                        : "gui.linktablet.edit_app.type.toggle.tooltip"), mouseX, mouseY);
+                        ? "gui.linktablet.edit_signal.type.timed.tooltip"
+                        : "gui.linktablet.edit_signal.type.toggle.tooltip"), mouseX, mouseY);
             } else {
                 // Hovered inventory/ghost slot tooltip (vanilla)
                 renderTooltip(graphics, mouseX, mouseY);

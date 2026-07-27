@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -22,7 +22,7 @@ public class LifeScreen extends ArcadeScreen {
     private int generation;
     private int stepCounter;
 
-    public LifeScreen(AppView view, boolean returnToTablet) {
+    public LifeScreen(SignalView view, boolean returnToTablet) {
         super("life", view, returnToTablet);
         seed();
     }

@@ -19,7 +19,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * The all-items search picker as a modal overlay INSIDE the app edit
+ * The all-items search picker as a modal overlay INSIDE the signal edit
  * screen — switching to a separate Screen would close the container
  * session, so this draws z-lifted over the editor and swallows input
  * while open (same pattern as the color popup, bigger). Picks return a
