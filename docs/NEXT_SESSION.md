@@ -3,13 +3,14 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-26 — v1.9.1 tagged, upload = user's next step)
+## Status (2026-07-26 — v1.9.1 LIVE EVERYWHERE)
 
-- **v1.9.1 tagged 2026-07-26** (dev-tested by the user same day):
-  JEI/EMI drag onto the edit screen's ICON slot — third ghost-drag
-  target (`iconSlotArea`/`stageIconItem` on AppEditScreen, wired in
-  both compat classes). Client-only, pairs with 1.9.0. Upload +
-  announcement (include both listing links) = user's step.
+- **v1.9.1 LIVE 2026-07-26** (tagged, pushed, uploaded to both
+  platforms, Discord announcement posted — all same day): JEI/EMI
+  drag onto the edit screen's ICON slot — third ghost-drag target
+  (`iconSlotArea`/`stageIconItem` on AppEditScreen, wired in both
+  compat classes). Client-only, pairs with 1.9.0 (no coordinated
+  server update needed).
 
 - **v1.9.0 LIVE EVERYWHERE 2026-07-25** (tagged, pushed, uploaded to
   both platforms, Discord announcement posted — all same day):
