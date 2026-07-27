@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.1 — 2026-07-26
+
+- The app **icon slot now accepts JEI/EMI drags**: drag any item from
+  the ingredient panel onto the icon button in the edit screen to set
+  it as the app's custom icon — same as the frequency slots have
+  worked since 1.7.0, nothing is consumed. (EMI also highlights the
+  icon slot while dragging.)
+- Client-only change, no new content — 1.9.1 pairs with 1.9.0 servers
+  and clients.
+
 ## 1.9.0 — 2026-07-25
 
 - The Link Tablet is now **manufactured, not crafted**: build a Tablet

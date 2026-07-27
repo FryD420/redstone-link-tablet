@@ -3,7 +3,13 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-25 — v1.9.0 TAGGED, upload = user's next step)
+## Status (2026-07-26 — v1.9.1 tagged, upload = user's next step)
+
+- **v1.9.1 tagged 2026-07-26** (dev-tested by the user same day):
+  JEI/EMI drag onto the edit screen's ICON slot — third ghost-drag
+  target (`iconSlotArea`/`stageIconItem` on AppEditScreen, wired in
+  both compat classes). Client-only, pairs with 1.9.0. Upload +
+  announcement (include both listing links) = user's step.
 
 - **v1.9.0 LIVE EVERYWHERE 2026-07-25** (tagged, pushed, uploaded to
   both platforms, Discord announcement posted — all same day):
@@ -52,7 +58,7 @@ at the repo root (auto-loaded every Claude session).
    server tick calling `aimAt(nearest non-spectator ≤~8 blocks)` at
    ~3-4 tick cadence with a small angle threshold, + client lerp in
    the BER so it glides. Power off = stays put. No new registries or
-   payloads → ships as 1.9.1, pairs with 1.9.0. ~Half session incl.
+   payloads → ships as 1.9.2, pairs with 1.9.x. ~Half session incl.
    tuning range/cadence; needs a multiplayer feel-test.
 2. **Listing refresh for 1.9.0 (text can go anytime, image needs the
    shoot)** — rewrite DESCRIPTION.md's "recipe" section (~184-194) to
@@ -145,6 +151,8 @@ at the repo root (auto-loaded every Claude session).
 
 ## Release history (compressed)
 
+- 1.9.1 (2026-07-26): JEI/EMI drag onto the icon slot (client-only,
+  pairs with 1.9.0).
 - 1.9.0 (2026-07-25): deployer-manufactured tablet — sequenced
   assembly (case → board → cell → display), 5 new items, stage-aware
   incomplete art, crafting recipe removed. Registrar "13"; pairs

@@ -239,6 +239,21 @@ public class AppEditScreen extends AbstractContainerScreen<AppEditMenu> {
         UISounds.tick(1.3F);
     }
 
+    /**
+     * Absolute rect of the icon slot button — the JEI/EMI drag handlers'
+     * third drop target (1.9.1).
+     */
+    public Rect2i iconSlotArea() {
+        return new Rect2i(leftPos + RIGHT_COL, topPos + 26, 24, 24);
+    }
+
+    /** Sets a viewer-dragged ingredient as the app's custom icon. */
+    public void stageIconItem(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        iconItem = Optional.of(stack.getItem());
+        UISounds.tick(1.3F);
+    }
+
     /** Picker picks land in the first empty ghost slot (else slot 1). */
     private void stageFromPicker(ItemStack stack) {
         if (stack.isEmpty()) return;

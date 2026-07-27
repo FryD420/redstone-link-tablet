@@ -43,7 +43,7 @@ public class JeiCompat implements IModPlugin {
                                                    ITypedIngredient<I> ingredient, boolean doStart) {
             Optional<ItemStack> stack = ingredient.getIngredient(VanillaTypes.ITEM_STACK);
             if (stack.isEmpty()) return List.of();
-            List<Target<I>> targets = new ArrayList<>(2);
+            List<Target<I>> targets = new ArrayList<>(3);
             for (int slot = 0; slot < 2; slot++) {
                 Rect2i area = screen.frequencySlotArea(slot);
                 int target = slot;
@@ -59,6 +59,19 @@ public class JeiCompat implements IModPlugin {
                     }
                 });
             }
+            // Icon slot (1.9.1): drop sets the app's custom icon
+            Rect2i iconArea = screen.iconSlotArea();
+            targets.add(new Target<>() {
+                @Override
+                public Rect2i getArea() {
+                    return iconArea;
+                }
+
+                @Override
+                public void accept(I dropped) {
+                    screen.stageIconItem(stack.get());
+                }
+            });
             return targets;
         }
 
