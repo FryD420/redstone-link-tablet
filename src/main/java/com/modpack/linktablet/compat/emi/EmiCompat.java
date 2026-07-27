@@ -38,6 +38,11 @@ public class EmiCompat implements EmiPlugin {
                     return true;
                 }
             }
+            // Icon slot (1.9.1): drop sets the app's custom icon
+            if (contains(screen.iconSlotArea(), x, y)) {
+                screen.stageIconItem(stack);
+                return true;
+            }
             return false;
         }
 
@@ -50,6 +55,9 @@ public class EmiCompat implements EmiPlugin {
                 graphics.fill(a.getX(), a.getY(),
                         a.getX() + a.getWidth(), a.getY() + a.getHeight(), 0x8830B848);
             }
+            Rect2i icon = screen.iconSlotArea();
+            graphics.fill(icon.getX(), icon.getY(),
+                    icon.getX() + icon.getWidth(), icon.getY() + icon.getHeight(), 0x8830B848);
         }
 
         private static ItemStack firstStack(EmiIngredient ingredient) {
