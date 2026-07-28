@@ -288,6 +288,13 @@ byline**. What shipped:
   - Regressions: signals grid/list/reorder/sliders/momentary/timer,
     merged surfaces, mounted taps, secret games, JEI/EMI drags,
     pre-1.10 world upgrade (kiosks boot to launcher, old pins fine).
+  - **Sparse placed-screen tiles (2026-07-28, three user-tuning
+    rounds same day)**: 1–3 signals cap at the 4-signal cell size,
+    centered as a block; a LONE signal is a bespoke centered SQUARE
+    at 1.5× the cell (`loneTileRect` — ✔ USER-APPROVED "thats the
+    vibe 100%"). Still worth one regression tap each on: lone
+    momentary, lone slider click-and-slide (bar spans the square),
+    lone tile on a merged wall + mounted, and off-tile tap → GUI.
   - **Signal links (2026-07-28)**: link A→B in all three modes, tap A
     from GUI + overlay + placed screen, chain A→B→C, loop A→B→A (must
     not hang), timer target fires its pulse, chain glyph on tiles and
