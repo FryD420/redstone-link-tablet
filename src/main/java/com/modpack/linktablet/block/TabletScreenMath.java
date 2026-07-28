@@ -187,6 +187,23 @@ public final class TabletScreenMath {
         return new GridLayout(sl.k(), sl.m());
     }
 
+    /**
+     * Centered sparse block (2026-07-28, user request): when the screen
+     * holds fewer signals than grid cells, the tiles occupy a
+     * usedCols×usedRows block CENTERED on the glass instead of hugging
+     * the top-left. Renderer, hit-test, and the slider-bar span all
+     * derive placement from these two + the same half-stride offsets —
+     * keep every site in lockstep.
+     */
+    public static int usedCols(int visible, int cols) {
+        return Math.min(Math.max(1, visible), cols);
+    }
+
+    public static int usedRows(int visible, int cols, int rows) {
+        int uc = usedCols(visible, cols);
+        return Math.min(rows, (Math.max(1, visible) + uc - 1) / uc);
+    }
+
     // ------------------------------------------------------------------
     // Screen content rotation (wrench): the layout lives in a "logical"
     // glass whose axes turn with the content — landscape when the
@@ -519,10 +536,23 @@ public final class TabletScreenMath {
         if (list) {
             index = (int) (pv * LIST_ROWS * h / gh);
         } else {
+            // Centered sparse block: cells keep the capped-density size,
+            // but only usedCols×usedRows of them exist, centered — taps
+            // in the surrounding glass miss (→ GUI), mirroring the
+            // renderer's offsets exactly
             SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
-            int row = (int) (pv * sl.rows() / gh);
-            int col = (int) (pu * sl.cols() / gw);
-            index = row * sl.cols() + col;
+            int visible = visibleSignals(signalCount, false, w, h);
+            int uc = usedCols(visible, sl.cols());
+            int ur = usedRows(visible, sl.cols(), sl.rows());
+            double cellW = gw / sl.cols();
+            double cellH = gh / sl.rows();
+            double u = pu - (sl.cols() - uc) * cellW / 2;
+            double v = pv - (sl.rows() - ur) * cellH / 2;
+            if (u < 0 || v < 0) return null;
+            int col = (int) (u / cellW);
+            int row = (int) (v / cellH);
+            if (col >= uc || row >= ur) return null;
+            index = row * uc + col;
         }
         if (index >= visibleSignals(signalCount, list, w, h)) return null;
         return new PipHit(index, (float) (GLASS_U0 + pu));
@@ -544,8 +574,11 @@ public final class TabletScreenMath {
             return new float[]{su1 - LIST_SWITCH_W * 1.6f, su1};
         }
         SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
+        int visible = visibleSignals(signalCount, false, w, h);
+        int uc = usedCols(visible, sl.cols());
         float tileW = tileSize(gw, sl.cols());
-        float u0 = tileU0(surfaceIndex % sl.cols(), tileW);
+        float offU = (sl.cols() - uc) * (tileW + SPACE) / 2f;
+        float u0 = offU + tileU0(surfaceIndex % uc, tileW);
         float inset = sliderInset(tileW);
         return new float[]{u0 + inset, u0 + tileW - inset};
     }

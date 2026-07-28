@@ -194,6 +194,12 @@ public final class TabletScreenRenderer {
         float rowH = tileSize(glassH, TabletScreenMath.LIST_ROWS * surfaceH);
         float tileW = tileSize(glassW, cols);
         float tileH = tileSize(glassH, sl.rows());
+        // Centered sparse block: place tiles in a usedCols-wide block
+        // centered on the glass — the hit-test applies the same offsets
+        int usedCols = TabletScreenMath.usedCols(count, cols);
+        float offU = (cols - usedCols) * (tileW + SPACE) / 2f;
+        float offV = (sl.rows() - TabletScreenMath.usedRows(count, cols, sl.rows()))
+                * (tileH + SPACE) / 2f;
         boolean labels = !list && sl.k() * sl.m() <= LABEL_CELLS_MAX;
         float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
         // Bottom strip of each big tile reserved for the name label
@@ -214,8 +220,8 @@ public final class TabletScreenRenderer {
                         packedLight, held, rowH,
                         TabletScreenMath.GLASS_U0 + SPACE, u1 - SPACE, plainRows);
             } else {
-                float u0 = tileU0(i % cols, tileW);
-                float v0 = tileV0(i / cols, tileH);
+                float u0 = offU + tileU0(i % usedCols, tileW);
+                float v0 = offV + tileV0(i / usedCols, tileH);
                 renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, signal, color, theme,
                         packedLight, ringW, held, labelZone);
             }
@@ -231,8 +237,8 @@ public final class TabletScreenRenderer {
                 // Icon fills the inset chip exactly, like the GUI's 16px-on-16px
                 size = Math.min(LIST_ICON, rowH * 2f / 3f);
             } else {
-                cu = tileU0(i % cols, tileW) + tileW / 2f;
-                cv = tileV0(i / cols, tileH) + (tileH - labelZone) / 2f;
+                cu = offU + tileU0(i % usedCols, tileW) + tileW / 2f;
+                cv = offV + tileV0(i / usedCols, tileH) + (tileH - labelZone) / 2f;
                 float cell = Math.min(tileW, tileH - labelZone);
                 if (cell >= CHIP_MIN_CELL) {
                     // Icon fills the inset chip exactly, like the list rows
@@ -283,9 +289,9 @@ public final class TabletScreenRenderer {
             for (int i = 0; i < count; i++) {
                 FittedLabel label = fitLabel(font, signals.get(i).name(), maxPx);
                 if (label.text().isBlank()) continue;
-                float cu = tileU0(i % cols, tileW) + tileW / 2f;
+                float cu = offU + tileU0(i % usedCols, tileW) + tileW / 2f;
                 // Bottom-aligned so a shrunk label hugs the tile edge
-                float top = tileV0(i / cols, tileH) + tileH - textH * label.fit() - SPACE;
+                float top = offV + tileV0(i / usedCols, tileH) + tileH - textH * label.fit() - SPACE;
                 // White with a black outline: the label sits on the signal's
                 // own tile color (any brightness), not the theme surface
                 drawLabel(poseStack, buffers, font, label.text(), cu, top, scale * label.fit(),
@@ -301,8 +307,8 @@ public final class TabletScreenRenderer {
                 Signal signal = signals.get(i);
                 if (!signal.slider()) continue;
                 String level = String.valueOf(signal.strength());
-                float u0 = tileU0(i % cols, tileW);
-                float v0 = tileV0(i / cols, tileH);
+                float u0 = offU + tileU0(i % usedCols, tileW);
+                float v0 = offV + tileV0(i / usedCols, tileH);
                 float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
                 float levelW = font.width(level) * numH / FONT_LINE;
                 float cell = Math.min(tileW, tileH - labelZone);
