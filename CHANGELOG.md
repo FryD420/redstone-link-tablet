@@ -75,6 +75,10 @@
   custom face for placed screens. Mod developers: see the
   `com.modpack.linktablet.api` package (both the program and its
   client half register through events on your own mod bus).
+- Placed-screen tiles no longer balloon on sparse tablets: one to
+  three signals now lay out at the four-signal tile size (a lone tile
+  is a quarter of the glass, not a wall-to-wall icon). Tapping the
+  empty glass around them opens the GUI. Merged walls are unchanged.
 - Note for servers: the network protocol grew (renamed payloads plus
   the new gauges traffic), so servers and clients need to update
   together — this version does not pair with 1.9.x. Worlds and tablet

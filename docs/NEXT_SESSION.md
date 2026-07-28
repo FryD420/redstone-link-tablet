@@ -295,8 +295,13 @@ byline**. What shipped:
     remove a target then tap the source (stale link no-ops),
     **frequency-less links-only signal** saves and drives targets
     (user request from first look, 2026-07-28 — Save enables on
-    links alone, server gate is freqs-OR-links).
-  - **Follow mode (2026-07-28)**: powered mounted tablet tracks you
+    links alone, server gate is freqs-OR-links). ✔ USER-VERIFIED
+    2026-07-28 ("ok that worked") after the save()-guard fix
+    (65fa5b6); the rest of the links row still pending.
+  - **Follow mode (2026-07-28)**: ✔ USER-VERIFIED 2026-07-28
+    ("follow mode works, it's smooth") — single-player pass; the
+    multiplayer nearest-player feel-test below still stands. Full
+    row: powered mounted tablet tracks you
     smoothly (no jitter standing still — the 2° threshold), freezes
     on power-off, resumes on power-on, wrench re-aim/flip still work
     while powered, taps land after the glide settles, works on floor/

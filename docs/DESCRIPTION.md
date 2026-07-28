@@ -132,7 +132,7 @@ carried one and it follows the item around your inventory.
 
 The tablet's physical screen isn't a texture — it renders your actual signals,
 live, on both the held and the placed tablet. Tiles size themselves to the signal
-count (one signal fills the whole glass; a full tablet converges on a dense grid),
+count (a few signals get big tiles; a full tablet converges on a dense grid),
 active signals glow, timers glow for as long as their pulse runs, and each tablet
 remembers whether you last used it in grid or list view.
 

@@ -149,7 +149,14 @@ public final class TabletScreenMath {
      * of {@link #gridLayout} (which delegates here).
      */
     public static SurfaceLayout surfaceLayout(int signalCount, int w, int h, int rot) {
-        int visible = Math.max(1, visibleSignals(signalCount, false, w, h));
+        // Sparse-layout cap (user decision 2026-07-28): fewer than four
+        // signals lay out as if there were four — a lone tile is a
+        // quarter of a standalone glass instead of the whole screen
+        // (merged walls are untouched: their first ladder rung already
+        // covers 4). Taps outside the real tiles miss (index >= count
+        // below) and fall through to the GUI, so render and hit-test
+        // stay consistent with no extra geometry.
+        int visible = Math.max(4, visibleSignals(signalCount, false, w, h));
         int k = COLS;
         int m = ROWS;
         for (int[] step : DENSITY_LADDER) {
