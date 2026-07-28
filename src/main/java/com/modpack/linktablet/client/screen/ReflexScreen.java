@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,7 +24,7 @@ public class ReflexScreen extends ArcadeScreen {
     private int resultMs;
     private boolean newBest;
 
-    public ReflexScreen(AppView view, boolean returnToTablet) {
+    public ReflexScreen(SignalView view, boolean returnToTablet) {
         super("reflex", view, returnToTablet);
         arm();
     }

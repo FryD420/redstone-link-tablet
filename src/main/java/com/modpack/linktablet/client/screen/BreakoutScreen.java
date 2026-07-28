@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -10,7 +10,7 @@ import net.minecraft.util.Mth;
 /**
  * 🧱 (1.8.0, unadvertised): "Breakout" + a Brick icon. Mouse paddle,
  * five rows of bricks, three lives; clearing the wall rebuilds it
- * faster. The paddle is basically a slider app that fought back.
+ * faster. The paddle is basically a slider signal that fought back.
  * Best score in {@link ClientPrefs}.
  */
 public class BreakoutScreen extends ArcadeScreen {
@@ -39,7 +39,7 @@ public class BreakoutScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public BreakoutScreen(AppView view, boolean returnToTablet) {
+    public BreakoutScreen(SignalView view, boolean returnToTablet) {
         super("breakout", view, returnToTablet);
         reset();
     }

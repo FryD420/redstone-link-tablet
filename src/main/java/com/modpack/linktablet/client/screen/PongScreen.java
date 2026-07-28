@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -30,7 +30,7 @@ public class PongScreen extends ArcadeScreen {
     private boolean playerWon;
     private boolean newBest;
 
-    public PongScreen(AppView view, boolean returnToTablet) {
+    public PongScreen(SignalView view, boolean returnToTablet) {
         super("pong", view, returnToTablet);
         centerBall();
     }

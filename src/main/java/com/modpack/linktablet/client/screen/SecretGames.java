@@ -1,15 +1,26 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import net.minecraft.client.gui.screens.Screen;
 
 /**
  * 🕹️ Client dispatch for the secret games — ids come from
- * {@code SignalApp.secretGameId()}; extend BOTH tables together.
+ * {@code Signal.secretGameId()}; extend BOTH tables together.
  */
 public final class SecretGames {
 
-    public static Screen create(String id, AppView view, boolean returnToTablet) {
+    /** App-tile launch (1.10.0: every game is its own program): same
+     * dispatch, but ESC goes Home — the tile is the door, unlike
+     * secret-pip launches which return to the signals grid. */
+    public static Screen createApp(String id, SignalView view) {
+        Screen screen = create(id, view, true);
+        if (screen instanceof ArcadeScreen arcade) {
+            arcade.setReturnProgram(com.modpack.linktablet.Program.LAUNCHER);
+        }
+        return screen;
+    }
+
+    public static Screen create(String id, SignalView view, boolean returnToTablet) {
         return switch (id) {
             case "lights" -> new LightsOutScreen(view, returnToTablet);
             case "sweeper" -> new SweeperScreen(view, returnToTablet);

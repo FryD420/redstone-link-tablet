@@ -1,6 +1,6 @@
 package com.modpack.linktablet.compat.emi;
 
-import com.modpack.linktablet.client.screen.AppEditScreen;
+import com.modpack.linktablet.client.screen.SignalEditScreen;
 import dev.emi.emi.api.EmiDragDropHandler;
 import dev.emi.emi.api.EmiEntrypoint;
 import dev.emi.emi.api.EmiPlugin;
@@ -13,7 +13,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * EMI integration (1.7.0): drag an item from the index onto either
- * frequency ghost slot of the app edit screen to stage it — same path as
+ * frequency ghost slot of the signal edit screen to stage it — same path as
  * dropping a carried stack, nothing is consumed. Discovered by EMI's own
  * {@code @EmiEntrypoint} scan, so this class never loads on installs
  * without EMI.
@@ -23,13 +23,13 @@ public class EmiCompat implements EmiPlugin {
 
     @Override
     public void register(EmiRegistry registry) {
-        registry.addDragDropHandler(AppEditScreen.class, new FrequencyDragDropHandler());
+        registry.addDragDropHandler(SignalEditScreen.class, new FrequencyDragDropHandler());
     }
 
-    private static class FrequencyDragDropHandler implements EmiDragDropHandler<AppEditScreen> {
+    private static class FrequencyDragDropHandler implements EmiDragDropHandler<SignalEditScreen> {
 
         @Override
-        public boolean dropStack(AppEditScreen screen, EmiIngredient ingredient, int x, int y) {
+        public boolean dropStack(SignalEditScreen screen, EmiIngredient ingredient, int x, int y) {
             ItemStack stack = firstStack(ingredient);
             if (stack.isEmpty()) return false;
             for (int slot = 0; slot < 2; slot++) {
@@ -38,7 +38,7 @@ public class EmiCompat implements EmiPlugin {
                     return true;
                 }
             }
-            // Icon slot (1.9.1): drop sets the app's custom icon
+            // Icon slot (1.9.1): drop sets the signal's custom icon
             if (contains(screen.iconSlotArea(), x, y)) {
                 screen.stageIconItem(stack);
                 return true;
@@ -47,7 +47,7 @@ public class EmiCompat implements EmiPlugin {
         }
 
         @Override
-        public void render(AppEditScreen screen, EmiIngredient dragged, GuiGraphics graphics,
+        public void render(SignalEditScreen screen, EmiIngredient dragged, GuiGraphics graphics,
                            int mouseX, int mouseY, float delta) {
             if (firstStack(dragged).isEmpty()) return;
             for (int slot = 0; slot < 2; slot++) {

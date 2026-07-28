@@ -3,7 +3,7 @@ package com.modpack.linktablet.compat;
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.frequency.Frequency;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.item.TabletItem;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.registry.ModDataComponents;
@@ -30,12 +30,12 @@ import java.util.UUID;
  * Server-side bridge between tablets and Create's Redstone Link network.
  * <p>
  * Every server tick, each online player's inventory is scanned for
- * tablets. For every app that is toggled ON — plus every momentary app
+ * tablets. For every signal that is toggled ON — plus every momentary signal
  * currently held down (see {@link #setHeld}) — a {@link VirtualTransmitter}
  * is kept registered on Create's global link network (the exact same
  * network real Redstone Links and Linked Controllers use), broadcasting
- * the app's signal strength from the player's current position. When two
- * apps drive the same frequency, the strongest strength wins, mirroring
+ * the signal's signal strength from the player's current position. When two
+ * signals drive the same frequency, the strongest strength wins, mirroring
  * how stacked Redstone Link transmitters behave.
  * <p>
  * Momentary hold state is transient and never written to the item, so a
@@ -64,7 +64,7 @@ public class TabletTransmitterHandler {
     public static final int MIN_PULSE_TICKS = 4;
 
     /**
-     * One momentary app currently held down: its frequencies, strength,
+     * One momentary signal currently held down: its frequencies, strength,
      * for placed tablets the block position to broadcast from (null =
      * broadcast from the player), the game time the hold expires unless
      * refreshed (-1 = held until an explicit release packet), and the
@@ -92,7 +92,7 @@ public class TabletTransmitterHandler {
 
     /**
      * Starts (or RESTARTS — a re-tap tops the clock back up, user
-     * decision 2026-07-19) a Timer app's pulse: a self-expiring hold
+     * decision 2026-07-19) a Timer signal's pulse: a self-expiring hold
      * that the normal expiry loop finishes, off-click and pip included.
      * No release packet exists for timers; the clock is the release.
      */
@@ -148,8 +148,8 @@ public class TabletTransmitterHandler {
 
     /**
      * Clears every momentary hold aimed at one tablet. Holds are keyed by
-     * app index, so a reorder invalidates them: for a placed tablet any
-     * player may be holding one of its apps; for a held tablet only the
+     * signal index, so a reorder invalidates them: for a placed tablet any
+     * player may be holding one of its signals; for a held tablet only the
      * reordering player's own hand can be.
      */
     public static void clearHeldForTarget(Player player, boolean mainHand, @Nullable BlockPos pos) {
@@ -189,21 +189,21 @@ public class TabletTransmitterHandler {
 
         // 1. Collect every frequency that should currently be broadcasting
         //    from this player, with the strongest requested strength:
-        //    toggled-ON apps on any tablet in the inventory, plus held
-        //    momentary apps.
+        //    toggled-ON signals on any tablet in the inventory, plus held
+        //    momentary signals.
         Map<Frequency, Integer> wanted = new HashMap<>();
         var inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
             ItemStack stack = inventory.getItem(slot);
             if (!(stack.getItem() instanceof TabletItem)) continue;
-            List<SignalApp> apps = stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
-            for (SignalApp app : apps) {
-                // Momentary and Timer apps broadcast via holds, never
+            List<Signal> signals = stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of());
+            for (Signal signal : signals) {
+                // Momentary and Timer signals broadcast via holds, never
                 // via a persisted active flag
-                if (!app.active() || app.momentary() || app.timed()) continue;
-                for (Frequency freq : app.frequencies()) {
+                if (!signal.active() || signal.momentary() || signal.timed()) continue;
+                for (Frequency freq : signal.frequencies()) {
                     if (!freq.isEmpty()) {
-                        wanted.merge(freq, app.strength(), Math::max);
+                        wanted.merge(freq, signal.strength(), Math::max);
                     }
                 }
             }

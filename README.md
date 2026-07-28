@@ -80,6 +80,12 @@ Each is marked with a comment in the source:
   `Create.REDSTONE_LINK_NETWORK_HANDLER` and the `IRedstoneLinkable`
   interface; method names are stable across Create 6.x.
 
+## Addon API
+
+Since 1.10.0 other mods can register their own tablet apps (App Store
+row, Home tile, screen, optional HUD overlay and kiosk face). Tutorial
+and worked example: [docs/API.md](docs/API.md).
+
 ## License
 
 MIT — free to use in modpacks.

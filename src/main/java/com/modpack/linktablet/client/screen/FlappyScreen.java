@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.RandomSource;
@@ -32,7 +32,7 @@ public class FlappyScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public FlappyScreen(AppView view, boolean returnToTablet) {
+    public FlappyScreen(SignalView view, boolean returnToTablet) {
         super("flappy", view, returnToTablet);
         reset();
     }

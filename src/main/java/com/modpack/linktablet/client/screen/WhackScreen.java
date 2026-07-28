@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -27,7 +27,7 @@ public class WhackScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public WhackScreen(AppView view, boolean returnToTablet) {
+    public WhackScreen(SignalView view, boolean returnToTablet) {
         super("whack", view, returnToTablet);
         reset();
     }

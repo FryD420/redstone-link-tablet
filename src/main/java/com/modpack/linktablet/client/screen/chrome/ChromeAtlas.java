@@ -10,7 +10,7 @@ package com.modpack.linktablet.client.screen.chrome;
  * <p>Authoring rules (enforced by ChromeTool):
  * <ul>
  *   <li>Tintable surfaces — rails included — are near-white grayscale;
- *       the runtime multiplies theme/app colors in via shader color,
+ *       the runtime multiplies theme/signal colors in via shader color,
  *       which can only darken. "Light" accents are authored at full
  *       white so they take the tint color exactly.</li>
  *   <li>Only the ink field ships real colors (drawn untinted — it is
@@ -55,9 +55,9 @@ public final class ChromeAtlas {
     public static final Region CANVAS = Region.sliced(0, 0, 24, 24, 8);
     /** Rail frame with a transparent center; tinted {@code theme.bodyOuter}, drawn over CANVAS. */
     public static final Region RAIL_FRAME = Region.sliced(32, 0, 48, 48, 12);
-    /** Parchment plaque; tinted by a theme role or an app color. */
+    /** Parchment plaque; tinted by a theme role or a signal color. */
     public static final Region PLAQUE = Region.sliced(96, 0, 24, 24, 6);
-    /** Raised plaque for grid app tiles; tinted by the app color. */
+    /** Raised plaque for grid signal tiles; tinted by the signal color. */
     public static final Region TILE = Region.sliced(128, 0, 24, 24, 5);
     /** Inventory slot cell (vanilla-style inset); tinted with {@code theme.rowBg}. */
     public static final Region SLOT = Region.fixed(160, 0, 18, 18);

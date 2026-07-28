@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -29,7 +29,7 @@ public class DodgeScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public DodgeScreen(AppView view, boolean returnToTablet) {
+    public DodgeScreen(SignalView view, boolean returnToTablet) {
         super("dodge", view, returnToTablet);
         reset();
     }

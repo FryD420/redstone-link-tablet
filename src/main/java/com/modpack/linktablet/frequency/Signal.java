@@ -15,19 +15,19 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A single "app" saved on a Tablet. An app is a scene button: activating
+ * A single "signal" saved on a Tablet. A signal is a scene button: activating
  * it broadcasts on <em>all</em> of its frequencies at once.
  *
  * @param name        display name shown under the tile
- * @param frequencies the Redstone Link frequencies this app transmits on
+ * @param frequencies the Redstone Link frequencies this signal transmits on
  *                    (1..{@link #MAX_FREQUENCIES}, all activated together)
  * @param active      current on/off state (persisted on the tablet item;
- *                    always false for momentary apps — their held state is
+ *                    always false for momentary signals — their held state is
  *                    transient and server-side only)
  * @param momentary   true = transmits only while the button is held,
  *                    false = classic toggle
  * @param strength    transmitted signal strength — 1..15, except slider
- *                    apps where it doubles as the LIVE slider value
+ *                    signals where it doubles as the LIVE slider value
  *                    ({@code sliderMin}..{@code sliderMax})
  * @param color       ARGB tile background color
  * @param icon        optional custom icon item; when empty the first
@@ -37,7 +37,7 @@ import java.util.Optional;
  *                    user-toggled — that keeps the transmitter collectors'
  *                    {@code active && !momentary} rule working unchanged
  * @param sliderMin   bottom of a slider's travel (0..14). A min above 0
- *                    means the slider can never rest at 0 — the app is
+ *                    means the slider can never rest at 0 — the signal is
  *                    always transmitting, by design (no off notch)
  * @param sliderMax   top of a slider's travel (sliderMin+1..15)
  * @param note        free-text player note, "" = none (the empty default
@@ -51,10 +51,17 @@ import java.util.Optional;
  *                    server state
  * @param pulseTicks  Timer pulse length in game ticks
  *                    ({@link #MIN_PULSE_TICKS}..{@link #MAX_PULSE_TICKS})
+ * @param linkId      stable identity for signal links (1.10.0), minted
+ *                    SERVER-SIDE in handleUpsert only. 0 = unassigned
+ *                    (pre-links data; never a valid link target). Ids
+ *                    survive reorder/remove because they ride the record.
+ * @param links       signal links (1.10.0): tapping THIS toggle also
+ *                    drives each link's target — see {@link Link}
  */
-public record SignalApp(String name, List<Frequency> frequencies, boolean active, boolean momentary,
+public record Signal(String name, List<Frequency> frequencies, boolean active, boolean momentary,
                         int strength, int color, Optional<ResourceLocation> icon, boolean slider,
-                        int sliderMin, int sliderMax, String note, boolean timed, int pulseTicks) {
+                        int sliderMin, int sliderMax, String note, boolean timed, int pulseTicks,
+                        int linkId, List<Link> links) {
 
     public static final int MAX_NAME_LENGTH = 24;
     public static final int MAX_FREQUENCIES = 8;
@@ -64,31 +71,73 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
     public static final int MIN_PULSE_TICKS = 2;
     public static final int MAX_PULSE_TICKS = 600; // 30s
     public static final int DEFAULT_PULSE_TICKS = 20; // 1s
+    public static final int MAX_LINKS = 8;
 
-    public static final Codec<SignalApp> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.fieldOf("name").forGetter(SignalApp::name),
-            Frequency.CODEC.listOf().fieldOf("frequencies").forGetter(SignalApp::frequencies),
-            Codec.BOOL.fieldOf("active").forGetter(SignalApp::active),
-            Codec.BOOL.optionalFieldOf("momentary", false).forGetter(SignalApp::momentary),
-            Codec.INT.optionalFieldOf("strength", MAX_STRENGTH).forGetter(SignalApp::strength),
-            Codec.INT.optionalFieldOf("color", DEFAULT_COLOR).forGetter(SignalApp::color),
-            ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(SignalApp::icon),
-            Codec.BOOL.optionalFieldOf("slider", false).forGetter(SignalApp::slider),
-            Codec.INT.optionalFieldOf("slider_min", 0).forGetter(SignalApp::sliderMin),
-            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(SignalApp::sliderMax),
-            Codec.STRING.optionalFieldOf("note", "").forGetter(SignalApp::note),
-            Codec.BOOL.optionalFieldOf("timed", false).forGetter(SignalApp::timed),
-            Codec.INT.optionalFieldOf("pulse_ticks", DEFAULT_PULSE_TICKS).forGetter(SignalApp::pulseTicks)
-    ).apply(instance, SignalApp::new));
+    /**
+     * One signal link (1.10.0): when the OWNING toggle is tapped, the
+     * target signal (found by {@link Signal#linkId}) reacts per mode.
+     * Toggle targets change state and chain onward; Timer targets fire
+     * their pulse (terminal); momentary/slider targets are skipped.
+     */
+    public record Link(int targetId, Mode mode) {
+
+        /** Ordinal-coded on wire and disk — append-only, never reorder. */
+        public enum Mode {
+            /** Any tap on the source turns the target ON. */
+            ON,
+            /** Any tap on the source turns the target OFF. */
+            OFF,
+            /** The target copies the source's new state. */
+            FOLLOW;
+
+            public static Mode byOrdinal(int ordinal) {
+                Mode[] values = values();
+                return values[Mth.clamp(ordinal, 0, values.length - 1)];
+            }
+        }
+
+        public static final Codec<Link> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.INT.fieldOf("target").forGetter(Link::targetId),
+                Codec.INT.optionalFieldOf("mode", 0).xmap(Mode::byOrdinal, Mode::ordinal)
+                        .forGetter(Link::mode)
+        ).apply(instance, Link::new));
+
+        public static final StreamCodec<RegistryFriendlyByteBuf, Link> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.VAR_INT, Link::targetId,
+                        ByteBufCodecs.VAR_INT.map(Mode::byOrdinal, Mode::ordinal), Link::mode,
+                        Link::new);
+    }
+
+    public static final Codec<Signal> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.fieldOf("name").forGetter(Signal::name),
+            Frequency.CODEC.listOf().fieldOf("frequencies").forGetter(Signal::frequencies),
+            Codec.BOOL.fieldOf("active").forGetter(Signal::active),
+            Codec.BOOL.optionalFieldOf("momentary", false).forGetter(Signal::momentary),
+            Codec.INT.optionalFieldOf("strength", MAX_STRENGTH).forGetter(Signal::strength),
+            Codec.INT.optionalFieldOf("color", DEFAULT_COLOR).forGetter(Signal::color),
+            ResourceLocation.CODEC.optionalFieldOf("icon").forGetter(Signal::icon),
+            Codec.BOOL.optionalFieldOf("slider", false).forGetter(Signal::slider),
+            Codec.INT.optionalFieldOf("slider_min", 0).forGetter(Signal::sliderMin),
+            Codec.INT.optionalFieldOf("slider_max", MAX_STRENGTH).forGetter(Signal::sliderMax),
+            Codec.STRING.optionalFieldOf("note", "").forGetter(Signal::note),
+            Codec.BOOL.optionalFieldOf("timed", false).forGetter(Signal::timed),
+            Codec.INT.optionalFieldOf("pulse_ticks", DEFAULT_PULSE_TICKS).forGetter(Signal::pulseTicks),
+            Codec.INT.optionalFieldOf("link_id", 0).forGetter(Signal::linkId),
+            Link.CODEC.listOf().optionalFieldOf("links", List.of()).forGetter(Signal::links)
+    ).apply(instance, Signal::new));
 
     private static final StreamCodec<RegistryFriendlyByteBuf, List<Frequency>> FREQ_LIST_STREAM_CODEC =
             Frequency.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_FREQUENCIES));
 
+    private static final StreamCodec<RegistryFriendlyByteBuf, List<Link>> LINK_LIST_STREAM_CODEC =
+            Link.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINKS));
+
     /** Hand-rolled: too many fields for StreamCodec.composite. New fields
      * go at the END of decode AND encode, in the same order. */
-    public static final StreamCodec<RegistryFriendlyByteBuf, SignalApp> STREAM_CODEC = new StreamCodec<>() {
+    public static final StreamCodec<RegistryFriendlyByteBuf, Signal> STREAM_CODEC = new StreamCodec<>() {
         @Override
-        public SignalApp decode(RegistryFriendlyByteBuf buf) {
+        public Signal decode(RegistryFriendlyByteBuf buf) {
             String name = ByteBufCodecs.STRING_UTF8.decode(buf);
             List<Frequency> frequencies = FREQ_LIST_STREAM_CODEC.decode(buf);
             boolean active = buf.readBoolean();
@@ -102,46 +151,60 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             String note = ByteBufCodecs.STRING_UTF8.decode(buf);
             boolean timed = buf.readBoolean();
             int pulseTicks = buf.readVarInt();
-            return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
-                    sliderMin, sliderMax, note, timed, pulseTicks);
+            int linkId = buf.readVarInt();
+            List<Link> links = LINK_LIST_STREAM_CODEC.decode(buf);
+            return new Signal(name, frequencies, active, momentary, strength, color, icon, slider,
+                    sliderMin, sliderMax, note, timed, pulseTicks, linkId, links);
         }
 
         @Override
-        public void encode(RegistryFriendlyByteBuf buf, SignalApp app) {
-            ByteBufCodecs.STRING_UTF8.encode(buf, app.name());
-            FREQ_LIST_STREAM_CODEC.encode(buf, app.frequencies());
-            buf.writeBoolean(app.active());
-            buf.writeBoolean(app.momentary());
-            buf.writeVarInt(app.strength());
-            buf.writeInt(app.color());
-            buf.writeOptional(app.icon(), FriendlyByteBuf::writeResourceLocation);
-            buf.writeBoolean(app.slider());
-            buf.writeVarInt(app.sliderMin());
-            buf.writeVarInt(app.sliderMax());
-            ByteBufCodecs.STRING_UTF8.encode(buf, app.note());
-            buf.writeBoolean(app.timed());
-            buf.writeVarInt(app.pulseTicks());
+        public void encode(RegistryFriendlyByteBuf buf, Signal signal) {
+            ByteBufCodecs.STRING_UTF8.encode(buf, signal.name());
+            FREQ_LIST_STREAM_CODEC.encode(buf, signal.frequencies());
+            buf.writeBoolean(signal.active());
+            buf.writeBoolean(signal.momentary());
+            buf.writeVarInt(signal.strength());
+            buf.writeInt(signal.color());
+            buf.writeOptional(signal.icon(), FriendlyByteBuf::writeResourceLocation);
+            buf.writeBoolean(signal.slider());
+            buf.writeVarInt(signal.sliderMin());
+            buf.writeVarInt(signal.sliderMax());
+            ByteBufCodecs.STRING_UTF8.encode(buf, signal.note());
+            buf.writeBoolean(signal.timed());
+            buf.writeVarInt(signal.pulseTicks());
+            buf.writeVarInt(signal.linkId());
+            LINK_LIST_STREAM_CODEC.encode(buf, signal.links());
         }
     };
 
-    public SignalApp withActive(boolean newActive) {
-        return new SignalApp(name, frequencies, newActive, momentary, strength, color, icon, slider,
-                sliderMin, sliderMax, note, timed, pulseTicks);
+    public Signal withActive(boolean newActive) {
+        return new Signal(name, frequencies, newActive, momentary, strength, color, icon, slider,
+                sliderMin, sliderMax, note, timed, pulseTicks, linkId, links);
     }
 
-    /** Slider apps: set the live value; {@code active} follows (value > 0).
-     * Clamps into the app's range — the server authority against stale or
+    /** Slider signals: set the live value; {@code active} follows (value > 0).
+     * Clamps into the signal's range — the server authority against stale or
      * hostile payloads. */
-    public SignalApp withSliderValue(int value) {
+    public Signal withSliderValue(int value) {
         int clean = Mth.clamp(value, sliderMin, sliderMax);
-        return new SignalApp(name, frequencies, clean > 0, false, clean, color, icon, true,
-                sliderMin, sliderMax, note, false, pulseTicks);
+        return new Signal(name, frequencies, clean > 0, false, clean, color, icon, true,
+                sliderMin, sliderMax, note, false, pulseTicks, linkId, links);
     }
 
     /** Server-side note write; the caller sends the whole new text. */
-    public SignalApp withNote(String newNote) {
-        return new SignalApp(name, frequencies, active, momentary, strength, color, icon, slider,
-                sliderMin, sliderMax, cleanNote(newNote), timed, pulseTicks);
+    public Signal withNote(String newNote) {
+        return new Signal(name, frequencies, active, momentary, strength, color, icon, slider,
+                sliderMin, sliderMax, cleanNote(newNote), timed, pulseTicks, linkId, links);
+    }
+
+    /** Server-side id mint (handleUpsert's ensure-ids pass ONLY). */
+    public Signal withLinkId(int newId) {
+        return new Signal(name, frequencies, active, momentary, strength, color, icon, slider,
+                sliderMin, sliderMax, note, timed, pulseTicks, newId, links);
+    }
+
+    public boolean hasLinks() {
+        return !links.isEmpty();
     }
 
     public boolean hasNote() {
@@ -150,7 +213,7 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
 
     /**
      * 🐍🕹️ (1.7.1, expanded 1.8.0): certain NAME + ICON pairs turn an
-     * app into a shortcut for a hidden game — GUI clicks and
+     * signal into a shortcut for a hidden game — GUI clicks and
      * placed-screen taps open it instead of toggling (both sides
      * consult this, so the world tap stays inert on the server).
      * Derived, never on the wire. The client maps ids to screens in
@@ -167,7 +230,7 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
             "2048", "crossing", "runner", "stacker", "stack", "invaders",
             "crates", "sokoban", "life", "paint");
 
-    /** Game id when this app is a secret-game shortcut, else null. */
+    /** Game id when this signal is a secret-game shortcut, else null. */
     @org.jetbrains.annotations.Nullable
     public String secretGameId() {
         String key = name.strip().toLowerCase(java.util.Locale.ROOT);
@@ -225,7 +288,7 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
     }
 
     /** Sanitizes untrusted client input server-side. */
-    public SignalApp sanitized() {
+    public Signal sanitized() {
         String cleanName = name.length() > MAX_NAME_LENGTH ? name.substring(0, MAX_NAME_LENGTH) : name;
         List<Frequency> cleanFreqs = frequencies.stream()
                 .filter(f -> !f.isEmpty())
@@ -233,24 +296,38 @@ public record SignalApp(String name, List<Frequency> frequencies, boolean active
                 .limit(MAX_FREQUENCIES)
                 .toList();
         int cleanPulse = Mth.clamp(pulseTicks, MIN_PULSE_TICKS, MAX_PULSE_TICKS);
+        List<Link> cleanLinks = cleanLinks();
         if (slider) {
             // Sliders can rest at their min (0 allowed); active is derived,
             // momentary/timed excluded. Range: 0 <= min < max <= 15.
             int cleanMin = Mth.clamp(sliderMin, 0, MAX_STRENGTH - 1);
             int cleanMax = Mth.clamp(sliderMax, cleanMin + 1, MAX_STRENGTH);
             int cleanValue = Mth.clamp(strength, cleanMin, cleanMax);
-            return new SignalApp(cleanName.strip(), cleanFreqs, cleanValue > 0, false,
+            return new Signal(cleanName.strip(), cleanFreqs, cleanValue > 0, false,
                     cleanValue, color, icon, true, cleanMin, cleanMax, cleanNote(note),
-                    false, cleanPulse);
+                    false, cleanPulse, linkId, cleanLinks);
         }
-        // Momentary and Timer apps never persist an active state (their
+        // Momentary and Timer signals never persist an active state (their
         // signal is transient server state); non-sliders keep the default
         // 0/15 range so nothing extra persists. Timed excludes momentary.
         boolean cleanTimed = timed;
         boolean cleanMomentary = momentary && !timed;
         boolean cleanActive = !cleanMomentary && !cleanTimed && active;
-        return new SignalApp(cleanName.strip(), cleanFreqs, cleanActive, cleanMomentary,
+        return new Signal(cleanName.strip(), cleanFreqs, cleanActive, cleanMomentary,
                 Mth.clamp(strength, 1, MAX_STRENGTH), color, icon, false, 0, MAX_STRENGTH,
-                cleanNote(note), cleanTimed, cleanPulse);
+                cleanNote(note), cleanTimed, cleanPulse, linkId, cleanLinks);
+    }
+
+    /** Links: drop unassigned (id 0) and self targets, dedupe by target
+     * (first wins), cap at {@link #MAX_LINKS}. */
+    private List<Link> cleanLinks() {
+        if (links.isEmpty()) return List.of();
+        java.util.LinkedHashMap<Integer, Link> byTarget = new java.util.LinkedHashMap<>();
+        for (Link link : links) {
+            if (link.targetId() == 0 || link.targetId() == linkId) continue;
+            byTarget.putIfAbsent(link.targetId(), link);
+            if (byTarget.size() >= MAX_LINKS) break;
+        }
+        return byTarget.isEmpty() ? List.of() : List.copyOf(byTarget.values());
     }
 }

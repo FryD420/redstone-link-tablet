@@ -2,7 +2,7 @@ package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -13,7 +13,7 @@ import net.minecraft.util.Mth;
 import java.util.function.Supplier;
 
 /**
- * Floating per-app note window (1.6.0): a small chrome-framed "OS
+ * Floating per-signal note window (1.6.0): a small chrome-framed "OS
  * window" that hovers over the tablet home screen — draggable by its
  * title bar, closed ONLY by the corner button or ESC. It is NOT modal:
  * clicks outside it fall through to the tablet GUI (little-window
@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  * flushes its own edits: {@link #defocus()}/{@link #onClose()} send a
  * {@code SetNotePayload} when the text changed — the server stays
  * authoritative and other players' edits sync back through normal
- * app-list sync.
+ * signal-list sync.
  */
 public class NoteWindow implements FloatingWindow {
 
@@ -45,10 +45,10 @@ public class NoteWindow implements FloatingWindow {
     private final Supplier<ScreenTheme> theme;
     private final Component title;
     private final MultiLineEditBox box;
-    /** Tablet this window's app lives on (windows outlive any screen). */
-    final com.modpack.linktablet.client.AppView view;
-    /** App this window belongs to (several windows may be open at once). */
-    final int appIndex;
+    /** Tablet this window's signal lives on (windows outlive any screen). */
+    final com.modpack.linktablet.client.SignalView view;
+    /** Signal this window belongs to (several windows may be open at once). */
+    final int signalIndex;
 
     private String original;
     private int x;
@@ -56,10 +56,10 @@ public class NoteWindow implements FloatingWindow {
     private boolean draggingTitle = false;
     private double dragDX, dragDY;
 
-    NoteWindow(Font font, com.modpack.linktablet.client.AppView view, int appIndex,
+    NoteWindow(Font font, com.modpack.linktablet.client.SignalView view, int signalIndex,
                Component title, String note, int x, int y) {
         this.view = view;
-        this.appIndex = appIndex;
+        this.signalIndex = signalIndex;
         this.font = font;
         this.theme = view::theme;
         this.title = title;
@@ -73,7 +73,7 @@ public class NoteWindow implements FloatingWindow {
                 // The window draws a themed ink field instead
             }
         };
-        this.box.setCharacterLimit(SignalApp.MAX_NOTE_LENGTH);
+        this.box.setCharacterLimit(Signal.MAX_NOTE_LENGTH);
         this.box.setValue(note);
         this.box.setFocused(true);
     }
@@ -97,10 +97,10 @@ public class NoteWindow implements FloatingWindow {
     /** Sends the note to the server when it changed since the last save. */
     private void save() {
         if (!changed()) return;
-        if (appIndex >= view.apps().size()) return;
+        if (signalIndex >= view.signals().size()) return;
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.modpack.linktablet.network.ModNetworking.SetNotePayload(
-                        view.target(), appIndex, value()));
+                        view.target(), signalIndex, value()));
         original = value();
     }
 
@@ -117,7 +117,7 @@ public class NoteWindow implements FloatingWindow {
 
     @Override
     public boolean shouldClose() {
-        return appIndex < 0 || appIndex >= view.apps().size();
+        return signalIndex < 0 || signalIndex >= view.signals().size();
     }
 
     @Override

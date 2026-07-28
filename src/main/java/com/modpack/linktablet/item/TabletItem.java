@@ -48,7 +48,7 @@ public class TabletItem extends Item {
     /**
      * Sneak + right-click a surface: mount the tablet as a block.
      * Plain right-click on a Redstone Link (anything with Create's
-     * {@code LinkBehaviour}): open the app editor pre-filled with that
+     * {@code LinkBehaviour}): open the signal editor pre-filled with that
      * link's frequency.
      */
     @Override
@@ -83,7 +83,7 @@ public class TabletItem extends Item {
     /**
      * Consumes the click when the target block carries a link frequency,
      * or null to fall through. The editor itself only opens client-side;
-     * the eventual save travels the normal UpsertApp path.
+     * the eventual save travels the normal UpsertSignal path.
      */
     private static InteractionResult tryOpenLink(UseOnContext context, Player player) {
         Level level = context.getLevel();

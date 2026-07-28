@@ -3,7 +3,7 @@ package com.modpack.linktablet.client.render;
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
 import com.modpack.linktablet.client.TextFit;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -26,10 +26,10 @@ import java.util.Set;
 
 /**
  * Draws the tablet's live mini screen: a background over the glass area
- * and the first visible apps as either icon pips (grid) or icon +
+ * and the first visible signals as either icon pips (grid) or icon +
  * mini-switch rows (list), echoing the GUI's two layouts. The grid sizes
- * itself to the app count ({@link TabletScreenMath#gridLayout}) — one app
- * fills the glass, tiles shrink as apps are added. Shared by the block
+ * itself to the signal count ({@link TabletScreenMath#gridLayout}) — one signal
+ * fills the glass, tiles shrink as signals are added. Shared by the block
  * entity renderer and the item renderer — the caller positions the
  * PoseStack so that screen-local texel {@code (u, v)} maps to local
  * {@code (u/16, layer, v/16)} with the screen normal on +Y.
@@ -106,6 +106,28 @@ public final class TabletScreenRenderer {
     private TabletScreenRenderer() {}
 
     /**
+     * Kiosk launcher face (1.10.0): one synthetic tile per home-roster
+     * program, drawn through the exact signal-grid pipeline — the same
+     * layout table the server hit-test reads via the home list's size,
+     * so there is no separate launcher geometry to drift. Tiles pose as
+     * active toggles (bright chip, accent outline, full-bright icon) so
+     * they read as lit app icons. Rebuilt per call: labels go stale on
+     * language switch, rosters change from the drawer.
+     */
+    public static List<Signal> launcherTiles(List<com.modpack.linktablet.api.TabletProgram> home) {
+        List<Signal> tiles = new java.util.ArrayList<>(home.size());
+        for (com.modpack.linktablet.api.TabletProgram program : home) {
+            tiles.add(new Signal(
+                    program.displayName().getString(),
+                    List.of(), true, false, Signal.MAX_STRENGTH, program.chipColor(),
+                    java.util.Optional.ofNullable(program.iconItem()),
+                    false, 0, Signal.MAX_STRENGTH, "", false, Signal.MIN_PULSE_TICKS,
+                    0, List.of()));
+        }
+        return tiles;
+    }
+
+    /**
      * @param list     the tablet's stored screen layout (switch list vs
      *                 pip grid)
      * @param rot      screen content rotation, quarter turns CW (0–3) —
@@ -114,13 +136,23 @@ public final class TabletScreenRenderer {
      * @param backlit  true when the screen's emissive state is on (block
      *                 LIT / item GUI-open) — brightens the background
      * @param packedLight world light used for non-glowing parts
-     * @param heldPips indices of momentary apps currently held down —
+     * @param heldPips indices of momentary signals currently held down —
      *                 those pips render lit
      */
     public static void render(PoseStack poseStack, MultiBufferSource buffers,
-                              List<SignalApp> apps, boolean list, int rot, ScreenTheme theme,
+                              List<Signal> signals, boolean list, int rot, ScreenTheme theme,
                               boolean backlit, int packedLight, Set<Integer> heldPips) {
-        render(poseStack, buffers, apps, list, rot, theme, backlit, packedLight, heldPips, 1, 1, 0);
+        render(poseStack, buffers, signals, list, rot, theme, backlit, packedLight, heldPips,
+                1, 1, 0, false);
+    }
+
+    /** Pre-plainRows signature kept for the signal call sites. */
+    public static void render(PoseStack poseStack, MultiBufferSource buffers,
+                              List<Signal> signals, boolean list, int rot, ScreenTheme theme,
+                              boolean backlit, int packedLight, Set<Integer> heldPips,
+                              int surfaceW, int surfaceH, int caseTint) {
+        render(poseStack, buffers, signals, list, rot, theme, backlit, packedLight, heldPips,
+                surfaceW, surfaceH, caseTint, false);
     }
 
     /** Default (undyed) case tint — mirrors ClientSetup's block color. */
@@ -134,10 +166,203 @@ public final class TabletScreenRenderer {
      * surface by construction. Content rotation only exists at 1×1
      * (surfaces clamp to 0; see TabletBlockEntity.effectiveRotation).
      */
+    /**
+     * @param plainRows list rows without the switch/knob mechanism —
+     *                  the kiosk LAUNCHER face's list mode (1.10.0 test
+     *                  pass 2: rows are doors, not toggles). Same
+     *                  geometry as signal rows, so the hit-test stays
+     *                  shared.
+     */
     public static void render(PoseStack poseStack, MultiBufferSource buffers,
-                              List<SignalApp> apps, boolean list, int rot, ScreenTheme theme,
+                              List<Signal> signals, boolean list, int rot, ScreenTheme theme,
                               boolean backlit, int packedLight, Set<Integer> heldPips,
-                              int surfaceW, int surfaceH, int caseTint) {
+                              int surfaceW, int surfaceH, int caseTint, boolean plainRows) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        VertexConsumer vc = base.vc();
+        PoseStack.Pose pose = base.pose();
+        float glassW = base.glassW();
+        float glassH = base.glassH();
+        float u1 = base.u1();
+        float v1 = base.v1();
+        int bgLight = base.bgLight();
+
+        int count = TabletScreenMath.visibleSignals(signals.size(), list, surfaceW, surfaceH);
+        TabletScreenMath.SurfaceLayout sl =
+                TabletScreenMath.surfaceLayout(signals.size(), surfaceW, surfaceH, rot);
+        int cols = sl.cols();
+        float rowH = tileSize(glassH, TabletScreenMath.LIST_ROWS * surfaceH);
+        float tileW = tileSize(glassW, cols);
+        float tileH = tileSize(glassH, sl.rows());
+        // Centered sparse block: place tiles in a usedCols-wide block
+        // centered on the glass — the hit-test applies the same offsets
+        int usedCols = TabletScreenMath.usedCols(count, cols);
+        float offU = (cols - usedCols) * (tileW + SPACE) / 2f;
+        float offV = (sl.rows() - TabletScreenMath.usedRows(count, cols, sl.rows()))
+                * (tileH + SPACE) / 2f;
+        if (!list && count == 1) {
+            // Lone tile: the bespoke centered square (loneTileRect is
+            // the one source — hit tail and slider bar read it too).
+            // Redirecting tileW/tileH/offU/offV here feeds every pass
+            // below without touching their placement expressions.
+            float[] lone = TabletScreenMath.loneTileRect(glassW, glassH);
+            tileW = lone[2];
+            tileH = lone[2];
+            offU = lone[0] - (TabletScreenMath.GLASS_U0 + SPACE);
+            offV = lone[1] - (TabletScreenMath.GLASS_V0 + SPACE);
+        }
+        boolean labels = !list && sl.k() * sl.m() <= LABEL_CELLS_MAX;
+        float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
+        // Bottom strip of each big tile reserved for the name label
+        float labelZone = labels ? textH + LABEL_GAP : 0f;
+        float ringW = Mth.clamp(Math.min(tileW, tileH) * (RING / REFERENCE_TILE), RING, 1.25f);
+
+        // Strict pass order — all quads, then all icons, then all text.
+        // An icon's model (or the font) may need a render type that shares
+        // the fallback buffer, which ends any in-progress shared batch;
+        // interleaving would leave our quad buffer dead mid-loop
+        // ("Not building!" crash with modded icons).
+        for (int i = 0; i < count; i++) {
+            Signal signal = signals.get(i);
+            int color = signal.color() | 0xFF000000;
+            boolean held = heldPips.contains(i);
+            if (list) {
+                renderSwitchRow(pose, vc, listV0(i, rowH), signal, color, theme,
+                        packedLight, held, rowH,
+                        TabletScreenMath.GLASS_U0 + SPACE, u1 - SPACE, plainRows);
+            } else {
+                float u0 = offU + tileU0(i % usedCols, tileW);
+                float v0 = offV + tileV0(i / usedCols, tileH);
+                renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, signal, color, theme,
+                        packedLight, ringW, held, labelZone);
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            Signal signal = signals.get(i);
+            boolean glowing = (signal.active() && !signal.momentary()) || heldPips.contains(i);
+            int light = glowing ? LightTexture.FULL_BRIGHT : packedLight;
+            float cu, cv, size;
+            if (list) {
+                cu = TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
+                cv = listV0(i, rowH) + rowH / 2f;
+                // Icon fills the inset chip exactly, like the GUI's 16px-on-16px
+                size = Math.min(LIST_ICON, rowH * 2f / 3f);
+            } else {
+                cu = offU + tileU0(i % usedCols, tileW) + tileW / 2f;
+                cv = offV + tileV0(i / usedCols, tileH) + (tileH - labelZone) / 2f;
+                float cell = Math.min(tileW, tileH - labelZone);
+                if (cell >= CHIP_MIN_CELL) {
+                    // Icon fills the inset chip exactly, like the list rows
+                    size = Math.min(cell - 2 * chipInset(cell), ICON_MAX);
+                } else {
+                    size = Mth.clamp(cell * ICON_FRAC, ICON_MIN, ICON_MAX);
+                }
+                if (signal.momentary() || signal.timed()) size *= MOMENTARY_ICON_FRAC;
+            }
+            renderIcon(poseStack, buffers, signal.iconStack(), cu, cv, size, light);
+        }
+        // Text pass (third): big-tile labels in grid mode, row names in
+        // list mode, slider level numerals in both.
+        Font font = Minecraft.getInstance().font;
+        if (list) {
+            float scale = LIST_TEXT_H / 16f / FONT_LINE;
+            // Between the icon chip and the switch; slider rows have a
+            // wider track plus the level numeral, so budget per row
+            float textU0 = TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
+            for (int i = 0; i < count; i++) {
+                Signal signal = signals.get(i);
+                // Plain (launcher) rows have no control — text runs to
+                // the row's right edge
+                float controlU0 = plainRows ? u1 - SPACE
+                        : u1 - SPACE - SWITCH_MARGIN
+                        - (signal.slider() ? SWITCH_W * 1.6f : SWITCH_W);
+                float textU1 = controlU0 - 0.4f;
+                if (signal.slider()) {
+                    String level = String.valueOf(signal.strength());
+                    float levelW = font.width(level) * LIST_TEXT_H / FONT_LINE;
+                    float levelTop = listV0(i, rowH) + (rowH - LIST_TEXT_H) / 2f;
+                    drawLabel(poseStack, buffers, font, level, controlU0 - 0.3f - levelW,
+                            levelTop, scale, false, false, theme.textPrimary, bgLight);
+                    textU1 = controlU0 - 0.6f - levelW;
+                }
+                int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
+                FittedLabel label = fitLabel(font, signal.name(), maxPx);
+                if (label.text().isBlank()) continue;
+                float top = listV0(i, rowH) + (rowH - LIST_TEXT_H * label.fit()) / 2f;
+                // Plain text: rows sit on the themed track, no outline needed
+                drawLabel(poseStack, buffers, font, label.text(), textU0, top, scale * label.fit(),
+                        false, false, theme.textPrimary, bgLight);
+            }
+        } else if (labels) {
+            // Texel width budget → font pixels at this label height
+            int maxPx = (int) ((tileW - 2 * SPACE) * FONT_LINE / textH);
+            float scale = textH / 16f / FONT_LINE;
+            for (int i = 0; i < count; i++) {
+                FittedLabel label = fitLabel(font, signals.get(i).name(), maxPx);
+                if (label.text().isBlank()) continue;
+                float cu = offU + tileU0(i % usedCols, tileW) + tileW / 2f;
+                // Bottom-aligned so a shrunk label hugs the tile edge
+                float top = offV + tileV0(i / usedCols, tileH) + tileH - textH * label.fit() - SPACE;
+                // White with a black outline: the label sits on the signal's
+                // own tile color (any brightness), not the theme surface
+                drawLabel(poseStack, buffers, font, label.text(), cu, top, scale * label.fit(),
+                        true, true, 0xFFFFFFFF, bgLight);
+            }
+        }
+        if (!list) {
+            // Slider level numerals, stack-count style on the chip's
+            // bottom-right corner (outlined, drawn in the raised text
+            // layer so block icons can't cover them); dense classic pips
+            // keep the old under-the-strip badge
+            for (int i = 0; i < count; i++) {
+                Signal signal = signals.get(i);
+                if (!signal.slider()) continue;
+                String level = String.valueOf(signal.strength());
+                float u0 = offU + tileU0(i % usedCols, tileW);
+                float v0 = offV + tileV0(i / usedCols, tileH);
+                float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
+                float levelW = font.width(level) * numH / FONT_LINE;
+                float cell = Math.min(tileW, tileH - labelZone);
+                float u, v;
+                if (cell >= CHIP_MIN_CELL) {
+                    float half = (cell - 2 * chipInset(cell)) / 2f;
+                    u = u0 + tileW / 2f + half - levelW;
+                    v = v0 + (tileH - labelZone) / 2f + half - numH;
+                } else {
+                    float inset = TabletScreenMath.sliderInset(tileW);
+                    u = u0 + tileW - inset - levelW;
+                    v = v0 + inset + sliderBarH(tileH) + 0.25f;
+                }
+                drawLabel(poseStack, buffers, font, level, u, v,
+                        numH / 16f / FONT_LINE, false, true, 0xFFFFFFFF, bgLight);
+            }
+        }
+        poseStack.popPose();
+    }
+
+    /** Slider value-strip height — shared by the quad pass and the numeral pass. */
+    private static float sliderBarH(float tileH) {
+        return Mth.clamp(tileH * 0.18f, 0.25f, 0.6f);
+    }
+
+    /** Everything the content passes need after the shared background:
+     * logical glass spans, glass bounds, the shared buffer, background
+     * light. Produced by {@link #beginScreen} with the pose PUSHED —
+     * the caller must {@code popPose()}. */
+    private record ScreenBase(float glassW, float glassH, float u1, float v1,
+                              VertexConsumer vc, PoseStack.Pose pose, int bgLight) {
+    }
+
+    /**
+     * Shared screen base (extracted for the 1.10.0 program faces): the
+     * rotation pose and the background/bezel/skirt quads, identical for
+     * every program the kiosk can show. Pushes the pose — every caller
+     * pops after its content passes.
+     */
+    private static ScreenBase beginScreen(PoseStack poseStack, MultiBufferSource buffers,
+                                          int rot, ScreenTheme theme, boolean backlit,
+                                          int packedLight, int surfaceW, int surfaceH,
+                                          int caseTint) {
         int members = surfaceW * surfaceH;
         // Content rotation: draw in a "logical" glass (spans swapped
         // when rot is odd) spun about the physical glass center. The
@@ -223,143 +448,340 @@ public final class TabletScreenRenderer {
             // solid display housing.
             skirt(pose, vc, su0, sv0, su1, sv1, 1.2f, shade(tint, 0.8f), packedLight);
         }
+        return new ScreenBase(glassW, glassH, u1, v1, vc, pose, bgLight);
+    }
 
-        int count = TabletScreenMath.visibleApps(apps.size(), list, surfaceW, surfaceH);
-        TabletScreenMath.SurfaceLayout sl =
-                TabletScreenMath.surfaceLayout(apps.size(), surfaceW, surfaceH, rot);
-        int cols = sl.cols();
-        float rowH = tileSize(glassH, TabletScreenMath.LIST_ROWS * surfaceH);
-        float tileW = tileSize(glassW, cols);
-        float tileH = tileSize(glassH, sl.rows());
-        boolean labels = !list && sl.k() * sl.m() <= LABEL_CELLS_MAX;
-        float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
-        // Bottom strip of each big tile reserved for the name label
-        float labelZone = labels ? textH + LABEL_GAP : 0f;
-        float ringW = Mth.clamp(Math.min(tileW, tileH) * (RING / REFERENCE_TILE), RING, 1.25f);
-
-        // Strict pass order — all quads, then all icons, then all text.
-        // An icon's model (or the font) may need a render type that shares
-        // the fallback buffer, which ends any in-progress shared batch;
-        // interleaving would leave our quad buffer dead mid-loop
-        // ("Not building!" crash with modded icons).
-        for (int i = 0; i < count; i++) {
-            SignalApp app = apps.get(i);
-            int color = app.color() | 0xFF000000;
-            boolean held = heldPips.contains(i);
-            if (list) {
-                renderSwitchRow(pose, vc, listV0(i, rowH), app, color, theme,
-                        packedLight, held, rowH,
-                        TabletScreenMath.GLASS_U0 + SPACE, u1 - SPACE);
-            } else {
-                float u0 = tileU0(i % cols, tileW);
-                float v0 = tileV0(i / cols, tileH);
-                renderPip(pose, vc, u0, v0, u0 + tileW, v0 + tileH, app, color, theme,
-                        packedLight, ringW, held, labelZone);
-            }
-        }
-        for (int i = 0; i < count; i++) {
-            SignalApp app = apps.get(i);
-            boolean glowing = (app.active() && !app.momentary()) || heldPips.contains(i);
-            int light = glowing ? LightTexture.FULL_BRIGHT : packedLight;
-            float cu, cv, size;
-            if (list) {
-                cu = TabletScreenMath.GLASS_U0 + SPACE + rowH / 2f;
-                cv = listV0(i, rowH) + rowH / 2f;
-                // Icon fills the inset chip exactly, like the GUI's 16px-on-16px
-                size = Math.min(LIST_ICON, rowH * 2f / 3f);
-            } else {
-                cu = tileU0(i % cols, tileW) + tileW / 2f;
-                cv = tileV0(i / cols, tileH) + (tileH - labelZone) / 2f;
-                float cell = Math.min(tileW, tileH - labelZone);
-                if (cell >= CHIP_MIN_CELL) {
-                    // Icon fills the inset chip exactly, like the list rows
-                    size = Math.min(cell - 2 * chipInset(cell), ICON_MAX);
-                } else {
-                    size = Mth.clamp(cell * ICON_FRAC, ICON_MIN, ICON_MAX);
-                }
-                if (app.momentary() || app.timed()) size *= MOMENTARY_ICON_FRAC;
-            }
-            renderIcon(poseStack, buffers, app.iconStack(), cu, cv, size, light);
-        }
-        // Text pass (third): big-tile labels in grid mode, row names in
-        // list mode, slider level numerals in both.
+    /**
+     * Generic kiosk face for programs without a bespoke world pass
+     * (1.10.0 suite — calculator today): the shared screen base plus the
+     * program's name, dimmed, centered. The face is a door — tapping the
+     * glass opens the program's GUI — so it only needs to say which door
+     * it is. Text-only content, pass order trivially safe.
+     */
+    public static void renderLabelFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH,
+                                       int caseTint, String label) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
         Font font = Minecraft.getInstance().font;
-        if (list) {
-            float scale = LIST_TEXT_H / 16f / FONT_LINE;
-            // Between the icon chip and the switch; slider rows have a
-            // wider track plus the level numeral, so budget per row
-            float textU0 = TabletScreenMath.GLASS_U0 + SPACE + rowH + 0.4f;
-            for (int i = 0; i < count; i++) {
-                SignalApp app = apps.get(i);
-                float controlU0 = u1 - SPACE - SWITCH_MARGIN
-                        - (app.slider() ? SWITCH_W * 1.6f : SWITCH_W);
-                float textU1 = controlU0 - 0.4f;
-                if (app.slider()) {
-                    String level = String.valueOf(app.strength());
-                    float levelW = font.width(level) * LIST_TEXT_H / FONT_LINE;
-                    float levelTop = listV0(i, rowH) + (rowH - LIST_TEXT_H) / 2f;
-                    drawLabel(poseStack, buffers, font, level, controlU0 - 0.3f - levelW,
-                            levelTop, scale, false, false, theme.textPrimary, bgLight);
-                    textU1 = controlU0 - 0.6f - levelW;
-                }
-                int maxPx = (int) ((textU1 - textU0) * FONT_LINE / LIST_TEXT_H);
-                FittedLabel label = fitLabel(font, app.name(), maxPx);
-                if (label.text().isBlank()) continue;
-                float top = listV0(i, rowH) + (rowH - LIST_TEXT_H * label.fit()) / 2f;
-                // Plain text: rows sit on the themed track, no outline needed
-                drawLabel(poseStack, buffers, font, label.text(), textU0, top, scale * label.fit(),
-                        false, false, theme.textPrimary, bgLight);
-            }
-        } else if (labels) {
-            // Texel width budget → font pixels at this label height
-            int maxPx = (int) ((tileW - 2 * SPACE) * FONT_LINE / textH);
-            float scale = textH / 16f / FONT_LINE;
-            for (int i = 0; i < count; i++) {
-                FittedLabel label = fitLabel(font, apps.get(i).name(), maxPx);
-                if (label.text().isBlank()) continue;
-                float cu = tileU0(i % cols, tileW) + tileW / 2f;
-                // Bottom-aligned so a shrunk label hugs the tile edge
-                float top = tileV0(i / cols, tileH) + tileH - textH * label.fit() - SPACE;
-                // White with a black outline: the label sits on the app's
-                // own tile color (any brightness), not the theme surface
-                drawLabel(poseStack, buffers, font, label.text(), cu, top, scale * label.fit(),
-                        true, true, 0xFFFFFFFF, bgLight);
-            }
+        float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+        float textH = Mth.clamp(
+                (base.glassW() - 2f) * FONT_LINE / Math.max(1, font.width(label)),
+                0.8f, base.glassH() * 0.2f);
+        float top = TabletScreenMath.GLASS_V0 + (base.glassH() - textH) / 2f;
+        drawLabel(poseStack, buffers, font, label, cu, top, textH / 16f / FONT_LINE,
+                true, false, theme.textMuted, base.bgLight());
+        poseStack.popPose();
+    }
+
+    /**
+     * Addon kiosk face (the addon API): the shared screen base, then the
+     * painter's BUFFERED calls flushed in the mandatory pass order —
+     * all fills, then all items, then all text — so addon code cannot
+     * break the shared-batch invariant however it paints. Fill layers
+     * follow call order (painter's algorithm) inside the band below the
+     * icon/text layers.
+     */
+    public static void renderAddonFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH, int caseTint,
+                                       com.modpack.linktablet.api.client.TabletFacePainter painter,
+                                       net.minecraft.world.level.block.entity.BlockEntity be,
+                                       float partialTick) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        BufferedFace ctx = new BufferedFace(base.glassW(), base.glassH(), theme, backlit,
+                be, partialTick);
+        painter.paint(ctx);
+        int fills = ctx.fills.size();
+        for (int i = 0; i < fills; i++) {
+            BufferedFace.Fill fill = ctx.fills.get(i);
+            // Stack later fills above earlier ones, staying under the
+            // icon (3.5x) and text (4x) layers
+            float layer = LAYER * (1f + 2f * (fills <= 1 ? 0f : i / (float) (fills - 1)));
+            fillRect(base.pose(), base.vc(),
+                    TabletScreenMath.GLASS_U0 + fill.u0(), TabletScreenMath.GLASS_V0 + fill.v0(),
+                    TabletScreenMath.GLASS_U0 + fill.u1(), TabletScreenMath.GLASS_V0 + fill.v1(),
+                    layer, fill.argb(), base.bgLight());
         }
-        if (!list) {
-            // Slider level numerals, stack-count style on the chip's
-            // bottom-right corner (outlined, drawn in the raised text
-            // layer so block icons can't cover them); dense classic pips
-            // keep the old under-the-strip badge
-            for (int i = 0; i < count; i++) {
-                SignalApp app = apps.get(i);
-                if (!app.slider()) continue;
-                String level = String.valueOf(app.strength());
-                float u0 = tileU0(i % cols, tileW);
-                float v0 = tileV0(i / cols, tileH);
-                float numH = Mth.clamp(tileH * 0.22f, 0.8f, 1.6f);
-                float levelW = font.width(level) * numH / FONT_LINE;
-                float cell = Math.min(tileW, tileH - labelZone);
-                float u, v;
-                if (cell >= CHIP_MIN_CELL) {
-                    float half = (cell - 2 * chipInset(cell)) / 2f;
-                    u = u0 + tileW / 2f + half - levelW;
-                    v = v0 + (tileH - labelZone) / 2f + half - numH;
-                } else {
-                    float inset = TabletScreenMath.sliderInset(tileW);
-                    u = u0 + tileW - inset - levelW;
-                    v = v0 + inset + sliderBarH(tileH) + 0.25f;
-                }
-                drawLabel(poseStack, buffers, font, level, u, v,
-                        numH / 16f / FONT_LINE, false, true, 0xFFFFFFFF, bgLight);
+        for (BufferedFace.Item item : ctx.items) {
+            renderIcon(poseStack, buffers, item.stack(),
+                    TabletScreenMath.GLASS_U0 + item.centerU(),
+                    TabletScreenMath.GLASS_V0 + item.centerV(),
+                    item.size(), base.bgLight());
+        }
+        Font addonFont = Minecraft.getInstance().font;
+        for (BufferedFace.Text text : ctx.texts) {
+            drawLabel(poseStack, buffers, addonFont, text.text(),
+                    TabletScreenMath.GLASS_U0 + text.u(),
+                    TabletScreenMath.GLASS_V0 + text.top(),
+                    text.height() / 16f / FONT_LINE,
+                    text.centered(), text.outline(), text.argb(), base.bgLight());
+        }
+        poseStack.popPose();
+    }
+
+    /** The buffering {@code TabletFaceContext} behind {@link #renderAddonFace}. */
+    private static final class BufferedFace
+            implements com.modpack.linktablet.api.client.TabletFaceContext {
+
+        record Fill(float u0, float v0, float u1, float v1, int argb) {}
+
+        record Item(ItemStack stack, float centerU, float centerV, float size) {}
+
+        record Text(String text, float u, float top, float height, int argb,
+                    boolean centered, boolean outline) {}
+
+        final List<Fill> fills = new java.util.ArrayList<>();
+        final List<Item> items = new java.util.ArrayList<>();
+        final List<Text> texts = new java.util.ArrayList<>();
+
+        private final float width;
+        private final float height;
+        private final ScreenTheme theme;
+        private final boolean backlit;
+        private final net.minecraft.world.level.block.entity.BlockEntity blockEntity;
+        private final float partialTick;
+
+        BufferedFace(float width, float height, ScreenTheme theme, boolean backlit,
+                     net.minecraft.world.level.block.entity.BlockEntity blockEntity,
+                     float partialTick) {
+            this.width = width;
+            this.height = height;
+            this.theme = theme;
+            this.backlit = backlit;
+            this.blockEntity = blockEntity;
+            this.partialTick = partialTick;
+        }
+
+        @Override
+        public float width() {
+            return width;
+        }
+
+        @Override
+        public float height() {
+            return height;
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            return theme;
+        }
+
+        @Override
+        public boolean backlit() {
+            return backlit;
+        }
+
+        @Override
+        public net.minecraft.world.level.block.entity.BlockEntity blockEntity() {
+            return blockEntity;
+        }
+
+        @Override
+        public float partialTick() {
+            return partialTick;
+        }
+
+        @Override
+        public void fill(float u, float v, float w, float h, int argb) {
+            if (w <= 0 || h <= 0) return;
+            fills.add(new Fill(u, v, u + w, v + h, argb | 0xFF000000));
+        }
+
+        @Override
+        public void item(ItemStack stack, float centerU, float centerV, float size) {
+            if (stack == null || stack.isEmpty() || size <= 0) return;
+            items.add(new Item(stack, centerU, centerV, size));
+        }
+
+        @Override
+        public void text(String text, float u, float top, float height, int argb,
+                         boolean centered, boolean outline) {
+            if (text == null || text.isEmpty() || height <= 0) return;
+            texts.add(new Text(text, u, top, height, argb, centered, outline));
+        }
+    }
+
+    /**
+     * Kiosk calculator face (1.10.0, from the first test pass — the
+     * bare label read as "nothing renders"): the shared screen base
+     * plus the LIVE calculator display — the viewer's own session tape
+     * ({@code CalcEngine} is client-static, like the GUI). Pending op
+     * small above, entry big below; tap the glass to work the pad.
+     * Text-only content, pass order trivially safe.
+     */
+    public static void renderCalcFace(PoseStack poseStack, MultiBufferSource buffers,
+                                      int rot, ScreenTheme theme, boolean backlit,
+                                      int packedLight, int surfaceW, int surfaceH,
+                                      int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        Font font = Minecraft.getInstance().font;
+        boolean error = com.modpack.linktablet.client.screen.CalcEngine.error();
+        String entry = error
+                ? Component.translatable("gui.linktablet.calc.error").getString()
+                : com.modpack.linktablet.client.screen.CalcEngine.entry();
+        String opGlyph = com.modpack.linktablet.client.screen.CalcEngine.pendingOpGlyph();
+
+        float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+        float entryH = Mth.clamp(
+                (base.glassW() - 1.5f) * FONT_LINE / Math.max(1, font.width(entry)),
+                0.8f, base.glassH() * 0.28f);
+        float opH = Mth.clamp(entryH * 0.5f, 0.7f, 2f);
+        float gap = entryH * 0.2f;
+        float blockH = entryH + (opGlyph.isEmpty() ? 0 : opH + gap);
+        float top = TabletScreenMath.GLASS_V0 + (base.glassH() - blockH) / 2f;
+        if (!opGlyph.isEmpty()) {
+            drawLabel(poseStack, buffers, font, opGlyph, cu, top,
+                    opH / 16f / FONT_LINE, true, false, theme.accent, base.bgLight());
+            top += opH + gap;
+        }
+        drawLabel(poseStack, buffers, font, entry, cu, top, entryH / 16f / FONT_LINE,
+                true, false, theme.textPrimary, base.bgLight());
+        poseStack.popPose();
+    }
+
+    /**
+     * Kiosk gauges face (1.10.0 OS suite): the shared screen base plus
+     * one procedural dial per gauge — tick arc, needle, value, name.
+     * The world twin of {@code GaugeDialPainter}: quads instead of
+     * fills, and the strict pass order holds (all dial quads first,
+     * then all text). Readings arrive per-index from the BE's own
+     * synced receivers — a kiosk dial shows what a link AT THE BLOCK
+     * hears.
+     */
+    public static void renderGaugesFace(PoseStack poseStack, MultiBufferSource buffers,
+                                        List<com.modpack.linktablet.frequency.Gauge> gauges,
+                                        int[] readings, int rot, ScreenTheme theme,
+                                        boolean backlit, int packedLight, int surfaceW,
+                                        int surfaceH, int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        int count = Math.min(gauges.size(), readings.length);
+        if (count == 0) {
+            poseStack.popPose();
+            return;
+        }
+        int cols = count <= 2 ? 1 : 2;
+        int rows = Mth.positiveCeilDiv(count, cols);
+        float cellW = base.glassW() / cols;
+        float cellH = base.glassH() / rows;
+        float radius = Math.min(cellW, cellH) * 0.30f;
+        Font font = Minecraft.getInstance().font;
+
+        // Pass 1: quads — ticks, needle, hub for every dial
+        for (int i = 0; i < count; i++) {
+            com.modpack.linktablet.frequency.Gauge gauge = gauges.get(i);
+            int value = Mth.clamp(readings[i], 0, com.modpack.linktablet.frequency.Gauge.MAX_VALUE);
+            float cu = TabletScreenMath.GLASS_U0 + (i % cols + 0.5f) * cellW;
+            float cv = TabletScreenMath.GLASS_V0 + (i / cols) * cellH + cellH * 0.55f;
+            int color = gauge.color() | 0xFF000000;
+            int max = com.modpack.linktablet.frequency.Gauge.MAX_VALUE;
+            float tick = Mth.clamp(radius * 0.12f, 0.08f, 0.3f);
+            for (int t = 0; t <= max; t++) {
+                float angle = (float) Math.toRadians(180.0 - t * 180.0 / max);
+                float tu = cu + radius * Mth.cos(angle);
+                float tv = cv - radius * Mth.sin(angle);
+                boolean lit = value > 0 && t <= value;
+                fillRect(base.pose(), base.vc(), tu - tick, tv - tick, tu + tick, tv + tick,
+                        LAYER, lit ? color : theme.switchOff,
+                        lit ? LightTexture.FULL_BRIGHT : packedLight);
+            }
+            // Needle: thin quad from the hub toward the value angle
+            float needleAngle = (float) Math.toRadians(180.0 - value * 180.0 / max);
+            float du = Mth.cos(needleAngle);
+            float dv = -Mth.sin(needleAngle);
+            float len = radius - 2.5f * tick;
+            float half = Mth.clamp(radius * 0.06f, 0.06f, 0.15f);
+            // Perpendicular in (u,v)
+            float pu = -dv * half;
+            float pv = du * half;
+            int needleColor = value > 0 ? color : theme.textMuted;
+            int needleLight = value > 0 ? LightTexture.FULL_BRIGHT : packedLight;
+            quad(base.pose(), base.vc(),
+                    cu - pu, cv - pv,
+                    cu + pu, cv + pv,
+                    cu + du * len + pu, cv + dv * len + pv,
+                    cu + du * len - pu, cv + dv * len - pv,
+                    LAYER * 2, needleColor, needleLight);
+            // Hub
+            fillRect(base.pose(), base.vc(), cu - 1.5f * tick, cv - 1.5f * tick,
+                    cu + 1.5f * tick, cv + 1.5f * tick, LAYER * 3, theme.textMuted, packedLight);
+        }
+
+        // Pass 2 (text): value inside the arc, name under the dial
+        for (int i = 0; i < count; i++) {
+            com.modpack.linktablet.frequency.Gauge gauge = gauges.get(i);
+            int value = Mth.clamp(readings[i], 0, com.modpack.linktablet.frequency.Gauge.MAX_VALUE);
+            float cu = TabletScreenMath.GLASS_U0 + (i % cols + 0.5f) * cellW;
+            float cv = TabletScreenMath.GLASS_V0 + (i / cols) * cellH + cellH * 0.55f;
+            String level = String.valueOf(value);
+            float numH = Mth.clamp(radius * 0.55f, 0.8f, 2.2f);
+            drawLabel(poseStack, buffers, font, level, cu, cv - radius * 0.55f - numH,
+                    numH / 16f / FONT_LINE, true, false,
+                    value > 0 ? theme.textPrimary : theme.textFaint, base.bgLight());
+            if (!gauge.name().isBlank()) {
+                float nameH = Mth.clamp(radius * 0.4f, 0.7f, 1.6f);
+                int maxPx = (int) ((cellW - 2 * SPACE) * FONT_LINE / nameH);
+                FittedLabel label = fitLabel(font, gauge.name(), maxPx);
+                drawLabel(poseStack, buffers, font, label.text(), cu, cv + nameH * 0.4f,
+                        nameH * label.fit() / 16f / FONT_LINE, true, false,
+                        theme.textMuted, base.bgLight());
             }
         }
         poseStack.popPose();
     }
 
-    /** Slider value-strip height — shared by the quad pass and the numeral pass. */
-    private static float sliderBarH(float tileH) {
-        return Mth.clamp(tileH * 0.18f, 0.25f, 0.6f);
+    /** One arbitrary quad (the dial needle) at the given layer height. */
+    private static void quad(PoseStack.Pose pose, VertexConsumer vc,
+                             float u0, float v0, float u1, float v1,
+                             float u2, float v2, float u3, float v3,
+                             float layer, int argb, int light) {
+        vertex(pose, vc, u0 / 16f, layer, v0 / 16f, argb, light);
+        vertex(pose, vc, u1 / 16f, layer, v1 / 16f, argb, light);
+        vertex(pose, vc, u2 / 16f, layer, v2 / 16f, argb, light);
+        vertex(pose, vc, u3 / 16f, layer, v3 / 16f, argb, light);
+    }
+
+    /**
+     * Kiosk clock face (1.10.0 OS suite): the shared screen base plus a
+     * big digital wall clock — local time with a blinking colon, the
+     * date beneath. Content is TEXT ONLY, so the strict pass order holds
+     * trivially (base quads, then font batches). Time is the viewer's
+     * real local clock, which every client agrees on to the second.
+     */
+    public static void renderClockFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH,
+                                       int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        Font font = Minecraft.getInstance().font;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        String time = String.format("%02d%s%02d", now.getHour(),
+                now.getSecond() % 2 == 0 ? ":" : " ", now.getMinute());
+        String date = now.getDayOfWeek().getDisplayName(
+                java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+                + " " + now.getDayOfMonth() + " " + now.getMonth().getDisplayName(
+                java.time.format.TextStyle.SHORT, java.util.Locale.getDefault());
+
+        // Time height: as big as fits the glass width (with margins),
+        // capped by height; date scales at 40% underneath
+        float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+        float timeH = Math.min(base.glassH() * 0.34f,
+                (base.glassW() - 2f) * FONT_LINE / font.width(time));
+        float dateH = Mth.clamp(timeH * 0.4f, 0.8f, 2.5f);
+        float gap = timeH * 0.25f;
+        float top = TabletScreenMath.GLASS_V0
+                + (base.glassH() - (timeH + gap + dateH)) / 2f;
+        drawLabel(poseStack, buffers, font, time, cu, top, timeH / 16f / FONT_LINE,
+                true, false, theme.textPrimary, base.bgLight());
+        drawLabel(poseStack, buffers, font, date, cu, top + timeH + gap,
+                dateH / 16f / FONT_LINE, true, false, theme.textMuted, base.bgLight());
+        poseStack.popPose();
     }
 
     /** Label after fitting: possibly ellipsized text + the scale multiplier applied. */
@@ -424,24 +846,24 @@ public final class TabletScreenRenderer {
 
     /**
      * Grid entry (icon drawn later). Big-enough tiles get the list rows'
-     * structure — themed plaque with an inset app-color chip
+     * structure — themed plaque with an inset signal-color chip
      * ({@link #renderChipTile}); dense grids keep the classic pip where
-     * the whole cell is the app color.
+     * the whole cell is the signal color.
      */
     private static void renderPip(PoseStack.Pose pose, VertexConsumer vc,
                                   float u0, float v0, float u1, float v1,
-                                  SignalApp app, int color, ScreenTheme theme,
+                                  Signal signal, int color, ScreenTheme theme,
                                   int packedLight, float ringW, boolean held,
                                   float labelZone) {
         float cell = Math.min(u1 - u0, v1 - v0 - labelZone);
         if (cell >= CHIP_MIN_CELL) {
-            renderChipTile(pose, vc, u0, v0, u1, v1, app, color, theme,
+            renderChipTile(pose, vc, u0, v0, u1, v1, signal, color, theme,
                     packedLight, ringW, held, labelZone, cell);
             return;
         }
-        if (app.slider()) {
+        if (signal.slider()) {
             // Plate lights with any output; a top strip shows the value
-            boolean on = app.strength() > 0;
+            boolean on = signal.strength() > 0;
             int plate = on ? color : dim(color);
             int plateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, plate, plateLight);
@@ -453,7 +875,7 @@ public final class TabletScreenRenderer {
             float bv0 = v0 + inset;
             fillRect(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 2, SLIDER_TRACK, packedLight);
             if (on) {
-                float fill = bu0 + (bu1 - bu0) * app.fillFraction();
+                float fill = bu0 + (bu1 - bu0) * signal.fillFraction();
                 fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
                         brighten(color), LightTexture.FULL_BRIGHT);
             }
@@ -462,7 +884,7 @@ public final class TabletScreenRenderer {
                     SLIDER_TRACK, packedLight);
             return;
         }
-        if (app.momentary() || app.timed()) {
+        if (signal.momentary() || signal.timed()) {
             if (held) {
                 // Pressed / pulse running: fills solid and glows
                 fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
@@ -470,7 +892,7 @@ public final class TabletScreenRenderer {
             } else {
                 ring(pose, vc, u0, v0, u1, v1, LAYER, dim(color), packedLight, ringW);
             }
-        } else if (app.active()) {
+        } else if (signal.active()) {
             fillRect(pose, vc, u0, v0, u1, v1, LAYER, brighten(color), LightTexture.FULL_BRIGHT);
             raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, brighten(color), LightTexture.FULL_BRIGHT);
         } else {
@@ -480,21 +902,21 @@ public final class TabletScreenRenderer {
     }
 
     /**
-     * Grid tile as a themed plaque with an inset app-color chip — the
+     * Grid tile as a themed plaque with an inset signal-color chip — the
      * list rows' look (and the GUI grid's). The chip centers on the icon
      * center (labels reserve the tile bottom) and carries the state:
      * bright + full-bright when on, dim otherwise, hollow ring while a
-     * momentary app is unheld. Slider value strips keep their exact
+     * momentary signal is unheld. Slider value strips keep their exact
      * pre-chip geometry — {@code TabletScreenMath.sliderBarU} maps drags
      * against it — so the chip sits at LAYER*1.75, under the strip (2x)
      * it can graze on small tiles.
      */
     private static void renderChipTile(PoseStack.Pose pose, VertexConsumer vc,
                                        float u0, float v0, float u1, float v1,
-                                       SignalApp app, int color, ScreenTheme theme,
+                                       Signal signal, int color, ScreenTheme theme,
                                        int packedLight, float ringW, boolean held,
                                        float labelZone, float cell) {
-        boolean on = (app.active() && !app.momentary()) || held;
+        boolean on = (signal.active() && !signal.momentary()) || held;
         int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
         fillRect(pose, vc, u0, v0, u1, v1, LAYER, theme.screenTrack, packedLight);
         raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
@@ -508,7 +930,7 @@ public final class TabletScreenRenderer {
         float half = (cell - 2 * chipInset(cell)) / 2f;
         float cu = (u0 + u1) / 2f;
         float cv = v0 + (v1 - v0 - labelZone) / 2f;
-        if ((app.momentary() || app.timed()) && !held) {
+        if ((signal.momentary() || signal.timed()) && !held) {
             ring(pose, vc, cu - half, cv - half, cu + half, cv + half, LAYER * 1.75f,
                     dim(color), packedLight, ringW);
         } else {
@@ -516,15 +938,15 @@ public final class TabletScreenRenderer {
                     on ? brighten(color) : dim(color), stateLight);
         }
 
-        if (app.slider()) {
+        if (signal.slider()) {
             float inset = TabletScreenMath.sliderInset(u1 - u0);
             float barH = sliderBarH(v1 - v0);
             float bu0 = u0 + inset;
             float bu1 = u1 - inset;
             float bv0 = v0 + inset;
             fillRect(pose, vc, bu0, bv0, bu1, bv0 + barH, LAYER * 2, SLIDER_TRACK, packedLight);
-            if (app.strength() > 0) {
-                float fill = bu0 + (bu1 - bu0) * app.fillFraction();
+            if (signal.strength() > 0) {
+                float fill = bu0 + (bu1 - bu0) * signal.fillFraction();
                 fillRect(pose, vc, bu0, bv0, fill, bv0 + barH, LAYER * 3,
                         brighten(color), LightTexture.FULL_BRIGHT);
             }
@@ -534,25 +956,30 @@ public final class TabletScreenRenderer {
     }
 
     /** List row: colored chip left, mini switch right (icon drawn later).
-     *  Bounds arrive precomputed (member offsets included on surfaces). */
+     *  Bounds arrive precomputed (member offsets included on surfaces).
+     *  {@code plainRows} drops the switch — launcher rows are doors. */
     private static void renderSwitchRow(PoseStack.Pose pose, VertexConsumer vc,
-                                        float v0, SignalApp app, int color,
+                                        float v0, Signal signal, int color,
                                         ScreenTheme theme, int packedLight, boolean held,
-                                        float rowH, float u0, float u1) {
+                                        float rowH, float u0, float u1, boolean plainRows) {
         float v1 = v0 + rowH;
-        boolean on = (app.active() && !app.momentary()) || held;
+        boolean on = (signal.active() && !signal.momentary()) || held;
         int stateLight = on ? LightTexture.FULL_BRIGHT : packedLight;
 
         fillRect(pose, vc, u0, v0, u1, v1, LAYER, theme.screenTrack, packedLight);
         // Rows read as raised plaques, like the GUI's list rows
         raisedBevel(pose, vc, u0, v0, u1, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
 
-        // Icon chip in the app's color, inset INSIDE the row plaque like
+        // Icon chip in the signal's color, inset INSIDE the row plaque like
         // the GUI's chip (its 4px-in-24 margin, scaled); flat — color IS
         // the content
         float chipInset = rowH / 6f;
         fillRect(pose, vc, u0 + chipInset, v0 + chipInset, u0 + rowH - chipInset, v1 - chipInset,
                 LAYER * 2, on ? brighten(color) : dim(color), stateLight);
+
+        if (plainRows) {
+            return; // no switch mechanism — the row itself is the button
+        }
 
         // Track vertically centered in the row and inset from the row's
         // right edge, GUI-style
@@ -560,14 +987,14 @@ public final class TabletScreenRenderer {
         float su0 = su1 - SWITCH_W;
         float sv0 = v0 + (rowH - SWITCH_H) / 2f;
         float sv1 = sv0 + SWITCH_H;
-        if (app.slider()) {
+        if (signal.slider()) {
             // Wider mini track with a knob at the current value
             float tu0 = su1 - SWITCH_W * 1.6f;
             float tv0 = v0 + (rowH - SWITCH_H * 0.5f) / 2f;
             float tv1 = tv0 + SWITCH_H * 0.5f;
             fillRect(pose, vc, tu0, tv0, su1, tv1, LAYER * 2, theme.switchOff, packedLight);
-            float knob = tu0 + (su1 - tu0 - KNOB_W) * app.fillFraction();
-            if (app.strength() > 0) {
+            float knob = tu0 + (su1 - tu0 - KNOB_W) * signal.fillFraction();
+            if (signal.strength() > 0) {
                 // Above the track, below the knob — coplanar quads z-fight
                 // at glancing angles (latent since 1.4.0, exposed by
                 // higher-contrast themes)
@@ -580,7 +1007,7 @@ public final class TabletScreenRenderer {
                     on ? theme.accent : theme.textMuted, stateLight);
             return;
         }
-        if (app.momentary()) {
+        if (signal.momentary()) {
             // Push button: dot lights while held, mirroring the GUI
             fillRect(pose, vc, su0, sv0, su1, sv1, LAYER * 2,
                     held ? theme.accentDim : theme.switchOff, stateLight);
@@ -598,7 +1025,7 @@ public final class TabletScreenRenderer {
     }
 
     /**
-     * The app's item icon rendered flat on the screen. Depth is squashed
+     * The signal's item icon rendered flat on the screen. Depth is squashed
      * to a sliver, so even block models read as 2D screen icons (their
      * GUI display angle flattens into the familiar inventory-icon look).
      */

@@ -30,24 +30,37 @@ public final class OverlayPin {
     private static int ticksInWorld = 0;
     private static boolean restoredThisSession = false;
 
-    // ---- API (TabletScreen's pin button) -----------------------------
+    // ---- API (the program screens' pin buttons) ----------------------
 
-    /** Whether the given GUI view is the currently pinned tablet. */
-    public static boolean isPinned(AppView guiView) {
+    /** Whether the given GUI view is pinned showing the given program
+     * (1.10.0: the pin is per-app — a clock pin is not a signals pin). */
+    public static boolean isPinned(SignalView guiView, com.modpack.linktablet.api.TabletProgram program) {
         MiniTabletWindow window = NoteWindows.find(MiniTabletWindow.class);
         if (window == null) return false;
-        return window.view().target().equals(effective(guiView).target());
+        return window.program() == program
+                && window.view().target().equals(effective(guiView).target());
     }
 
-    /** Pins (or re-pins) the given tablet; replaces any existing pin. */
-    public static void pin(AppView guiView) {
+    /** Signals-program shorthand (the classic 1.7.0 pin). */
+    public static boolean isPinned(SignalView guiView) {
+        return isPinned(guiView, com.modpack.linktablet.Program.SIGNALS);
+    }
+
+    /** Pins (or re-pins) the given tablet showing the given program;
+     * replaces any existing pin — there is ONE overlay window. */
+    public static void pin(SignalView guiView, com.modpack.linktablet.api.TabletProgram program) {
         MiniTabletWindow existing = NoteWindows.find(MiniTabletWindow.class);
         if (existing != null) {
             NoteWindows.remove(existing);
         }
-        AppView view = effective(guiView);
-        persist(view);
-        NoteWindows.add(new MiniTabletWindow(view));
+        SignalView view = effective(guiView);
+        persist(view, program);
+        NoteWindows.add(new MiniTabletWindow(view, program));
+    }
+
+    /** Signals-program shorthand (the classic 1.7.0 pin). */
+    public static void pin(SignalView guiView) {
+        pin(guiView, com.modpack.linktablet.Program.SIGNALS);
     }
 
     /** Unpins from the GUI button (the window's X calls onClose itself). */
@@ -63,23 +76,29 @@ public final class OverlayPin {
      * A Hand view pinned as-is would track whatever the player holds
      * next; convert it to the underlying inventory slot instead.
      */
-    private static AppView effective(AppView guiView) {
-        if (!(guiView instanceof AppView.Hand hand)) return guiView;
+    private static SignalView effective(SignalView guiView) {
+        if (!(guiView instanceof SignalView.Hand hand)) return guiView;
         Minecraft mc = Minecraft.getInstance();
         int slot = hand.hand() == net.minecraft.world.InteractionHand.MAIN_HAND
                 ? mc.player.getInventory().selected
                 : Inventory.SLOT_OFFHAND;
-        return new AppView.Slot(slot);
+        return new SignalView.Slot(slot);
     }
 
     // ---- Persistence -------------------------------------------------
 
-    public static void persist(AppView view) {
-        if (view instanceof AppView.Slot slot) {
-            ClientPrefs.setOverlayPin("slot:" + slot.slot());
-        } else if (view instanceof AppView.Block block) {
+    /** Descriptor grows an {@code @<programKey>} suffix for non-signals
+     * pins (1.10.0) — absent means Signals, so every pre-1.10 pin
+     * restores unchanged. */
+    public static void persist(SignalView view, com.modpack.linktablet.api.TabletProgram program) {
+        String suffix = program == com.modpack.linktablet.Program.SIGNALS
+                ? "" : "@" + program.key();
+        if (view instanceof SignalView.Slot slot) {
+            ClientPrefs.setOverlayPin("slot:" + slot.slot() + suffix);
+        } else if (view instanceof SignalView.Block block) {
             BlockPos p = block.pos();
-            ClientPrefs.setOverlayPin("block:" + p.getX() + "," + p.getY() + "," + p.getZ());
+            ClientPrefs.setOverlayPin(
+                    "block:" + p.getX() + "," + p.getY() + "," + p.getZ() + suffix);
         }
     }
 
@@ -87,15 +106,29 @@ public final class OverlayPin {
         ClientPrefs.setOverlayPin("");
     }
 
-    private static AppView parse(String descriptor) {
+    private record Pin(SignalView view, com.modpack.linktablet.api.TabletProgram program) {
+    }
+
+    private static Pin parse(String descriptor) {
+        // Program suffix first; the launcher is a legitimate pin target
+        // (the app dock), and byKey folds unknown future keys onto it —
+        // a downgrade still shows a usable dock instead of losing the pin
+        com.modpack.linktablet.api.TabletProgram program = com.modpack.linktablet.Program.SIGNALS;
+        int at = descriptor.indexOf('@');
+        if (at >= 0) {
+            program = com.modpack.linktablet.Programs.byKey(descriptor.substring(at + 1));
+            descriptor = descriptor.substring(0, at);
+        }
         try {
             if (descriptor.startsWith("slot:")) {
-                return new AppView.Slot(Integer.parseInt(descriptor.substring(5)));
+                return new Pin(new SignalView.Slot(
+                        Integer.parseInt(descriptor.substring(5))), program);
             }
             if (descriptor.startsWith("block:")) {
                 String[] parts = descriptor.substring(6).split(",");
-                return new AppView.Block(new BlockPos(
-                        Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
+                return new Pin(new SignalView.Block(new BlockPos(
+                        Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[2]))), program);
             }
         } catch (RuntimeException ignored) {
             // Malformed prefs line — treat as no pin
@@ -118,12 +151,12 @@ public final class OverlayPin {
 
         String descriptor = ClientPrefs.overlayPin();
         if (descriptor.isEmpty() || NoteWindows.find(MiniTabletWindow.class) != null) return;
-        AppView view = parse(descriptor);
-        if (view == null) {
+        Pin pin = parse(descriptor);
+        if (pin == null) {
             clear();
             return;
         }
-        NoteWindows.add(new MiniTabletWindow(view));
+        NoteWindows.add(new MiniTabletWindow(pin.view(), pin.program()));
     }
 
     private OverlayPin() {

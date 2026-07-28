@@ -71,13 +71,18 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onRegisterMenuScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
-        event.register(com.modpack.linktablet.registry.ModMenus.APP_EDIT.get(),
-                com.modpack.linktablet.client.screen.AppEditScreen::new);
+        event.register(com.modpack.linktablet.registry.ModMenus.SIGNAL_EDIT.get(),
+                com.modpack.linktablet.client.screen.SignalEditScreen::new);
     }
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
+            // Addon API: collect every mod's program CLIENTS (screens,
+            // overlays, kiosk faces). Runs after common setup, so the
+            // program table is already frozen and keys validate.
+            net.neoforged.fml.ModLoader.postEvent(
+                    new com.modpack.linktablet.api.client.RegisterTabletProgramClientsEvent());
             PonderIndex.addPlugin(new LinkTabletPonderPlugin());
             // Stage-aware incomplete-tablet art: Create advances the
             // transitional stack's progress component 1/3 per deploy, so

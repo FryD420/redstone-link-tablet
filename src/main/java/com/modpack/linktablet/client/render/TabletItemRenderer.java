@@ -1,9 +1,9 @@
 package com.modpack.linktablet.client.render;
 
 import com.modpack.linktablet.LinkTabletMod;
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.screen.TabletScreen;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.registry.ModDataComponents;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * Custom item renderer for the tablet: draws the baked model (base or
  * lit — the old {@code linktablet:lit} property override, now decided
- * here), then overlays the live app pips on the screen plane in every
+ * here), then overlays the live signal pips on the screen plane in every
  * display context except GUI slots, where 16px pips would be mush.
  */
 public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
@@ -67,9 +67,9 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         itemRenderer.renderModelLists(model, stack, packedLight, packedOverlay, poseStack, vc);
 
         if (context == ItemDisplayContext.GUI) return;
-        // Drawn even with no apps so the empty screen matches the in-use
+        // Drawn even with no signals so the empty screen matches the in-use
         // look (flat glass, no baked home-button art)
-        List<SignalApp> apps = stack.getOrDefault(ModDataComponents.TABLET_APPS.get(), List.of());
+        List<Signal> signals = stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of());
 
         poseStack.pushPose();
         // Map the shared screen frame (u right, v down, +Y out) onto the
@@ -80,19 +80,19 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         ScreenTheme theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         // Held items ignore the stored screen rotation — it's a mounting
         // concern; the hand always shows portrait.
-        TabletScreenRenderer.render(poseStack, buffers, apps, listLayout, 0, theme, lit,
+        TabletScreenRenderer.render(poseStack, buffers, signals, listLayout, 0, theme, lit,
                 packedLight, heldPips(stack));
         poseStack.popPose();
     }
 
     /**
-     * While this player holds a momentary app down in the GUI open on
+     * While this player holds a momentary signal down in the GUI open on
      * this stack, mirror it on the first-person screen.
      */
     private static Set<Integer> heldPips(ItemStack stack) {
         Minecraft mc = Minecraft.getInstance();
         if (!(mc.screen instanceof TabletScreen tablet)) return Set.of();
-        if (!(tablet.view() instanceof AppView.Hand handView)) return Set.of();
+        if (!(tablet.view() instanceof SignalView.Hand handView)) return Set.of();
         if (mc.player == null || mc.player.getItemInHand(handView.hand()) != stack) return Set.of();
         int held = tablet.heldMomentaryIndex();
         return held >= 0 ? Set.of(held) : Set.of();
@@ -105,7 +105,7 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
     private static boolean isScreenLit(ItemStack stack) {
         Minecraft mc = Minecraft.getInstance();
         if (!(mc.screen instanceof TabletScreen tablet)) return false;
-        if (!(tablet.view() instanceof AppView.Hand handView)) return false;
+        if (!(tablet.view() instanceof SignalView.Hand handView)) return false;
         return mc.player != null && mc.player.getItemInHand(handView.hand()) == stack;
     }
 }

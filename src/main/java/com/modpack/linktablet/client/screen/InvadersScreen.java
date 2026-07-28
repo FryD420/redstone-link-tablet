@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -39,7 +39,7 @@ public class InvadersScreen extends ArcadeScreen {
     private boolean over;
     private boolean newBest;
 
-    public InvadersScreen(AppView view, boolean returnToTablet) {
+    public InvadersScreen(SignalView view, boolean returnToTablet) {
         super("invaders", view, returnToTablet);
         reset();
     }

@@ -1,9 +1,9 @@
 package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.LinkTabletMod;
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.network.ModNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -46,10 +46,10 @@ public final class NoteWindows {
 
     // ---- API ---------------------------------------------------------
 
-    /** Opens an app's note window, or raises it if already open. */
-    public static void open(AppView view, int index) {
-        List<SignalApp> apps = view.apps();
-        if (index < 0 || index >= apps.size()) return;
+    /** Opens a signal's note window, or raises it if already open. */
+    public static void open(SignalView view, int index) {
+        List<Signal> signals = view.signals();
+        if (index < 0 || index >= signals.size()) return;
         NoteWindow existing = findNote(view.target(), index);
         if (existing != null) {
             raise(existing);
@@ -57,11 +57,11 @@ public final class NoteWindows {
             UISounds.tick(1.3F);
             return;
         }
-        SignalApp app = apps.get(index);
+        Signal signal = signals.get(index);
         int[] at = cascadeOrigin(NoteWindow.W, NoteWindow.H);
         WINDOWS.forEach(FloatingWindow::defocus);
         WINDOWS.add(new NoteWindow(Minecraft.getInstance().font, view, index,
-                Component.literal(app.name()), app.note(), at[0], at[1]));
+                Component.literal(signal.name()), signal.note(), at[0], at[1]));
         UISounds.page();
     }
 
@@ -108,10 +108,10 @@ public final class NoteWindows {
 
     // ---- Internals ---------------------------------------------------
 
-    private static NoteWindow findNote(ModNetworking.AppTarget target, int index) {
+    private static NoteWindow findNote(ModNetworking.SignalTarget target, int index) {
         for (FloatingWindow w : WINDOWS) {
             if (w instanceof NoteWindow note
-                    && note.appIndex == index && note.view.target().equals(target)) {
+                    && note.signalIndex == index && note.view.target().equals(target)) {
                 return note;
             }
         }

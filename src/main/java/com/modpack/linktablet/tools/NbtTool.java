@@ -1,7 +1,7 @@
 package com.modpack.linktablet.tools;
 
 import com.modpack.linktablet.frequency.Frequency;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
@@ -40,7 +40,7 @@ public final class NbtTool {
     /**
      * The ponder scene: 5×5 checkered baseplate (Create's convention),
      * a Redstone Link receiver with a torch/torch frequency, a lamp
-     * behind it, and a floor-mounted tablet carrying the matching app.
+     * behind it, and a floor-mounted tablet carrying the matching signal.
      */
     private static void gen(Path out) throws Exception {
         SharedConstants.tryDetectVersion();
@@ -88,16 +88,17 @@ public final class NbtTool {
         return tag;
     }
 
-    /** Tablet pre-configured with the matching "Lamp" app, toggled off. */
+    /** Tablet pre-configured with the matching "Lamp" signal, toggled off. */
     private static CompoundTag tabletNbt() {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", "linktablet:tablet");
-        SignalApp app = new SignalApp("Lamp",
+        Signal signal = new Signal("Lamp",
                 List.of(Frequency.of(Items.REDSTONE_TORCH, Items.REDSTONE_TORCH)),
-                false, false, SignalApp.MAX_STRENGTH, 0xFFF9801D, Optional.empty(), false,
-                0, SignalApp.MAX_STRENGTH, "", false, SignalApp.DEFAULT_PULSE_TICKS);
-        SignalApp.CODEC.listOf().encodeStart(NbtOps.INSTANCE, List.of(app))
-                .result().ifPresent(t -> tag.put("apps", t));
+                false, false, Signal.MAX_STRENGTH, 0xFFF9801D, Optional.empty(), false,
+                0, Signal.MAX_STRENGTH, "", false, Signal.DEFAULT_PULSE_TICKS,
+                0, List.of());
+        Signal.CODEC.listOf().encodeStart(NbtOps.INSTANCE, List.of(signal))
+                .result().ifPresent(t -> tag.put("apps", t)); // frozen BE key
         return tag;
     }
 

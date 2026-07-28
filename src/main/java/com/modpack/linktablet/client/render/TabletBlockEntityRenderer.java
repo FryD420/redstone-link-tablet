@@ -1,10 +1,11 @@
 package com.modpack.linktablet.client.render;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.Program;
 import com.modpack.linktablet.block.TabletBlock;
 import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.block.TabletScreenMath;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
@@ -25,9 +26,9 @@ import org.joml.Quaternionf;
 import java.util.List;
 
 /**
- * Draws the live app pips on a placed tablet's screen face. The baked
+ * Draws the live signal pips on a placed tablet's screen face. The baked
  * model (bezel, case, LIT texture swap) is untouched; this only layers
- * the mini screen slightly proud of the bezel. Tablets with no apps
+ * the mini screen slightly proud of the bezel. Tablets with no signals
  * render nothing here and look exactly like the plain model.
  */
 public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBlockEntity> {
@@ -53,14 +54,23 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         // Merged-surface parts draw nothing: the controller's pass covers
         // every member's glass (1.7.0).
         if (be.isSurfacePart()) return;
-        // Rendered even with no apps: the flat glass replaces the baked
+        // Kiosk programs (1.10.0): the screen shows whatever program the
+        // controller's synced nav byte says — launcher faces render the
+        // roster tiles through the same pipeline the signals use (grid
+        // forced, no held pips; the server hit-test mirrors both), and
+        // other programs get their own face pass (clock: text-only).
+        com.modpack.linktablet.api.TabletProgram program = be.currentProgram();
+        boolean launcher = program == Program.LAUNCHER;
+        // Rendered even with no signals: the flat glass replaces the baked
         // screen art everywhere, so empty and in-use tablets match.
-        List<SignalApp> apps = be.getApps();
+        List<Signal> signals = launcher
+                ? TabletScreenRenderer.launcherTiles(be.getHomeApps()) : be.getSignals();
         BlockState state = be.getBlockState();
         if (!state.hasProperty(TabletBlock.LIT)) return;
 
         if (be.isMounted()) {
-            renderMounted(be, state, apps, poseStack, buffers, packedLight, packedOverlay);
+            renderMounted(be, state, signals, program, poseStack, buffers, packedLight,
+                    packedOverlay, partialTick);
             return;
         }
 
@@ -83,10 +93,71 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         int caseTint = be.getCaseColor() != null
                 ? 0xFF000000 | be.getCaseColor().getTextureDiffuseColor()
                 : TabletScreenRenderer.DEFAULT_CASE_TINT;
-        TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
-                be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
-                packedLight, be.getHeldPips(), be.getSurfaceW(), be.getSurfaceH(), caseTint);
+        renderFace(be, state, signals, program, poseStack, buffers, packedLight,
+                be.getSurfaceW(), be.getSurfaceH(), caseTint, partialTick);
         poseStack.popPose();
+    }
+
+    /**
+     * One face dispatch for both the flat and mounted passes: built-ins
+     * keep their bespoke faces, addon programs draw through their API
+     * {@code facePainter} (buffered — the three-pass order is enforced
+     * by the flush), and everything else labels the door.
+     */
+    private static void renderFace(TabletBlockEntity be, BlockState state, List<Signal> signals,
+                                   com.modpack.linktablet.api.TabletProgram program,
+                                   PoseStack poseStack, MultiBufferSource buffers, int packedLight,
+                                   int surfaceW, int surfaceH, int caseTint, float partialTick) {
+        boolean launcher = program == Program.LAUNCHER;
+        if (program instanceof Program builtin) {
+            switch (builtin) {
+                case CLOCK -> TabletScreenRenderer.renderClockFace(poseStack, buffers,
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
+                case CALCULATOR -> TabletScreenRenderer.renderCalcFace(poseStack, buffers,
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
+                case GAUGES -> TabletScreenRenderer.renderGaugesFace(poseStack, buffers,
+                        be.getGauges(), gaugeReadings(be),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
+                // Launcher faces honor list mode too (test pass 2) — plain
+                // rows, since roster rows are doors, not toggles
+                case LAUNCHER, SIGNALS -> TabletScreenRenderer.render(poseStack, buffers, signals,
+                        be.isScreenList(),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, launcher ? java.util.Set.of() : be.getHeldPips(),
+                        surfaceW, surfaceH, caseTint, launcher);
+                // Programs with no bespoke face show their name — the tap
+                // opens the GUI, the face just labels the door
+                default -> TabletScreenRenderer.renderLabelFace(poseStack, buffers,
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint,
+                        program.displayName().getString());
+            }
+            return;
+        }
+        var client = com.modpack.linktablet.client.ProgramClients.get(program.key());
+        var painter = client == null ? null : client.facePainter();
+        if (painter != null) {
+            TabletScreenRenderer.renderAddonFace(poseStack, buffers,
+                    be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                    packedLight, surfaceW, surfaceH, caseTint, painter, be, partialTick);
+        } else {
+            TabletScreenRenderer.renderLabelFace(poseStack, buffers,
+                    be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                    packedLight, surfaceW, surfaceH, caseTint,
+                    program.displayName().getString());
+        }
+    }
+
+    /** Per-gauge readings from the BE's synced receiver state. */
+    private static int[] gaugeReadings(TabletBlockEntity be) {
+        int[] readings = new int[be.getGauges().size()];
+        for (int i = 0; i < readings.length; i++) {
+            readings[i] = be.gaugeReading(i);
+        }
+        return readings;
     }
 
     /**
@@ -99,8 +170,10 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
      * first, then the screen's quads → icons → text.
      */
     private static void renderMounted(TabletBlockEntity be, BlockState state,
-                                      List<SignalApp> apps, PoseStack poseStack,
-                                      MultiBufferSource buffers, int packedLight, int packedOverlay) {
+                                      List<Signal> signals,
+                                      com.modpack.linktablet.api.TabletProgram program,
+                                      PoseStack poseStack, MultiBufferSource buffers,
+                                      int packedLight, int packedOverlay, float partialTick) {
         Minecraft mc = Minecraft.getInstance();
         var modelRenderer = mc.getBlockRenderer().getModelRenderer();
 
@@ -118,8 +191,28 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                 null, stand, 1f, 1f, 1f, packedLight, packedOverlay);
         poseStack.popPose();
 
-        // Tablet on the ball: quaternion from the shared basis
-        TabletScreenMath.MountBasis basis = be.mountBasis();
+        // Tablet on the ball: quaternion from the RENDER basis — the
+        // synced angles smoothed client-side so follow-mode updates
+        // (and wrench flips) glide instead of snapping. Hit tests keep
+        // be.mountBasis() (the raw synced angles): clicks stay
+        // server-agreed, pixels catch up within a few frames — the
+        // accepted trade from the follow-mode design.
+        long now = net.minecraft.Util.getMillis();
+        float dt = be.renderLerpMillis == 0 ? 1f
+                : Math.min((now - be.renderLerpMillis) / 1000f, 1f);
+        be.renderLerpMillis = now;
+        if (Float.isNaN(be.renderPitch)) {
+            be.renderPitch = be.getMountPitch();
+            be.renderYaw = be.getMountYaw();
+        } else {
+            // Exponential approach, ~90% of the way in a quarter second
+            float step = 1f - (float) Math.pow(0.0001f, dt);
+            be.renderPitch = net.minecraft.util.Mth.rotLerp(step, be.renderPitch, be.getMountPitch());
+            be.renderYaw = net.minecraft.util.Mth.rotLerp(step, be.renderYaw, be.getMountYaw());
+        }
+        TabletScreenMath.MountBasis basis = TabletScreenMath.mountBasis(
+                be.getBlockPos(), be.mountAttachNormal(), be.renderPitch, be.renderYaw,
+                state.getValue(TabletBlock.LANDSCAPE));
         Vec3 pivot = TabletScreenMath.MountBasis.pivot(be.getBlockPos(), be.mountAttachNormal())
                 .subtract(Vec3.atLowerCornerOf(be.getBlockPos()));
         poseStack.pushPose();
@@ -151,9 +244,8 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
 
         // Live screen in the same canonical frame
         poseStack.translate(2 / 16f, SCREEN_HEIGHT, 1 / 16f);
-        TabletScreenRenderer.render(poseStack, buffers, apps, be.isScreenList(),
-                be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
-                packedLight, be.getHeldPips(), 1, 1, caseTint);
+        renderFace(be, state, signals, program, poseStack, buffers, packedLight,
+                1, 1, caseTint, partialTick);
         poseStack.popPose();
     }
 

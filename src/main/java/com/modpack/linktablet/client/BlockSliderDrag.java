@@ -4,7 +4,7 @@ import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletBlock;
 import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.block.TabletScreenMath;
-import com.modpack.linktablet.frequency.SignalApp;
+import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.network.ModNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -38,7 +38,7 @@ public final class BlockSliderDrag {
     /**
      * The clicked member: ray projection and the bar span are computed
      * against ITS screen plane (member-local u). On a merged surface
-     * this may differ from {@link #controllerPos}, which owns the app
+     * this may differ from {@link #controllerPos}, which owns the signal
      * data and receives the payloads.
      */
     private static BlockPos pos;
@@ -50,10 +50,10 @@ public final class BlockSliderDrag {
     }
 
     /** Grabs a slider (called from the block's use handler, client side). */
-    public static void start(BlockPos clickedPos, BlockPos controller, int appIndex) {
+    public static void start(BlockPos clickedPos, BlockPos controller, int signalIndex) {
         pos = clickedPos.immutable();
         controllerPos = controller.immutable();
-        index = appIndex;
+        index = signalIndex;
         lastSent = -1;
     }
 
@@ -103,8 +103,8 @@ public final class BlockSliderDrag {
             stop();
             return;
         }
-        List<SignalApp> apps = controller.getApps();
-        if (index >= apps.size() || !apps.get(index).slider()) {
+        List<Signal> signals = controller.getSignals();
+        if (index >= signals.size() || !signals.get(index).slider()) {
             stop();
             return;
         }
@@ -123,16 +123,16 @@ public final class BlockSliderDrag {
                         controller.effectiveRotation(), member.getSurfaceDx(), member.getSurfaceDy(),
                         controller.getSurfaceW(), controller.getSurfaceH());
         if (Float.isNaN(logicalU)) return;
-        float[] bar = TabletScreenMath.surfaceSliderBarU(index, apps.size(),
+        float[] bar = TabletScreenMath.surfaceSliderBarU(index, signals.size(),
                 controller.isScreenList(), controller.effectiveRotation(),
                 controller.getSurfaceW(), controller.getSurfaceH());
         float frac = net.minecraft.util.Mth.clamp((logicalU - bar[0]) / (bar[1] - bar[0]), 0.0F, 1.0F);
-        int value = apps.get(index).valueFromFraction(frac);
+        int value = signals.get(index).valueFromFraction(frac);
         if (value == lastSent) return;
         lastSent = value;
-        if (value != apps.get(index).strength()) {
+        if (value != signals.get(index).strength()) {
             PacketDistributor.sendToServer(new ModNetworking.SetSliderPayload(
-                    ModNetworking.AppTarget.ofBlock(controllerPos), index, value));
+                    ModNetworking.SignalTarget.ofBlock(controllerPos), index, value));
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,13 +20,22 @@ abstract class ArcadeScreen extends Screen {
     protected static final int PAD = 6;
     protected static final int HEADER = 16;
 
-    protected final AppView view;
+    protected final SignalView view;
     /** Game id — also the best-score key and (capitalized) the title. */
     protected final String gameId;
     /** GUI launches return to the tablet home; world taps to the world. */
     private final boolean returnToTablet;
+    /** Set when launched from the Arcade hub (1.10.0): ESC returns to
+     * that program instead of the secret pip's signal grid. */
+    @org.jetbrains.annotations.Nullable
+    private com.modpack.linktablet.Program returnProgram;
 
-    protected ArcadeScreen(String id, AppView view, boolean returnToTablet) {
+    /** Hub hook — see {@code ArcadeHubScreen}. */
+    void setReturnProgram(com.modpack.linktablet.Program program) {
+        this.returnProgram = program;
+    }
+
+    protected ArcadeScreen(String id, SignalView view, boolean returnToTablet) {
         super(Component.literal(
                 id.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + id.substring(1)));
         this.gameId = id;
@@ -110,10 +119,19 @@ abstract class ArcadeScreen extends Screen {
         graphics.drawCenteredString(font, hint, cx, cy + 14, 0xFF8A93A6);
     }
 
-    /** Same return-trip idiom as AppEditScreen for the GUI path. */
+    /** Same return-trip idiom as SignalEditScreen for the GUI path: back
+     * to the signal grid the secret pip lives on (or the Arcade hub for
+     * hub launches), never the launcher. */
     @Override
     public void onClose() {
-        minecraft.setScreen(returnToTablet ? new TabletScreen(view) : null);
+        if (returnProgram != null) {
+            com.modpack.linktablet.client.ClientHooks.returnToProgram(returnProgram, view);
+        } else if (returnToTablet) {
+            com.modpack.linktablet.client.ClientHooks.returnToProgram(
+                    com.modpack.linktablet.Program.SIGNALS, view);
+        } else {
+            minecraft.setScreen(null);
+        }
     }
 
     @Override

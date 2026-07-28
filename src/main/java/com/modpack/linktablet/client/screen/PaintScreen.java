@@ -1,6 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -16,7 +16,7 @@ public class PaintScreen extends ArcadeScreen {
     private static final int CELL = 7;
     private static final int SWATCH = 8;
 
-    /** The dye palette (same family as the app color presets). */
+    /** The dye palette (same family as the signal color presets). */
     private static final int[] PALETTE = {
             0xFFF9FFFE, 0xFFB02E26, 0xFFF9801D, 0xFFFED83D,
             0xFF80C71F, 0xFF5E7C16, 0xFF3AB3DA, 0xFF169C9C,
@@ -26,7 +26,7 @@ public class PaintScreen extends ArcadeScreen {
     private final int[] canvas = new int[COLS * ROWS];
     private int selected = 6;
 
-    public PaintScreen(AppView view, boolean returnToTablet) {
+    public PaintScreen(SignalView view, boolean returnToTablet) {
         super("paint", view, returnToTablet);
     }
 

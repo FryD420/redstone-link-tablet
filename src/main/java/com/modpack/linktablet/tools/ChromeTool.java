@@ -112,7 +112,7 @@ public final class ChromeTool {
         }
     }
 
-    /** Raised plaque (grid app tiles): stronger bevel, button feel. */
+    /** Raised plaque (grid signal tiles): stronger bevel, button feel. */
     private static void tile(Region r) {
         for (int y = 0; y < r.h(); y++) {
             for (int x = 0; x < r.w(); x++) {

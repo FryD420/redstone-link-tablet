@@ -1,14 +1,15 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.client.AppView;
+import com.modpack.linktablet.client.SignalView;
+import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.OverlayPin;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.block.TabletBlockEntity;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
-import com.modpack.linktablet.frequency.SignalApp;
-import com.modpack.linktablet.menu.AppEditMenu;
+import com.modpack.linktablet.frequency.Signal;
+import com.modpack.linktablet.menu.SignalEditMenu;
 import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,14 +25,14 @@ import java.util.List;
  * The tablet "home screen". Two selectable layouts (persisted client-side
  * via {@link ClientPrefs}):
  * <ul>
- *   <li><b>Grid</b> — colored app tiles with icons</li>
- *   <li><b>List</b> — one row per app with a toggle switch</li>
+ *   <li><b>Grid</b> — colored signal tiles with icons</li>
+ *   <li><b>List</b> — one row per signal with a toggle switch</li>
  * </ul>
  * In both modes:
  * <ul>
- *   <li>Left-click an app → toggle it on/off</li>
- *   <li>Right-click an app → edit it</li>
- *   <li>Click the add tile/row → add a new app</li>
+ *   <li>Left-click a signal → toggle it on/off</li>
+ *   <li>Right-click a signal → edit it</li>
+ *   <li>Click the add tile/row → add a new signal</li>
  * </ul>
  * The tablet body sizes itself to its content (scrolling once it would
  * exceed the screen).
@@ -49,11 +50,6 @@ public class TabletScreen extends Screen {
     static final int TILE_GAP = 8;
     static final int MAX_COLUMNS = 4;
 
-    /** App-color chip inset inside a grid tile — the list rows'
-     * chip-in-plaque structure at tile scale (1/6 of the span, like the
-     * list chip's 4px-in-24 margin). */
-    private static final int CHIP_INSET = 7;
-
     /** Grid slider bar inset from the tile edge (bar runs along the chip
      * bottom); {@link #sliderSpan} maps drags against this exact span. */
     private static final int GRID_BAR_INSET = 9;
@@ -67,7 +63,7 @@ public class TabletScreen extends Screen {
     static final int ROW_GAP = 4;
     static final int LIST_STRIDE = ROW_HEIGHT + ROW_GAP;
 
-    /** Toggle switch dimensions (list mode; shared with AppRowPainter). */
+    /** Toggle switch dimensions (list mode; shared with SignalRowPainter). */
     static final int SWITCH_W = 22;
     static final int SWITCH_H = 12;
 
@@ -88,14 +84,14 @@ public class TabletScreen extends Screen {
     static final int FREQ1_COLOR = 0xFFC93C36;
     static final int FREQ2_COLOR = 0xFF3E52C1;
 
-    private final AppView view;
+    private final SignalView view;
     private double scroll = 0;
 
-    /** Index of the momentary app currently held down, or -1. */
+    /** Index of the momentary signal currently held down, or -1. */
     private int heldMomentary = -1;
 
     /**
-     * Tap feedback for Timer apps: index → wall-clock millis until the
+     * Tap feedback for Timer signals: index → wall-clock millis until the
      * tile renders "pressed". Client-only flash — the real pulse state
      * lives on the server (placed screens show it via BE pips).
      */
@@ -111,40 +107,40 @@ public class TabletScreen extends Screen {
         return true;
     }
 
-    /** Index of the slider app currently being dragged, or -1. */
+    /** Index of the slider signal currently being dragged, or -1. */
     private int draggingSlider = -1;
 
     /** List-mode slider track width (wider than a switch — 16 stops;
-     * shared with AppRowPainter). */
+     * shared with SignalRowPainter). */
     static final int LIST_SLIDER_W = 60;
 
-    // Rearrange mode: while active, clicks grab-and-drag apps instead of
+    // Rearrange mode: while active, clicks grab-and-drag signals instead of
     // toggling them. The screen works on an optimistic local copy of the
-    // list ({@code workingApps}) so drags reflow instantly; each drop
-    // sends one ReorderAppPayload and the copy is retired once the
+    // list ({@code workingSignals}) so drags reflow instantly; each drop
+    // sends one ReorderSignalPayload and the copy is retired once the
     // server-synced list matches it (no snap-back flicker).
     private boolean reorderMode = false;
-    private List<SignalApp> workingApps = null;
+    private List<Signal> workingSignals = null;
     /** Theme dropdown open (swallows clicks like the edit screen's swatches). */
     private boolean themePopupOpen = false;
     /** Frames the retired overlay has waited for server sync. */
     private int overlayFrames = 0;
-    /** Current slot of the grabbed app while dragging, or -1. */
+    /** Current slot of the grabbed signal while dragging, or -1. */
     private int dragIndex = -1;
-    /** Slot the grabbed app was in at press time (the packet's "from"). */
+    /** Slot the grabbed signal was in at press time (the packet's "from"). */
     private int dragFromIndex = -1;
     private double dragOffsetX, dragOffsetY;
 
-    public TabletScreen(AppView view) {
+    public TabletScreen(SignalView view) {
         super(Component.translatable("gui.linktablet.tablet.title"));
         this.view = view;
     }
 
-    public AppView view() {
+    public SignalView view() {
         return view;
     }
 
-    /** Momentary app currently held in this GUI, or -1 (item renderer). */
+    /** Momentary signal currently held in this GUI, or -1 (item renderer). */
     public int heldMomentaryIndex() {
         return heldMomentary;
     }
@@ -163,12 +159,12 @@ public class TabletScreen extends Screen {
         graphics.drawString(font, text, cx - font.width(text) / 2, y, color, theme().textShadow);
     }
 
-    ModNetworking.AppTarget target() {
+    ModNetworking.SignalTarget target() {
         return view.target();
     }
 
-    private List<SignalApp> apps() {
-        return workingApps != null ? workingApps : view.apps();
+    private List<Signal> signals() {
+        return workingSignals != null ? workingSignals : view.signals();
     }
 
     private boolean listView() {
@@ -180,7 +176,7 @@ public class TabletScreen extends Screen {
     // ------------------------------------------------------------------
 
     private int totalTiles() {
-        return apps().size() + 1; // + "add" tile/row
+        return signals().size() + 1; // + "add" tile/row
     }
 
     private int columns() {
@@ -198,7 +194,9 @@ public class TabletScreen extends Screen {
 
     private int panelWidth() {
         int w = listView() ? LIST_WIDTH : gridNaturalWidth();
-        return Math.max(w, MIN_PANEL_WIDTH);
+        // The Home button (1.10.0) widens the left cluster — grow the
+        // floor with it or the title plaque overlaps the pin glyph
+        return Math.max(w, MIN_PANEL_WIDTH + MODE_BTN_SIZE + 4);
     }
 
     private int panelLeft() {
@@ -250,9 +248,15 @@ public class TabletScreen extends Screen {
         return bodyTop() + 8;
     }
 
-    /** Rearrange-mode toggle button, top-left of the body. */
-    private int reorderBtnX() {
+    /** Home (launcher) button, top-left corner (1.10.0) — every view:
+     * kiosks return to the block-bound launcher GUI too. */
+    private int homeBtnX() {
         return panelLeft() + 4;
+    }
+
+    /** Rearrange-mode toggle button, right of Home. */
+    private int reorderBtnX() {
+        return homeBtnX() + MODE_BTN_SIZE + 4;
     }
 
     /** Theme picker button, right of the rearrange button. */
@@ -271,12 +275,12 @@ public class TabletScreen extends Screen {
     }
 
     private boolean isBlockView() {
-        return view instanceof AppView.Block;
+        return view instanceof SignalView.Block;
     }
 
     /** Whether the viewed placed tablet is SOLO (opted out of merging). */
     private boolean soloScreen() {
-        if (!(view instanceof AppView.Block block) || minecraft == null
+        if (!(view instanceof SignalView.Block block) || minecraft == null
                 || minecraft.level == null) {
             return false;
         }
@@ -287,9 +291,9 @@ public class TabletScreen extends Screen {
         return (resolved != null ? resolved : be).isSoloScreen();
     }
 
-    // Theme dropdown: one row per theme (swatches + name), below the button
-    private static final int THEME_ROW_H = 14;
-    private static final int THEME_POPUP_W = 96;
+    // Theme dropdown metrics live in HeaderGlyphs (shared with the launcher)
+    private static final int THEME_ROW_H = HeaderGlyphs.THEME_ROW_H;
+    private static final int THEME_POPUP_W = HeaderGlyphs.THEME_POPUP_W;
 
     private int themePopupX() {
         return themeBtnX();
@@ -331,24 +335,24 @@ public class TabletScreen extends Screen {
      * Note glyph left edge inside a list row — right before the control,
      * mirrored by the row renderer and the click hit-test.
      */
-    private int noteGlyphListX(SignalApp app) {
-        int controlW = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+    private int noteGlyphListX(Signal signal) {
+        int controlW = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
         return rowX() + rowWidth() - 4 - controlW - 12;
     }
 
     /** True when the mouse is over an entry's note glyph (both layouts). */
     private boolean overNoteGlyph(int index, double mouseX, double mouseY) {
-        List<SignalApp> apps = apps();
-        if (index < 0 || index >= apps.size()) return false;
+        List<Signal> signals = signals();
+        if (index < 0 || index >= signals.size()) return false;
         int y = entryY(index);
         if (listView()) {
-            int gx = noteGlyphListX(apps.get(index));
+            int gx = noteGlyphListX(signals.get(index));
             return mouseX >= gx - 2 && mouseX < gx + 10
                     && mouseY >= y + (ROW_HEIGHT - 9) / 2 - 2 && mouseY < y + (ROW_HEIGHT + 9) / 2 + 2;
         }
         int x = entryX(index);
         // Top-left tile corner (below the frequency badge when present)
-        int gy = y + (apps.get(index).frequencies().size() > 1 ? 13 : 3);
+        int gy = y + (signals.get(index).frequencies().size() > 1 ? 13 : 3);
         return mouseX >= x + 1 && mouseX < x + 13 && mouseY >= gy - 2 && mouseY < gy + 11;
     }
 
@@ -363,6 +367,19 @@ public class TabletScreen extends Screen {
         graphics.pose().popPose();
     }
 
+    /** Tiny chain glyph (8x9, two interlocked links) — the signal-links
+     * indicator (1.10.0). Display only; links are edited in the edit
+     * screen's Links overlay. */
+    private void drawChainGlyph(GuiGraphics graphics, int gx, int gy, int frame, int hole) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200); // above 3D block icons
+        graphics.fill(gx, gy, gx + 5, gy + 5, frame);
+        graphics.fill(gx + 1, gy + 1, gx + 4, gy + 4, hole);
+        graphics.fill(gx + 3, gy + 4, gx + 8, gy + 9, frame);
+        graphics.fill(gx + 4, gy + 5, gx + 7, gy + 8, hole);
+        graphics.pose().popPose();
+    }
+
     // ------------------------------------------------------------------
     // Rearrange mode
     // ------------------------------------------------------------------
@@ -373,8 +390,8 @@ public class TabletScreen extends Screen {
 
     private void enterReorderMode() {
         releaseMomentary(); // never carry a held signal into the mode
-        if (workingApps == null) {
-            workingApps = new ArrayList<>(view.apps());
+        if (workingSignals == null) {
+            workingSignals = new ArrayList<>(view.signals());
         }
         reorderMode = true;
         overlayFrames = 0;
@@ -382,7 +399,7 @@ public class TabletScreen extends Screen {
     }
 
     private void exitReorderMode() {
-        // workingApps stays until the server-synced order matches it,
+        // workingSignals stays until the server-synced order matches it,
         // so the exit never shows a one-frame snap-back.
         reorderMode = false;
         dragIndex = dragFromIndex = -1;
@@ -390,17 +407,17 @@ public class TabletScreen extends Screen {
         UISounds.tick(1.0F);
     }
 
-    /** Slot the dragged app would land in at the mouse position, or -1. */
+    /** Slot the dragged signal would land in at the mouse position, or -1. */
     private int dragSlotAt(double mouseX, double mouseY) {
         int idx = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
-        if (idx == -1 || apps().isEmpty()) return -1;
-        return Math.min(idx, apps().size() - 1); // add tile = move to end
+        if (idx == -1 || signals().isEmpty()) return -1;
+        return Math.min(idx, signals().size() - 1); // add tile = move to end
     }
 
     private void updateDragHover(double mouseX, double mouseY) {
         int hover = dragSlotAt(mouseX, mouseY);
         if (hover != -1 && hover != dragIndex) {
-            workingApps.add(hover, workingApps.remove(dragIndex)); // live reflow
+            workingSignals.add(hover, workingSignals.remove(dragIndex)); // live reflow
             dragIndex = hover;
             UISounds.tick(1.3F);
         }
@@ -409,7 +426,7 @@ public class TabletScreen extends Screen {
     private void commitDrag() {
         if (dragging() && dragIndex != dragFromIndex) {
             PacketDistributor.sendToServer(
-                    new ModNetworking.ReorderAppPayload(target(), dragFromIndex, dragIndex));
+                    new ModNetworking.ReorderSignalPayload(target(), dragFromIndex, dragIndex));
         }
         dragIndex = dragFromIndex = -1;
     }
@@ -432,8 +449,8 @@ public class TabletScreen extends Screen {
 
         if (reorderMode) {
             // External add/remove synced in: refresh the copy, drop the drag
-            if (view.apps().size() != workingApps.size()) {
-                workingApps = new ArrayList<>(view.apps());
+            if (view.signals().size() != workingSignals.size()) {
+                workingSignals = new ArrayList<>(view.signals());
                 dragIndex = dragFromIndex = -1;
             }
             if (dragging()) {
@@ -445,12 +462,12 @@ public class TabletScreen extends Screen {
                 }
                 updateDragHover(mouseX, mouseY);
             }
-        } else if (workingApps != null) {
+        } else if (workingSignals != null) {
             // Retired overlay: hold the optimistic order until the server
             // echoes it back (or something else changed the list).
-            if (view.apps().equals(workingApps) || view.apps().size() != workingApps.size()
+            if (view.signals().equals(workingSignals) || view.signals().size() != workingSignals.size()
                     || ++overlayFrames > 40) {
-                workingApps = null;
+                workingSignals = null;
             }
         }
 
@@ -476,13 +493,13 @@ public class TabletScreen extends Screen {
         // Rail crossbar between the header and the scrolling content
         Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8, theme.bodyOuter);
 
-        List<SignalApp> apps = apps();
+        List<Signal> signals = signals();
 
         graphics.enableScissor(left - 4, gridTop() - 2, left + pw + 4, gridBottom());
         if (listView()) {
-            renderListContent(graphics, apps, mouseX, mouseY);
+            renderListContent(graphics, signals, mouseX, mouseY);
         } else {
-            renderGridContent(graphics, apps, mouseX, mouseY);
+            renderGridContent(graphics, signals, mouseX, mouseY);
         }
         graphics.disableScissor();
 
@@ -491,17 +508,17 @@ public class TabletScreen extends Screen {
             int fx = (int) (mouseX - dragOffsetX);
             int fy = (int) (mouseY - dragOffsetY);
             if (listView()) {
-                renderAppRow(graphics, apps.get(dragIndex), fx, fy, rowWidth(), false, false, false);
+                renderSignalRow(graphics, signals.get(dragIndex), fx, fy, rowWidth(), false, false, false);
                 graphics.fill(fx, fy, fx + rowWidth(), fy + ROW_HEIGHT, 0x28FFFFFF);
             } else {
-                renderAppTile(graphics, apps.get(dragIndex), fx, fy, false, false, false);
+                renderSignalTile(graphics, signals.get(dragIndex), fx, fy, false, false, false);
                 graphics.fill(fx, fy, fx + TILE_SIZE, fy + TILE_SIZE, 0x28FFFFFF);
             }
         }
 
-        if (apps.isEmpty()) {
+        if (signals.isEmpty()) {
             drawThemedCentered(graphics,
-                    Component.translatable("gui.linktablet.no_apps"),
+                    Component.translatable("gui.linktablet.no_signals"),
                     width / 2, bottom + 8, theme.textMuted);
         }
 
@@ -517,6 +534,8 @@ public class TabletScreen extends Screen {
         }
         if (hoveredNoteGlyph) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.note"), mouseX, mouseY);
+        } else if (overModeBtn(mouseX, mouseY, homeBtnX())) {
+            graphics.renderTooltip(font, Component.translatable("gui.linktablet.home"), mouseX, mouseY);
         } else if (overModeBtn(mouseX, mouseY, gridBtnX())) {
             graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
         } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
@@ -536,100 +555,34 @@ public class TabletScreen extends Screen {
     /** Theme dropdown, z-lifted above the batched content like the edit
      *  screen's color swatches. */
     private void renderThemePopup(GuiGraphics graphics, int mouseX, int mouseY, ScreenTheme current) {
-        int px = themePopupX();
-        int py = themePopupY();
-        ScreenTheme[] themes = ScreenTheme.values();
-
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 300);
-        Chrome.panel(graphics, px - 8, py - 8, THEME_POPUP_W + 16, themes.length * THEME_ROW_H + 16,
-                current);
-        for (int i = 0; i < themes.length; i++) {
-            ScreenTheme t = themes[i];
-            int y = py + i * THEME_ROW_H;
-            boolean hovered = mouseX >= px && mouseX < px + THEME_POPUP_W
-                    && mouseY >= y && mouseY < y + THEME_ROW_H;
-            if (t == current || hovered) {
-                graphics.fill(px, y, px + THEME_POPUP_W, y + THEME_ROW_H,
-                        t == current ? current.rowBgHover : current.rowBg);
-            }
-            // Swatch trio: panel, accent, text — the theme at a glance
-            graphics.fill(px + 2, y + 3, px + 10, y + 11, t.screenBgLit);
-            graphics.fill(px + 12, y + 3, px + 20, y + 11, t.accent);
-            graphics.fill(px + 22, y + 3, px + 30, y + 11, t.textPrimary);
-            graphics.drawString(font, t.displayName(), px + 34, y + 3,
-                    t == current ? current.accent : current.textPrimary, current.textShadow);
-        }
-        graphics.pose().popPose();
+        HeaderGlyphs.themePopup(graphics, font, themePopupX(), themePopupY(),
+                current, mouseX, mouseY);
     }
 
     private void renderModeButtons(GuiGraphics graphics, int mouseX, int mouseY) {
         int y = modeBtnY();
         boolean list = listView();
 
-        // Grid glyph: four small squares
-        int gx = gridBtnX();
-        int gridColor = glyphColor(!list, overModeBtn(mouseX, mouseY, gx));
-        graphics.fill(gx + 1, y + 1, gx + 5, y + 5, gridColor);
-        graphics.fill(gx + 7, y + 1, gx + 11, y + 5, gridColor);
-        graphics.fill(gx + 1, y + 7, gx + 5, y + 11, gridColor);
-        graphics.fill(gx + 7, y + 7, gx + 11, y + 11, gridColor);
-
-        // List glyph: three bars
-        int lx = listBtnX();
-        int listColor = glyphColor(list, overModeBtn(mouseX, mouseY, lx));
-        graphics.fill(lx + 1, y + 2, lx + 11, y + 4, listColor);
-        graphics.fill(lx + 1, y + 5, lx + 11, y + 7, listColor);
-        graphics.fill(lx + 1, y + 8, lx + 11, y + 10, listColor);
-
-        // Rearrange glyph: up/down arrow pair (top-left)
-        int rx = reorderBtnX();
-        int reorderColor = glyphColor(reorderMode, overModeBtn(mouseX, mouseY, rx));
-        graphics.fill(rx + 2, y + 2, rx + 4, y + 3, reorderColor);
-        graphics.fill(rx + 1, y + 3, rx + 5, y + 4, reorderColor);
-        graphics.fill(rx + 2, y + 4, rx + 4, y + 10, reorderColor);
-        graphics.fill(rx + 8, y + 2, rx + 10, y + 8, reorderColor);
-        graphics.fill(rx + 7, y + 8, rx + 11, y + 9, reorderColor);
-        graphics.fill(rx + 8, y + 9, rx + 10, y + 10, reorderColor);
-
-        // Theme glyph: frame + three color dots (a tiny palette)
-        int tx = themeBtnX();
-        int frame = glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, tx));
-        graphics.fill(tx + 1, y + 1, tx + 11, y + 2, frame);
-        graphics.fill(tx + 1, y + 10, tx + 11, y + 11, frame);
-        graphics.fill(tx + 1, y + 2, tx + 2, y + 10, frame);
-        graphics.fill(tx + 10, y + 2, tx + 11, y + 10, frame);
-        graphics.fill(tx + 3, y + 3, tx + 6, y + 6, 0xFF4ADE80);
-        graphics.fill(tx + 6, y + 6, tx + 9, y + 9, 0xFFB07CFF);
-        graphics.fill(tx + 3, y + 6, tx + 6, y + 9, 0xFF3AB3DA);
-
-        // Pin glyph: pushpin (head, flange, needle) — lit while THIS
-        // tablet is the pinned overlay
-        int px = pinBtnX();
-        int pin = glyphColor(OverlayPin.isPinned(view), overModeBtn(mouseX, mouseY, px));
-        graphics.fill(px + 4, y + 1, px + 8, y + 3, pin);
-        graphics.fill(px + 5, y + 3, px + 7, y + 6, pin);
-        graphics.fill(px + 2, y + 6, px + 10, y + 8, pin);
-        graphics.fill(px + 5, y + 8, px + 7, y + 11, pin);
-
-        // Link glyph (placed tablets only): two chain links — joined by
-        // a bar while merging is allowed, broken apart (and lit) while
-        // this tablet is SOLO
+        // Glyph pixel art lives in HeaderGlyphs (shared with the launcher)
+        HeaderGlyphs.grid(graphics, gridBtnX(), y,
+                glyphColor(!list, overModeBtn(mouseX, mouseY, gridBtnX())));
+        HeaderGlyphs.list(graphics, listBtnX(), y,
+                glyphColor(list, overModeBtn(mouseX, mouseY, listBtnX())));
+        HeaderGlyphs.home(graphics, homeBtnX(), y,
+                glyphColor(false, overModeBtn(mouseX, mouseY, homeBtnX())));
+        HeaderGlyphs.reorder(graphics, reorderBtnX(), y,
+                glyphColor(reorderMode, overModeBtn(mouseX, mouseY, reorderBtnX())));
+        HeaderGlyphs.themePalette(graphics, themeBtnX(), y,
+                glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, themeBtnX())));
+        // Pin lights while THIS tablet is the pinned overlay
+        HeaderGlyphs.pin(graphics, pinBtnX(), y,
+                glyphColor(OverlayPin.isPinned(view), overModeBtn(mouseX, mouseY, pinBtnX())));
+        // Link (placed tablets only): joined while merging is allowed,
+        // broken apart (and lit) while this tablet is SOLO
         if (isBlockView()) {
-            int kx = linkBtnX();
             boolean solo = soloScreen();
-            int link = glyphColor(solo, overModeBtn(mouseX, mouseY, kx));
-            graphics.fill(kx + 1, y + 3, kx + 5, y + 4, link);
-            graphics.fill(kx + 1, y + 8, kx + 5, y + 9, link);
-            graphics.fill(kx + 1, y + 4, kx + 2, y + 8, link);
-            graphics.fill(kx + 4, y + 4, kx + 5, y + 8, link);
-            graphics.fill(kx + 7, y + 3, kx + 11, y + 4, link);
-            graphics.fill(kx + 7, y + 8, kx + 11, y + 9, link);
-            graphics.fill(kx + 7, y + 4, kx + 8, y + 8, link);
-            graphics.fill(kx + 10, y + 4, kx + 11, y + 8, link);
-            if (!solo) {
-                graphics.fill(kx + 4, y + 5, kx + 8, y + 7, link);
-            }
+            HeaderGlyphs.link(graphics, linkBtnX(), y,
+                    glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
         }
     }
 
@@ -641,7 +594,7 @@ public class TabletScreen extends Screen {
 
     // ---- Grid mode ----------------------------------------------------
 
-    private void renderGridContent(GuiGraphics graphics, List<SignalApp> apps, int mouseX, int mouseY) {
+    private void renderGridContent(GuiGraphics graphics, List<Signal> signals, int mouseX, int mouseY) {
         int total = totalTiles();
         for (int i = 0; i < total; i++) {
             int x = entryX(i);
@@ -652,14 +605,14 @@ public class TabletScreen extends Screen {
                     && mouseY >= y && mouseY < y + TILE_SIZE
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
-            if (i < apps.size()) {
+            if (i < signals.size()) {
                 if (reorderMode && i == dragIndex) {
                     renderPlaceholderTile(graphics, x, y);
                 } else {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF8A93A6);
                     }
-                    renderAppTile(graphics, apps.get(i), x, y, hovered,
+                    renderSignalTile(graphics, signals.get(i), x, y, hovered,
                             i == heldMomentary || timerFlashActive(i),
                             !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
@@ -672,100 +625,98 @@ public class TabletScreen extends Screen {
         }
     }
 
-    /** Empty slot the dragged app was lifted out of. */
+    /** Empty slot the dragged signal was lifted out of. */
     private void renderPlaceholderTile(GuiGraphics graphics, int x, int y) {
         graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
         Chrome.plaque(graphics, x, y, TILE_SIZE, TILE_SIZE, theme().surfaceLo);
     }
 
-    private void renderAppTile(GuiGraphics graphics, SignalApp app, int x, int y, boolean hovered,
+    private void renderSignalTile(GuiGraphics graphics, Signal signal, int x, int y, boolean hovered,
                                boolean held, boolean noteHovered) {
         ScreenTheme theme = theme();
-        // Active glow border (momentary apps glow while held)
-        if (app.active() || held) {
-            graphics.fill(x - 2, y - 2, x + TILE_SIZE + 2, y + TILE_SIZE + 2, theme.accent);
-        } else if (hovered) {
-            graphics.fill(x - 1, y - 1, x + TILE_SIZE + 1, y + TILE_SIZE + 1, 0xFF5A6070);
-        }
-
-        // Themed tile with the app color as an inset chip — the list rows'
-        // plaque+chip structure (the color is the content, not the button)
-        Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, hovered ? theme.rowBgHover : theme.rowBg);
-        int color = app.color() | 0xFF000000;
-        int chipX0 = x + CHIP_INSET;
-        int chipY0 = y + CHIP_INSET;
-        int chipX1 = x + TILE_SIZE - CHIP_INSET;
-        int chipY1 = y + TILE_SIZE - CHIP_INSET;
-        graphics.fill(chipX0, chipY0, chipX1, chipY1, color);
+        // Base look (borders, plaque, color chip) shared with the
+        // launcher via the painter; momentary signals glow while held
+        int color = signal.color() | 0xFF000000;
+        SignalTilePainter.base(graphics, theme, x, y, TILE_SIZE, color,
+                signal.active() || held, hovered);
+        int chipY0 = y + SignalTilePainter.CHIP_INSET;
+        int chipX1 = x + TILE_SIZE - SignalTilePainter.CHIP_INSET;
+        int chipY1 = y + TILE_SIZE - SignalTilePainter.CHIP_INSET;
 
         // Icon centered on the chip: custom item, or the first frequency
         // pair drawn overlapping (a one-item frequency renders centered
         // like a custom icon). Sliders sit higher — the value bar runs
         // along the chip bottom.
-        int iy = app.slider() ? y + 10 : y + (TILE_SIZE - 16) / 2;
-        if (app.hasCustomIcon() || !app.primaryFrequency().isPair()) {
-            graphics.renderItem(app.iconStack(), x + (TILE_SIZE - 16) / 2, iy);
+        int iy = signal.slider() ? y + 10 : y + (TILE_SIZE - 16) / 2;
+        if (signal.hasCustomIcon() || !signal.primaryFrequency().isPair()) {
+            graphics.renderItem(signal.iconStack(), x + (TILE_SIZE - 16) / 2, iy);
         } else {
             int cx = x + TILE_SIZE / 2;
-            graphics.renderItem(app.primaryFrequency().icon1(), cx - 14, iy);
-            graphics.renderItem(app.primaryFrequency().icon2(), cx - 2, iy);
+            graphics.renderItem(signal.primaryFrequency().icon1(), cx - 14, iy);
+            graphics.renderItem(signal.primaryFrequency().icon2(), cx - 2, iy);
             drawFreqPairMarkers(graphics, cx, iy);
         }
 
-        if (app.slider()) {
+        if (signal.slider()) {
             // Value bar along the chip bottom; the value replaces the pip
             int tx0 = x + GRID_BAR_INSET;
             int tx1 = x + TILE_SIZE - GRID_BAR_INSET;
             int ty = chipY1 - 6;
             graphics.fill(tx0, ty, tx1, ty + 4, theme.switchOff);
-            if (app.strength() > 0) {
-                int fill = tx0 + Math.round((tx1 - tx0) * app.fillFraction());
+            if (signal.strength() > 0) {
+                int fill = tx0 + Math.round((tx1 - tx0) * signal.fillFraction());
                 graphics.fill(tx0, ty, fill, ty + 4, theme.accent);
             }
             // Level readout stack-count style: chip bottom-right, above the
             // bar. Z-lifted like vanilla stack counts so the 3D block icon
             // can't cover it.
-            String level = String.valueOf(app.strength());
+            String level = String.valueOf(signal.strength());
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 200);
             graphics.drawString(font, level, chipX1 - 2 - font.width(level), ty - 9,
                     0xFFE2E5EB, true);
             graphics.pose().popPose();
         } else {
-            // ON/OFF pip on the chip corner; momentary apps get a hollow
+            // ON/OFF pip on the chip corner; momentary signals get a hollow
             // ring (solid while held)
             int px = chipX1 - 6;
             int py = chipY0 + 2;
-            int pipColor = (app.active() || held) ? theme.accent : theme.switchOff;
+            int pipColor = (signal.active() || held) ? theme.accent : theme.switchOff;
             graphics.fill(px, py, px + 4, py + 4, pipColor);
             // Momentary AND Timer pips read as a hollow ring while idle
-            if ((app.momentary() || app.timed()) && !held) {
+            if ((signal.momentary() || signal.timed()) && !held) {
                 graphics.fill(px + 1, py + 1, px + 3, py + 3, color);
             }
         }
 
-        // Frequency count badge for scene apps
-        if (app.frequencies().size() > 1) {
-            graphics.drawString(font, "x" + app.frequencies().size(), x + 3, y + 3, 0xFFE2E5EB, true);
+        // Frequency count badge for scene signals
+        if (signal.frequencies().size() > 1) {
+            graphics.drawString(font, "x" + signal.frequencies().size(), x + 3, y + 3, 0xFFE2E5EB, true);
         }
 
         // Note glyph, tile top-left (below the badge when both show):
         // always visible when a note exists, on hover as the affordance
-        if (app.hasNote() || hovered || noteHovered) {
-            int gy = y + (app.frequencies().size() > 1 ? 13 : 3);
+        if (signal.hasNote() || hovered || noteHovered) {
+            int gy = y + (signal.frequencies().size() > 1 ? 13 : 3);
             int frame = noteHovered ? theme.glyphHover
-                    : app.hasNote() ? theme.textMuted : theme.textFaint;
+                    : signal.hasNote() ? theme.textMuted : theme.textFaint;
             drawNoteGlyph(graphics, x + 3, gy, frame, theme.surfaceLo);
             if (noteHovered) {
                 hoveredNoteGlyph = true;
             }
         }
 
+        // Chain glyph (1.10.0 signal links), below the note SLOT — a
+        // stable position whether the note affordance shows or not
+        if (signal.hasLinks()) {
+            int cy = y + (signal.frequencies().size() > 1 ? 13 : 3) + 12;
+            drawChainGlyph(graphics, x + 3, cy, theme.textMuted, theme.surfaceLo);
+        }
+
         // Name (ellipsized to tile width; full name via hover tooltip)
-        String name = TextFit.ellipsize(font, app.name(), TILE_SIZE + TILE_GAP - 2);
-        drawThemedCentered(graphics, name, x + TILE_SIZE / 2, y + TILE_SIZE + 3, theme.textPrimary);
-        if (hovered && !name.equals(app.name())) {
-            hoveredEllipsizedName = app.name();
+        String name = SignalTilePainter.label(graphics, font, theme, signal.name(), x, y, TILE_SIZE, TILE_GAP);
+        if (hovered && !name.equals(signal.name())) {
+            hoveredEllipsizedName = signal.name();
         }
     }
 
@@ -795,7 +746,7 @@ public class TabletScreen extends Screen {
         return panelWidth() - 2 * TILE_GAP;
     }
 
-    private void renderListContent(GuiGraphics graphics, List<SignalApp> apps, int mouseX, int mouseY) {
+    private void renderListContent(GuiGraphics graphics, List<Signal> signals, int mouseX, int mouseY) {
         int total = totalTiles();
         int x = rowX();
         int w = rowWidth();
@@ -807,14 +758,14 @@ public class TabletScreen extends Screen {
                     && mouseY >= y && mouseY < y + ROW_HEIGHT
                     && mouseY >= gridTop() - 2 && mouseY <= gridBottom();
 
-            if (i < apps.size()) {
+            if (i < signals.size()) {
                 if (reorderMode && i == dragIndex) {
                     renderPlaceholderRow(graphics, x, y, w);
                 } else {
                     if (reorderMode) {
                         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF8A93A6);
                     }
-                    renderAppRow(graphics, apps.get(i), x, y, w, hovered,
+                    renderSignalRow(graphics, signals.get(i), x, y, w, hovered,
                             i == heldMomentary || timerFlashActive(i),
                             !reorderMode && overNoteGlyph(i, mouseX, mouseY));
                 }
@@ -827,32 +778,39 @@ public class TabletScreen extends Screen {
         }
     }
 
-    /** Empty slot the dragged app was lifted out of. */
+    /** Empty slot the dragged signal was lifted out of. */
     private void renderPlaceholderRow(GuiGraphics graphics, int x, int y, int w) {
         graphics.fill(x - 1, y - 1, x + w + 1, y + ROW_HEIGHT + 1, 0xFF5A6070);
         Chrome.plaque(graphics, x, y, w, ROW_HEIGHT, theme().surfaceLo);
     }
 
-    private void renderAppRow(GuiGraphics graphics, SignalApp app, int x, int y, int w,
+    private void renderSignalRow(GuiGraphics graphics, Signal signal, int x, int y, int w,
                               boolean hovered, boolean held, boolean noteHovered) {
         ScreenTheme theme = theme();
         // Shared painter (also drives the pinned mini-tablet's rows)
-        String name = AppRowPainter.paint(graphics, font, theme, app, x, y, w, hovered, held);
-        if (hovered && !name.equals(app.name())) {
-            hoveredEllipsizedName = app.name();
+        String name = SignalRowPainter.paint(graphics, font, theme, signal, x, y, w, hovered, held);
+        if (hovered && !name.equals(signal.name())) {
+            hoveredEllipsizedName = signal.name();
         }
 
         // Note glyph, right before the control (mirrors noteGlyphListX) —
         // a GUI-only affordance, so it's overlaid here, not in the painter
-        if (app.hasNote() || hovered || noteHovered) {
-            int controlReserve = app.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+        if (signal.hasNote() || hovered || noteHovered) {
+            int controlReserve = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
             int gx = x + w - 4 - controlReserve - 12;
             int frame = noteHovered ? theme.glyphHover
-                    : app.hasNote() ? theme.textMuted : theme.textFaint;
+                    : signal.hasNote() ? theme.textMuted : theme.textFaint;
             drawNoteGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, frame, theme.surfaceLo);
             if (noteHovered) {
                 hoveredNoteGlyph = true;
             }
+        }
+
+        // Chain glyph (1.10.0 signal links), left of the note slot
+        if (signal.hasLinks()) {
+            int controlReserve = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+            int gx = x + w - 4 - controlReserve - 12 - 11;
+            drawChainGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, theme.textMuted, theme.surfaceLo);
         }
     }
 
@@ -860,7 +818,7 @@ public class TabletScreen extends Screen {
         ScreenTheme theme = theme();
         graphics.fill(x, y, x + w, y + ROW_HEIGHT, hovered ? theme.surfaceHi : theme.surfaceLo);
         drawThemedCentered(graphics,
-                Component.translatable("gui.linktablet.add_app_row"),
+                Component.translatable("gui.linktablet.add_signal_row"),
                 x + w / 2, y + (ROW_HEIGHT - 8) / 2, theme.textMuted);
     }
 
@@ -894,6 +852,12 @@ public class TabletScreen extends Screen {
         }
 
         if (button == 0) {
+            if (overModeBtn(mouseX, mouseY, homeBtnX())) {
+                // removed() releases any held momentary on the way out
+                UISounds.tick(1.2F);
+                ClientHooks.returnHome(view);
+                return true;
+            }
             if (overModeBtn(mouseX, mouseY, themeBtnX())) {
                 themePopupOpen = true;
                 UISounds.tick(1.3F);
@@ -950,7 +914,7 @@ public class TabletScreen extends Screen {
             // Grab-and-drag only; toggling/editing is suspended in the mode
             if (button == 0) {
                 int idx = listView() ? listIndexAt(mouseX, mouseY) : gridIndexAt(mouseX, mouseY);
-                if (idx >= 0 && idx < apps().size()) { // add tile inert
+                if (idx >= 0 && idx < signals().size()) { // add tile inert
                     dragIndex = dragFromIndex = idx;
                     dragOffsetX = mouseX - entryX(idx);
                     dragOffsetY = mouseY - entryY(idx);
@@ -981,7 +945,7 @@ public class TabletScreen extends Screen {
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
-    // ---- Slider apps ---------------------------------------------------
+    // ---- Slider signals ---------------------------------------------------
 
     /** Horizontal span of an entry's slider control (screen-x px). */
     private int[] sliderSpan(int index) {
@@ -994,19 +958,19 @@ public class TabletScreen extends Screen {
     }
 
     private int sliderValueFromMouse(int index, double mouseX) {
-        List<SignalApp> apps = apps();
-        if (index >= apps.size()) return 0; // app vanished mid-drag; sendSliderValue bails too
+        List<Signal> signals = signals();
+        if (index >= signals.size()) return 0; // signal vanished mid-drag; sendSliderValue bails too
         int[] span = sliderSpan(index);
         float rel = Mth.clamp((float) ((mouseX - span[0]) / (span[1] - span[0])), 0.0F, 1.0F);
-        return apps.get(index).valueFromFraction(rel);
+        return signals.get(index).valueFromFraction(rel);
     }
 
     /** Sends only actual changes — a drag emits at most 16 packets. */
     private void sendSliderValue(int index, int value) {
-        List<SignalApp> apps = apps();
-        if (index >= apps.size()) return;
-        SignalApp app = apps.get(index);
-        if (!app.slider() || app.strength() == value) return;
+        List<Signal> signals = signals();
+        if (index >= signals.size()) return;
+        Signal signal = signals.get(index);
+        if (!signal.slider() || signal.strength() == value) return;
         PacketDistributor.sendToServer(new ModNetworking.SetSliderPayload(target(), index, value));
     }
 
@@ -1040,59 +1004,59 @@ public class TabletScreen extends Screen {
     }
 
     private void handleEntryClick(int index, int button, double mouseX, double mouseY) {
-        List<SignalApp> apps = apps();
-        if (index < apps.size()) {
+        List<Signal> signals = signals();
+        if (index < signals.size()) {
             if (button == 1) {
                 // Right-click: edit (server opens the container menu)
                 UISounds.page();
                 PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
-                        AppEditMenu.EditContext.plain(target(), index)));
+                        SignalEditMenu.EditContext.plain(target(), index)));
             } else if (button == 0) {
-                SignalApp app = apps.get(index);
+                Signal signal = signals.get(index);
                 if (overNoteGlyph(index, mouseX, mouseY)) {
                     openNote(index);
                     return;
                 }
-                String game = app.secretGameId();
+                String game = signal.secretGameId();
                 if (game != null) {
                     UISounds.open();
                     minecraft.setScreen(SecretGames.create(game, view, true));
                     return;
                 }
-                if (app.slider()) {
+                if (signal.slider()) {
                     // Click sets the value from position; keep dragging to sweep
                     draggingSlider = index;
                     UISounds.tick(1.2F);
                     sendSliderValue(index, sliderValueFromMouse(index, mouseX));
                     return;
                 }
-                if (app.timed()) {
+                if (signal.timed()) {
                     // Tap: the server runs (or restarts) the timed pulse;
                     // a short client-side pressed flash sells the tap
                     UISounds.toggle(true);
                     timerFlash.put(index, net.minecraft.Util.getMillis() + 300);
                     PacketDistributor.sendToServer(
-                            new ModNetworking.TimedAppPayload(target(), index));
+                            new ModNetworking.TimedSignalPayload(target(), index));
                     return;
                 }
-                if (app.momentary()) {
+                if (signal.momentary()) {
                     // Press-and-hold: transmits until mouse release
                     UISounds.toggle(true);
                     heldMomentary = index;
                     PacketDistributor.sendToServer(
-                            new ModNetworking.MomentaryAppPayload(target(), index, true));
+                            new ModNetworking.MomentarySignalPayload(target(), index, true));
                 } else {
                     // Left-click: toggle
-                    UISounds.toggle(!app.active());
+                    UISounds.toggle(!signal.active());
                     PacketDistributor.sendToServer(
-                            new ModNetworking.ToggleAppPayload(target(), index));
+                            new ModNetworking.ToggleSignalPayload(target(), index));
                 }
             }
         } else if (button == 0) {
-            if (apps.size() < view.maxApps()) {
+            if (signals.size() < view.maxSignals()) {
                 UISounds.page();
                 PacketDistributor.sendToServer(new ModNetworking.OpenEditMenuPayload(
-                        AppEditMenu.EditContext.plain(target(), -1)));
+                        SignalEditMenu.EditContext.plain(target(), -1)));
             }
         }
     }
@@ -1110,9 +1074,9 @@ public class TabletScreen extends Screen {
             return true;
         }
         if (button == 0 && draggingSlider != -1) {
-            List<SignalApp> apps = apps();
-            if (draggingSlider < apps.size()) {
-                UISounds.tick(1.0F + apps.get(draggingSlider).strength() / 15.0F);
+            List<Signal> signals = signals();
+            if (draggingSlider < signals.size()) {
+                UISounds.tick(1.0F + signals.get(draggingSlider).strength() / 15.0F);
             }
             draggingSlider = -1;
             return true;
@@ -1123,7 +1087,7 @@ public class TabletScreen extends Screen {
     private void releaseMomentary() {
         if (heldMomentary == -1) return;
         PacketDistributor.sendToServer(
-                new ModNetworking.MomentaryAppPayload(target(), heldMomentary, false));
+                new ModNetworking.MomentarySignalPayload(target(), heldMomentary, false));
         heldMomentary = -1;
     }
 

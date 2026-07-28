@@ -1,7 +1,7 @@
 package com.modpack.linktablet.compat.jei;
 
 import com.modpack.linktablet.LinkTabletMod;
-import com.modpack.linktablet.client.screen.AppEditScreen;
+import com.modpack.linktablet.client.screen.SignalEditScreen;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.VanillaTypes;
@@ -18,7 +18,7 @@ import java.util.Optional;
 
 /**
  * JEI integration (1.7.0): drag an item from the ingredient panel onto
- * either frequency ghost slot of the app edit screen to stage it — same
+ * either frequency ghost slot of the signal edit screen to stage it — same
  * path as dropping a carried stack, nothing is consumed. Discovered by
  * JEI's own {@code @JeiPlugin} scan, so this class never loads on
  * installs without JEI.
@@ -33,13 +33,13 @@ public class JeiCompat implements IModPlugin {
 
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        registration.addGhostIngredientHandler(AppEditScreen.class, new FrequencyGhostHandler());
+        registration.addGhostIngredientHandler(SignalEditScreen.class, new FrequencyGhostHandler());
     }
 
-    private static class FrequencyGhostHandler implements IGhostIngredientHandler<AppEditScreen> {
+    private static class FrequencyGhostHandler implements IGhostIngredientHandler<SignalEditScreen> {
 
         @Override
-        public <I> List<Target<I>> getTargetsTyped(AppEditScreen screen,
+        public <I> List<Target<I>> getTargetsTyped(SignalEditScreen screen,
                                                    ITypedIngredient<I> ingredient, boolean doStart) {
             Optional<ItemStack> stack = ingredient.getIngredient(VanillaTypes.ITEM_STACK);
             if (stack.isEmpty()) return List.of();
@@ -59,7 +59,7 @@ public class JeiCompat implements IModPlugin {
                     }
                 });
             }
-            // Icon slot (1.9.1): drop sets the app's custom icon
+            // Icon slot (1.9.1): drop sets the signal's custom icon
             Rect2i iconArea = screen.iconSlotArea();
             targets.add(new Target<>() {
                 @Override
