@@ -99,37 +99,55 @@ at the repo root (auto-loaded every Claude session).
   `ClientHooks.openBlockHome` (NEVER the signals grid), and the
   signals GUI's Home button now shows on block views too.
 
-## ▶ NEXT SESSION: START HERE — App addon API (user-approved 2026-07-27)
+## ▶ App addon API — IN CODE 2026-07-27 (same day as the OS suite)
 
-Goal: addon mods register their own tablet programs into the App
-Store. Design points settled in advance (from the 2026-07-27
-exploration; refine before coding):
+Built and build+boot clean; awaiting the user's in-world pass (folds
+into S6 below). Decisions locked with the user via AskUserQuestion:
+**keys-native persistence now** (1.10.0 unreleased = the int formats
+never shipped), **buffered face context** (three-pass rule enforced
+structurally), **in-repo dev example** (jar-excluded), **no store
+byline**. What shipped:
 
-- **Identity**: addon programs persist by STABLE STRING KEY, not int
-  id — the int-id space (0–6 used) stays this mod's. Implication: the
-  `home_apps` component/NBT (int list) needs a parallel string list
-  (or a v2 format with the int form decoded forever — the frequency
-  LEGACY_CODEC precedent). The kiosk `screen_program` byte likewise
-  (string key alongside, byte kept for built-ins).
-- **Registration**: a `ProgramProvider`-style interface (key, name,
-  description, tile chip color + icon, screen factory, optional
-  overlay-content factory, optional kiosk-face renderer) + a
-  registration event or registry. `Program` enum stays for built-ins;
-  a wrapper table unifies enum + addons for launcher/store/roster
-  code (today's `Program.apps()` call sites become the seam).
-- **Store**: addon rows appear automatically (they're the point);
-  store gains scrolling once the shelf outgrows the 240 budget.
-- **Kiosk**: addon faces default to the label face; the face renderer
-  hook must respect the three-pass batching rule — DOCUMENT it in the
-  API javadoc or every addon will crash the shared buffer.
-- **Overlay**: addon OverlayContent slots into the `@<key>` pin
-  descriptor for free (parse already falls back gracefully).
-- **Nav sync**: SetProgramPayload carries an int id — needs the
-  string-key variant for addons.
-- API = public commitment: put it in a dedicated `api/` package,
-  document append-only rules, and version it in the jar manifest or a
-  constant. Half the session is design review with the user before
-  code.
+- **`api/` package** (PUBLIC COMMITMENT — append-only, see the new
+  CLAUDE.md gotcha): `TabletProgram` (key "modid:name", displayName,
+  storeDescription, chipColor, iconItem) + `RegisterTabletProgramsEvent`
+  (posted to every mod bus from commonSetup enqueueWork, then
+  `Programs.freeze()`); client: `TabletProgramClient` (screen factory,
+  optional overlay, optional face painter), `ProgramHost` (theme/
+  tabletName/goHome/isPinned/togglePin), `RegisterTabletProgramClientsEvent`
+  (posted from ClientSetup), `TabletFacePainter`+`TabletFaceContext`
+  (glass-texel fills/items/text, BUFFERED — `renderAddonFace` flushes
+  in pass order), and `OverlayContent` MOVED here (program() dropped;
+  the five impls updated). `LinkTabletApi.API_VERSION = 1`.
+- **`Programs`** = the one unified table (enum seeds it, addons sort
+  by key after; byKey falls back LAUNCHER, catalog(), fromKeys()
+  sanitizer, keys()). `Program` enum implements `TabletProgram`;
+  built-in dispatch stays `instanceof Program` switches (ClientHooks
+  screenFor, MiniTabletWindow contentFor, BER renderFace — the flat/
+  mounted switches got extracted into ONE helper), addons go through
+  `ProgramClients`.
+- **Keys-native persistence** (registrar "16"→"17"): HOME_APPS
+  component is now List<String> under the same id (Either-codec
+  decodes the old int list forever, always writes keys); BE
+  `home_apps`/`screen_program` tags write string forms, load
+  type-sniffs the pre-API int-array/byte forms; SetHomeAppsPayload
+  carries keys (wire cap 64), SetProgramPayload a key. Prefs + pin
+  `@<key>` descriptors were already strings — addon keys (with ':')
+  ride through untouched.
+- **Example addon** `example/ExampleAddon(+Client)` — "Dice"
+  (linktablet_example:dice): store row, screen (roll + pin toggle +
+  ESC→Home), overlay pane, kiosk die face — imports ONLY api/ +
+  vanilla; jar-excluded in build.gradle beside tools/.
+  **USER-VERIFIED in dev 2026-07-27 ("dice works"), then made
+  OPT-IN by user request** ("kinda lame next to the games"): it now
+  registers only with `-Dlinktablet.example=true` (dev-only guard
+  kept too). Flip the flag on whenever the API changes — it's the
+  API's regression test.
+- **S6 additions for the API** (append to the matrix; the Dice pass
+  itself is DONE — re-run with the flag only if the API changes):
+  dev-world legacy decode (existing rosters/kiosk programs survive
+  the int→key switch — type-sniff) and a store Get/Remove
+  regression.
 
 ## OS suite S6 (in-world regression pass — still owed)
 
@@ -286,15 +304,10 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
 
 ## Next session
 
-0. **App addon API (user-approved idea 2026-07-27, timing open)** —
-   let addon mods register their own tablet programs into the App
-   Store. Sketch: a registration hook (Program moves from enum to a
-   registry-ish table, or a parallel `ProgramProvider` interface the
-   enum delegates to), stable string ids for addon programs (the
-   int-id space stays ours; addon roster entries persist by KEY not
-   id), a client API for screen/overlay/kiosk-face providers, and
-   store metadata (name/desc/icon). Big design surface — own session,
-   and it cements public API, so design carefully before shipping.
+0. ~~App addon API~~ — **DONE IN CODE 2026-07-27** (see the section
+   above); remaining work is the user's in-world pass (S6) and,
+   post-release, announcing the API to addon authors (maybe a short
+   API.md / wiki page — not written yet, javadoc is the doc for now).
 1. **Redstone follow mode (queued 2026-07-22, user-requested; now ships
    AFTER the launcher, user decision 2026-07-27)** — a
    POWERED mounted tablet tracks the nearest player like the

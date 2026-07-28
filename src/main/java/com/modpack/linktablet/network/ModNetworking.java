@@ -374,13 +374,14 @@ public class ModNetworking {
     // Payload: replace the tablet's home-screen roster (1.10.0 settable
     // roster — the launcher's app drawer and tile removal both send it)
     // ------------------------------------------------------------------
-    public record SetHomeAppsPayload(SignalTarget target, List<Integer> ids)
+    public record SetHomeAppsPayload(SignalTarget target, List<String> keys)
             implements CustomPacketPayload {
         public static final Type<SetHomeAppsPayload> TYPE = new Type<>(id("set_home_apps"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SetHomeAppsPayload> STREAM_CODEC =
                 StreamCodec.composite(
                         SignalTarget.STREAM_CODEC, SetHomeAppsPayload::target,
-                        ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()), SetHomeAppsPayload::ids,
+                        ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(64)),
+                        SetHomeAppsPayload::keys,
                         SetHomeAppsPayload::new);
 
         @Override
@@ -516,12 +517,12 @@ public class ModNetworking {
     // both back). Block targets only; held/slot GUIs resume via the
     // client pref instead.
     // ------------------------------------------------------------------
-    public record SetProgramPayload(SignalTarget target, int programId) implements CustomPacketPayload {
+    public record SetProgramPayload(SignalTarget target, String programKey) implements CustomPacketPayload {
         public static final Type<SetProgramPayload> TYPE = new Type<>(id("set_program"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SetProgramPayload> STREAM_CODEC =
                 StreamCodec.composite(
                         SignalTarget.STREAM_CODEC, SetProgramPayload::target,
-                        ByteBufCodecs.VAR_INT, SetProgramPayload::programId,
+                        ByteBufCodecs.STRING_UTF8, SetProgramPayload::programKey,
                         SetProgramPayload::new);
 
         @Override
@@ -540,9 +541,9 @@ public class ModNetworking {
         if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
             TabletBlockEntity controller = be.resolveController();
             if (controller != null) {
-                // byId sanitizes: unknown ids fall back to the launcher
+                // byKey sanitizes: unknown keys fall back to the launcher
                 controller.setCurrentProgram(
-                        com.modpack.linktablet.Program.byId(payload.programId()));
+                        com.modpack.linktablet.Programs.byKey(payload.programKey()));
             }
         }
     }
@@ -573,7 +574,10 @@ public class ModNetworking {
         // in 1.10.0 with "14", but each wire growth gets its own fence).
         // "16": 1.10.0 kiosk-follows-GUI — SetProgramPayload added
         // (still inside the 1.10.0 pairing break).
-        PayloadRegistrar registrar = event.registrar("16");
+        // "17": 1.10.0 addon API — programs travel by string KEY:
+        // SetHomeAppsPayload carries keys, SetProgramPayload a key
+        // (still inside the 1.10.0 pairing break).
+        PayloadRegistrar registrar = event.registrar("17");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -627,14 +631,15 @@ public class ModNetworking {
         com.modpack.linktablet.client.ClientGaugeReadings.accept(payload.readings());
     }
 
-    /** Same both-target shape as {@link #handleSetTheme}; Program.fromIds
-     * sanitizes (unknown/launcher ids drop, dedupe, empty → default). */
+    /** Same both-target shape as {@link #handleSetTheme}; Programs.fromKeys
+     * sanitizes (unknown/launcher keys drop, dedupe, empty → default). */
     private static void handleSetHomeApps(SetHomeAppsPayload payload, IPayloadContext context) {
         Player player = context.player();
-        // Sanity cap, above the whole catalog (24 programs incl. games)
-        if (payload.ids().size() > 64) return;
-        List<com.modpack.linktablet.Program> home =
-                com.modpack.linktablet.Program.fromIds(payload.ids());
+        // Sanity cap, above the whole catalog (the wire codec also caps
+        // the list at 64)
+        if (payload.keys().size() > 64) return;
+        List<com.modpack.linktablet.api.TabletProgram> home =
+                com.modpack.linktablet.Programs.fromKeys(payload.keys());
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
@@ -652,11 +657,11 @@ public class ModNetworking {
         if (!stack.isEmpty()) {
             // The default roster is never written, so untouched tablets
             // stay component-free (the theme idiom)
-            if (home.equals(com.modpack.linktablet.Program.DEFAULT_HOME)) {
+            if (home.equals(com.modpack.linktablet.Programs.DEFAULT_HOME)) {
                 stack.remove(ModDataComponents.HOME_APPS.get());
             } else {
                 stack.set(ModDataComponents.HOME_APPS.get(),
-                        com.modpack.linktablet.Program.ids(home));
+                        com.modpack.linktablet.Programs.keys(home));
             }
         }
     }

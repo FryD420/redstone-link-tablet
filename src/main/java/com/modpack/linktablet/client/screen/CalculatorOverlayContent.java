@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -18,11 +19,6 @@ public class CalculatorOverlayContent implements OverlayContent {
     private static final int DISPLAY_H = 16;
     private static final int BTN_H = 16;
     private static final int GAP = 2;
-
-    @Override
-    public Program program() {
-        return Program.CALCULATOR;
-    }
 
     @Override
     public int height(int rowWidth) {

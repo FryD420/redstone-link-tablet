@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.TextFit;
@@ -26,11 +27,6 @@ public class GaugesOverlayContent implements OverlayContent {
 
     public GaugesOverlayContent(Supplier<SignalView> view) {
         this.view = view;
-    }
-
-    @Override
-    public Program program() {
-        return Program.GAUGES;
     }
 
     @Override

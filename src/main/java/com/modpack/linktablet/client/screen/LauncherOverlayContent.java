@@ -1,6 +1,7 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.Program;
+import com.modpack.linktablet.api.client.OverlayContent;
+import com.modpack.linktablet.api.TabletProgram;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.theme.ScreenTheme;
@@ -32,11 +33,6 @@ public class LauncherOverlayContent implements OverlayContent {
     }
 
     @Override
-    public Program program() {
-        return Program.LAUNCHER;
-    }
-
-    @Override
     public int height(int rowWidth) {
         return Math.max(1, view.get().homeApps().size()) * ROW_H - 2;
     }
@@ -45,11 +41,11 @@ public class LauncherOverlayContent implements OverlayContent {
     public void render(GuiGraphics graphics, Font font, ScreenTheme theme, int x, int top,
                        int rowWidth, int mouseX, int mouseY, boolean reachable,
                        int clipTop, int clipBottom) {
-        List<Program> home = view.get().homeApps();
+        List<TabletProgram> home = view.get().homeApps();
         for (int i = 0; i < home.size(); i++) {
             int ry = top + i * ROW_H;
             if (ry + ROW_H < clipTop || ry > clipBottom) continue;
-            Program program = home.get(i);
+            TabletProgram program = home.get(i);
             boolean hovered = reachable && mouseX >= x && mouseX < x + rowWidth
                     && mouseY >= ry && mouseY < ry + ROW_H - 2;
             graphics.fill(x, ry, x + rowWidth, ry + ROW_H - 2, hovered ? theme.rowBgHover : theme.rowBg);
@@ -61,7 +57,7 @@ public class LauncherOverlayContent implements OverlayContent {
                     graphics.renderItem(stack, x + 2, ry + 2);
                 }
             }
-            graphics.drawString(font, Component.translatable("program.linktablet." + program.key()),
+            graphics.drawString(font, program.displayName(),
                     x + 24, ry + (ROW_H - 10) / 2, theme.textPrimary, theme.textShadow);
         }
     }
@@ -69,7 +65,7 @@ public class LauncherOverlayContent implements OverlayContent {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button, int x, int top, int rowWidth) {
         if (button != 0) return false;
-        List<Program> home = view.get().homeApps();
+        List<TabletProgram> home = view.get().homeApps();
         for (int i = 0; i < home.size(); i++) {
             int ry = top + i * ROW_H;
             if (mouseY >= ry && mouseY < ry + ROW_H - 2) {

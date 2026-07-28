@@ -1,6 +1,7 @@
 package com.modpack.linktablet.client.screen;
 
-import com.modpack.linktablet.Program;
+import com.modpack.linktablet.Programs;
+import com.modpack.linktablet.api.TabletProgram;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.client.UISounds;
@@ -53,8 +54,8 @@ public class StoreScreen extends Screen {
         return view.theme();
     }
 
-    private List<Program> apps() {
-        return Program.apps();
+    private List<TabletProgram> apps() {
+        return Programs.catalog();
     }
 
     // ------------------------------------------------------------------
@@ -150,11 +151,11 @@ public class StoreScreen extends Screen {
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         scroll = net.minecraft.util.Mth.clamp(scroll, 0, maxScroll());
-        List<Program> home = view.homeApps();
-        List<Program> apps = apps();
+        List<TabletProgram> home = view.homeApps();
+        List<TabletProgram> apps = apps();
         graphics.enableScissor(rowX(), listTop(), rowX() + rowWidth(), listBottom());
         for (int i = 0; i < apps.size(); i++) {
-            Program program = apps.get(i);
+            TabletProgram program = apps.get(i);
             int x = rowX();
             int y = rowY(i);
             if (y + ROW_H < listTop() || y > listBottom()) continue;
@@ -172,10 +173,9 @@ public class StoreScreen extends Screen {
             }
             // Name + description, budgeted against the button
             int textX = x + ROW_H + 4;
-            graphics.drawString(font, Component.translatable("program.linktablet." + program.key()),
+            graphics.drawString(font, program.displayName(),
                     textX, y + 6, theme.textPrimary, theme.textShadow);
-            String desc = Component.translatable(
-                    "program.linktablet." + program.key() + ".desc").getString();
+            String desc = program.storeDescription().getString();
             int descBudget = btnX() - textX - 4;
             if (font.width(desc) > descBudget) {
                 desc = font.plainSubstrByWidth(desc, descBudget - font.width("…")) + "…";
@@ -201,9 +201,9 @@ public class StoreScreen extends Screen {
     // Input
     // ------------------------------------------------------------------
 
-    private void sendHome(List<Program> home) {
+    private void sendHome(List<TabletProgram> home) {
         PacketDistributor.sendToServer(new ModNetworking.SetHomeAppsPayload(
-                view.target(), Program.ids(home)));
+                view.target(), Programs.keys(home)));
     }
 
     @Override
@@ -214,11 +214,11 @@ public class StoreScreen extends Screen {
             return true;
         }
         if (button == 0) {
-            List<Program> apps = apps();
+            List<TabletProgram> apps = apps();
             for (int i = 0; i < apps.size(); i++) {
                 if (!overBtn(mouseX, mouseY, i)) continue;
-                Program program = apps.get(i);
-                List<Program> home = new java.util.ArrayList<>(view.homeApps());
+                TabletProgram program = apps.get(i);
+                List<TabletProgram> home = new java.util.ArrayList<>(view.homeApps());
                 if (home.contains(program)) {
                     if (home.size() == 1) {
                         UISounds.tick(0.7F); // the last app holds the door

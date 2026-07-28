@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientPrefs;
@@ -46,7 +47,7 @@ public class MiniTabletWindow implements FloatingWindow {
     private static final double MAX_BLOCK_DISTANCE_SQ = 64.0;
 
     private SignalView view;
-    private final Program program;
+    private final com.modpack.linktablet.api.TabletProgram program;
     private final OverlayContent content;
     private int x;
     private int y;
@@ -56,16 +57,10 @@ public class MiniTabletWindow implements FloatingWindow {
     /** Set when a slot binding finds no tablet anywhere — manager prunes. */
     private boolean orphaned = false;
 
-    public MiniTabletWindow(SignalView view, Program program) {
+    public MiniTabletWindow(SignalView view, com.modpack.linktablet.api.TabletProgram program) {
         this.view = view;
         this.program = program;
-        this.content = switch (program) {
-            case LAUNCHER -> new LauncherOverlayContent(this::view);
-            case CLOCK -> new ClockOverlayContent();
-            case CALCULATOR -> new CalculatorOverlayContent();
-            case GAUGES -> new GaugesOverlayContent(this::view);
-            default -> new SignalsOverlayContent(this::view);
-        };
+        this.content = contentFor(program);
         Minecraft mc = Minecraft.getInstance();
         int sw = mc.getWindow().getGuiScaledWidth();
         int defaultX = sw - W - 8;
@@ -77,8 +72,28 @@ public class MiniTabletWindow implements FloatingWindow {
         return view;
     }
 
-    public Program program() {
+    public com.modpack.linktablet.api.TabletProgram program() {
         return program;
+    }
+
+    /** Built-ins keep their bespoke contents; addon programs supply
+     * theirs through the API client. An addon pin restored without its
+     * mod (or without overlay content) degrades to the signals rows —
+     * the pre-1.10 pin look, never a dead window. */
+    private OverlayContent contentFor(com.modpack.linktablet.api.TabletProgram program) {
+        if (program instanceof Program builtin) {
+            return switch (builtin) {
+                case LAUNCHER -> new LauncherOverlayContent(this::view);
+                case CLOCK -> new ClockOverlayContent();
+                case CALCULATOR -> new CalculatorOverlayContent();
+                case GAUGES -> new GaugesOverlayContent(this::view);
+                default -> new SignalsOverlayContent(this::view);
+            };
+        }
+        var client = com.modpack.linktablet.client.ProgramClients.get(program.key());
+        OverlayContent content = client == null ? null : client.createOverlay(
+                new com.modpack.linktablet.client.ProgramHostImpl(this::view, program));
+        return content != null ? content : new SignalsOverlayContent(this::view);
     }
 
     // ---- Data binding ------------------------------------------------
@@ -224,7 +239,7 @@ public class MiniTabletWindow implements FloatingWindow {
                         ? view.customName().getString()
                         : program == Program.SIGNALS
                         ? Component.translatable("gui.linktablet.overlay.title").getString()
-                        : Component.translatable("program.linktablet." + program.key()).getString(),
+                        : program.displayName().getString(),
                 W - TITLE_H - 24);
         graphics.drawString(font, title, x + 10, y + 7, t.textPrimary, t.textShadow);
         Chrome.railH(graphics, x + 4, y + TITLE_H - 3, W - 8, t.bodyOuter);

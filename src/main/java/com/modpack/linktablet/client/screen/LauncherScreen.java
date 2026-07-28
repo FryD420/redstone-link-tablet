@@ -1,6 +1,8 @@
 package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.Program;
+import com.modpack.linktablet.Programs;
+import com.modpack.linktablet.api.TabletProgram;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.client.ClientPrefs;
@@ -62,7 +64,7 @@ public class LauncherScreen extends Screen {
     // once the server echo lands; wraps at 4 like the signal grid
     // ------------------------------------------------------------------
 
-    private List<Program> homeApps() {
+    private List<TabletProgram> homeApps() {
         return view.homeApps();
     }
 
@@ -242,14 +244,14 @@ public class LauncherScreen extends Screen {
     // face and the drawer read the same colors/icons
     // ------------------------------------------------------------------
 
-    private static ItemStack icon(Program program) {
+    private static ItemStack icon(TabletProgram program) {
         net.minecraft.resources.ResourceLocation id = program.iconItem();
         if (id == null) return ItemStack.EMPTY;
         return new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(id));
     }
 
-    private static Component label(Program program) {
-        return Component.translatable("program.linktablet." + program.key());
+    private static Component label(TabletProgram program) {
+        return program.displayName();
     }
 
     // ------------------------------------------------------------------
@@ -275,11 +277,11 @@ public class LauncherScreen extends Screen {
         Chrome.railH(graphics, left - 4, top + HEADER - 8, panelWidth() + 8, theme.bodyOuter);
 
         scroll = Mth.clamp(scroll, 0, maxScroll());
-        List<Program> roster = homeApps();
+        List<TabletProgram> roster = homeApps();
         graphics.enableScissor(left - 4, gridTop() - 2, left + panelWidth() + 4, gridBottom());
         for (int i = 0; i < totalTiles(); i++) {
             boolean store = i == storeTileIndex();
-            Program program = store ? Program.STORE : roster.get(i);
+            TabletProgram program = store ? Program.STORE : roster.get(i);
             int x = tileX(i);
             int y = tileY(i);
             int h = listView() ? TabletScreen.ROW_HEIGHT : TILE;
@@ -320,7 +322,7 @@ public class LauncherScreen extends Screen {
 
     /** Home entry as a list row (1.10.0 user feedback): chip + icon +
      * name, full panel width — the signals list's proportions. */
-    private void renderProgramRow(GuiGraphics graphics, ScreenTheme theme, Program program,
+    private void renderProgramRow(GuiGraphics graphics, ScreenTheme theme, TabletProgram program,
                                   int x, int y, boolean hovered) {
         int w = rowWidth();
         int h = TabletScreen.ROW_HEIGHT;
@@ -355,9 +357,9 @@ public class LauncherScreen extends Screen {
                 glyphColor(list, overModeBtn(mouseX, mouseY, listBtnX())));
     }
 
-    private void sendHome(List<Program> home) {
+    private void sendHome(List<TabletProgram> home) {
         PacketDistributor.sendToServer(new ModNetworking.SetHomeAppsPayload(
-                view.target(), Program.ids(home)));
+                view.target(), Programs.keys(home)));
     }
 
     @Override
@@ -390,9 +392,9 @@ public class LauncherScreen extends Screen {
                 return true;
             }
             if (index >= 0) {
-                List<Program> home = new java.util.ArrayList<>(homeApps());
+                List<TabletProgram> home = new java.util.ArrayList<>(homeApps());
                 if (home.size() > 1) {
-                    Program removed = home.remove(index);
+                    TabletProgram removed = home.remove(index);
                     sendHome(home);
                     UISounds.tick(1.0F);
                     if (minecraft != null && minecraft.player != null) {

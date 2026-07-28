@@ -332,7 +332,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 // compute the same layout
                 // List mode counts here too (test pass 2): the renderer
                 // draws roster rows through the same list table
-                java.util.List<Program> home = target.getHomeApps();
+                java.util.List<com.modpack.linktablet.api.TabletProgram> home = target.getHomeApps();
                 TabletScreenMath.PipHit tile = be.isMounted()
                         ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
                                 hitResult.getLocation(), home.size(), target.isScreenList(),

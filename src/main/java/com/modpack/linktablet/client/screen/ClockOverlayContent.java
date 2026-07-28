@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.ClockService;
 import com.modpack.linktablet.client.UISounds;
@@ -26,11 +27,6 @@ public class ClockOverlayContent implements OverlayContent {
     private static final int BIG_H = 16;
     private static final int ROW_H = 10;
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
-
-    @Override
-    public Program program() {
-        return Program.CLOCK;
-    }
 
     private boolean showTimer() {
         return ClockService.timerRunning();

@@ -54,6 +54,13 @@
   driving), Calculator a working mini pad, and the launcher pins an
   app dock — one click on the dock opens that app. Signals pins work
   exactly as before, and existing pins carry over.
+- **Addon API**: other mods can now register their own tablet
+  programs — each shows up in the App Store with its name, icon, and
+  description, joins Home rosters, opens its screen from tiles and
+  placed-tablet taps, and can supply a pinned-overlay pane and a
+  custom face for placed screens. Mod developers: see the
+  `com.modpack.linktablet.api` package (both the program and its
+  client half register through events on your own mod bus).
 - Note for servers: the network protocol grew (renamed payloads plus
   the new gauges traffic), so servers and clients need to update
   together — this version does not pair with 1.9.x. Worlds and tablet

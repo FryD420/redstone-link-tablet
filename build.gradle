@@ -107,6 +107,9 @@ tasks.register('chromeTool', JavaExec) {
 
 tasks.named('jar', Jar) {
     exclude('com/modpack/linktablet/tools/**')
+    // Dev-only example addon for the program API (see ExampleAddon):
+    // ships nowhere, runs every runClient.
+    exclude('com/modpack/linktablet/example/**')
 }
 
 tasks.named('processResources', ProcessResources) {

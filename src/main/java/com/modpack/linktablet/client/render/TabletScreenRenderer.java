@@ -114,11 +114,11 @@ public final class TabletScreenRenderer {
      * they read as lit app icons. Rebuilt per call: labels go stale on
      * language switch, rosters change from the drawer.
      */
-    public static List<Signal> launcherTiles(List<com.modpack.linktablet.Program> home) {
+    public static List<Signal> launcherTiles(List<com.modpack.linktablet.api.TabletProgram> home) {
         List<Signal> tiles = new java.util.ArrayList<>(home.size());
-        for (com.modpack.linktablet.Program program : home) {
+        for (com.modpack.linktablet.api.TabletProgram program : home) {
             tiles.add(new Signal(
-                    Component.translatable("program.linktablet." + program.key()).getString(),
+                    program.displayName().getString(),
                     List.of(), true, false, Signal.MAX_STRENGTH, program.chipColor(),
                     java.util.Optional.ofNullable(program.iconItem()),
                     false, 0, Signal.MAX_STRENGTH, "", false, Signal.MIN_PULSE_TICKS));
@@ -455,6 +455,136 @@ public final class TabletScreenRenderer {
         drawLabel(poseStack, buffers, font, label, cu, top, textH / 16f / FONT_LINE,
                 true, false, theme.textMuted, base.bgLight());
         poseStack.popPose();
+    }
+
+    /**
+     * Addon kiosk face (the addon API): the shared screen base, then the
+     * painter's BUFFERED calls flushed in the mandatory pass order —
+     * all fills, then all items, then all text — so addon code cannot
+     * break the shared-batch invariant however it paints. Fill layers
+     * follow call order (painter's algorithm) inside the band below the
+     * icon/text layers.
+     */
+    public static void renderAddonFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH, int caseTint,
+                                       com.modpack.linktablet.api.client.TabletFacePainter painter,
+                                       net.minecraft.world.level.block.entity.BlockEntity be,
+                                       float partialTick) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        BufferedFace ctx = new BufferedFace(base.glassW(), base.glassH(), theme, backlit,
+                be, partialTick);
+        painter.paint(ctx);
+        int fills = ctx.fills.size();
+        for (int i = 0; i < fills; i++) {
+            BufferedFace.Fill fill = ctx.fills.get(i);
+            // Stack later fills above earlier ones, staying under the
+            // icon (3.5x) and text (4x) layers
+            float layer = LAYER * (1f + 2f * (fills <= 1 ? 0f : i / (float) (fills - 1)));
+            fillRect(base.pose(), base.vc(),
+                    TabletScreenMath.GLASS_U0 + fill.u0(), TabletScreenMath.GLASS_V0 + fill.v0(),
+                    TabletScreenMath.GLASS_U0 + fill.u1(), TabletScreenMath.GLASS_V0 + fill.v1(),
+                    layer, fill.argb(), base.bgLight());
+        }
+        for (BufferedFace.Item item : ctx.items) {
+            renderIcon(poseStack, buffers, item.stack(),
+                    TabletScreenMath.GLASS_U0 + item.centerU(),
+                    TabletScreenMath.GLASS_V0 + item.centerV(),
+                    item.size(), base.bgLight());
+        }
+        Font addonFont = Minecraft.getInstance().font;
+        for (BufferedFace.Text text : ctx.texts) {
+            drawLabel(poseStack, buffers, addonFont, text.text(),
+                    TabletScreenMath.GLASS_U0 + text.u(),
+                    TabletScreenMath.GLASS_V0 + text.top(),
+                    text.height() / 16f / FONT_LINE,
+                    text.centered(), text.outline(), text.argb(), base.bgLight());
+        }
+        poseStack.popPose();
+    }
+
+    /** The buffering {@code TabletFaceContext} behind {@link #renderAddonFace}. */
+    private static final class BufferedFace
+            implements com.modpack.linktablet.api.client.TabletFaceContext {
+
+        record Fill(float u0, float v0, float u1, float v1, int argb) {}
+
+        record Item(ItemStack stack, float centerU, float centerV, float size) {}
+
+        record Text(String text, float u, float top, float height, int argb,
+                    boolean centered, boolean outline) {}
+
+        final List<Fill> fills = new java.util.ArrayList<>();
+        final List<Item> items = new java.util.ArrayList<>();
+        final List<Text> texts = new java.util.ArrayList<>();
+
+        private final float width;
+        private final float height;
+        private final ScreenTheme theme;
+        private final boolean backlit;
+        private final net.minecraft.world.level.block.entity.BlockEntity blockEntity;
+        private final float partialTick;
+
+        BufferedFace(float width, float height, ScreenTheme theme, boolean backlit,
+                     net.minecraft.world.level.block.entity.BlockEntity blockEntity,
+                     float partialTick) {
+            this.width = width;
+            this.height = height;
+            this.theme = theme;
+            this.backlit = backlit;
+            this.blockEntity = blockEntity;
+            this.partialTick = partialTick;
+        }
+
+        @Override
+        public float width() {
+            return width;
+        }
+
+        @Override
+        public float height() {
+            return height;
+        }
+
+        @Override
+        public ScreenTheme theme() {
+            return theme;
+        }
+
+        @Override
+        public boolean backlit() {
+            return backlit;
+        }
+
+        @Override
+        public net.minecraft.world.level.block.entity.BlockEntity blockEntity() {
+            return blockEntity;
+        }
+
+        @Override
+        public float partialTick() {
+            return partialTick;
+        }
+
+        @Override
+        public void fill(float u, float v, float w, float h, int argb) {
+            if (w <= 0 || h <= 0) return;
+            fills.add(new Fill(u, v, u + w, v + h, argb | 0xFF000000));
+        }
+
+        @Override
+        public void item(ItemStack stack, float centerU, float centerV, float size) {
+            if (stack == null || stack.isEmpty() || size <= 0) return;
+            items.add(new Item(stack, centerU, centerV, size));
+        }
+
+        @Override
+        public void text(String text, float u, float top, float height, int argb,
+                         boolean centered, boolean outline) {
+            if (text == null || text.isEmpty() || height <= 0) return;
+            texts.add(new Text(text, u, top, height, argb, centered, outline));
+        }
     }
 
     /**

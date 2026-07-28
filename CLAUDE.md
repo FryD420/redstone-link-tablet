@@ -176,6 +176,24 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   cancels the repeating use-key while dragging so neighbors can't be clicked.
   The server only ever sees validated payloads.
 
+- Addon API (1.10.0): `api/` is a PUBLIC COMMITMENT — append-only
+  (new interface methods need defaults; never change/remove
+  signatures), `LinkTabletApi.API_VERSION` bumps per released growth.
+  Programs persist by STRING KEY everywhere (roster component/BE NBT,
+  kiosk `screen_program`, both nav payloads, prefs, pin descriptors);
+  the pre-API int forms decode forever via type-sniffs in
+  `TabletBlockEntity.loadAdditional` and the HOME_APPS Either-codec —
+  never write ids again. `Programs` is the one unified table (enum +
+  addons, frozen after `RegisterTabletProgramsEvent` in common setup);
+  built-in dispatch stays `instanceof Program` switches, addons go
+  through `ProgramClients`. Addon kiosk faces draw ONLY through the
+  buffered `TabletFaceContext` (renderAddonFace flushes fills→items→
+  text, structurally enforcing the three-pass rule). The dev-only
+  example addon (`example/`, jar-excluded like tools/) must import
+  ONLY `api/` + vanilla — it's the API's regression test, OPT-IN via
+  `-Dlinktablet.example=true` (user decision: keep the dev store
+  shelf clean; enable it whenever the api/ surface changes).
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in

@@ -1,5 +1,6 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
@@ -43,11 +44,6 @@ public class SignalsOverlayContent implements OverlayContent {
 
     private List<Signal> signals() {
         return view.get().signals();
-    }
-
-    @Override
-    public Program program() {
-        return Program.SIGNALS;
     }
 
     @Override

@@ -52,21 +52,24 @@ public class TabletBlockEntity extends BlockEntity {
     /** UI theme; DARK is the default and is never persisted. */
     private ScreenTheme theme = ScreenTheme.DARK;
     /**
-     * Kiosk nav (1.10.0): id of the {@link com.modpack.linktablet.Program}
-     * this screen is showing. 0 (launcher) is the default and is never
-     * persisted — an absent tag boots to Home, including every pre-1.10
-     * kiosk (user decision). Controller-only on merged surfaces, synced
-     * via the update tag like everything else; never travels on the item.
+     * Kiosk nav (1.10.0): the program this screen is showing, persisted
+     * by KEY (string keys since the addon API — addon programs count;
+     * the pre-API byte id decodes forever). LAUNCHER is the default and
+     * is never persisted — an absent tag boots to Home, including every
+     * pre-1.10 kiosk (user decision). Controller-only on merged
+     * surfaces, synced via the update tag like everything else; never
+     * travels on the item.
      */
-    private byte screenProgram;
+    private com.modpack.linktablet.api.TabletProgram screenProgram =
+            com.modpack.linktablet.Program.LAUNCHER;
     /**
      * Settable roster (1.10.0): the programs on this tablet's home
-     * screen, in tile order. {@code Program.DEFAULT_HOME} (Signals
+     * screen, in tile order. {@code Programs.DEFAULT_HOME} (Signals
      * only) is the default and is never persisted; travels item↔block
      * like the theme.
      */
-    private List<com.modpack.linktablet.Program> homeApps =
-            com.modpack.linktablet.Program.DEFAULT_HOME;
+    private List<com.modpack.linktablet.api.TabletProgram> homeApps =
+            com.modpack.linktablet.Programs.DEFAULT_HOME;
     /** Screen content rotation, quarter turns CW; 0 is never persisted. */
     private int screenRotation;
     /** Custom (anvil) item name (1.8.0); survives the place/pickup trip. */
@@ -180,26 +183,26 @@ public class TabletBlockEntity extends BlockEntity {
     }
 
     /** The program this kiosk screen is showing (1.10.0). */
-    public com.modpack.linktablet.Program currentProgram() {
-        return com.modpack.linktablet.Program.byId(screenProgram);
+    public com.modpack.linktablet.api.TabletProgram currentProgram() {
+        return screenProgram;
     }
 
     /** Kiosk nav: taps mutate this on BOTH sides (vanilla replays the
      * use-packet), so routing always derives from agreed state. */
-    public void setCurrentProgram(com.modpack.linktablet.Program program) {
-        if (screenProgram == program.id()) return;
-        screenProgram = program.id();
+    public void setCurrentProgram(com.modpack.linktablet.api.TabletProgram program) {
+        if (screenProgram == program) return;
+        screenProgram = program;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
     }
 
-    public List<com.modpack.linktablet.Program> getHomeApps() {
+    public List<com.modpack.linktablet.api.TabletProgram> getHomeApps() {
         return homeApps;
     }
 
-    public void setHomeApps(List<com.modpack.linktablet.Program> homeApps) {
+    public void setHomeApps(List<com.modpack.linktablet.api.TabletProgram> homeApps) {
         if (this.homeApps.equals(homeApps)) return;
         this.homeApps = List.copyOf(homeApps);
         setChanged();
@@ -398,7 +401,7 @@ public class TabletBlockEntity extends BlockEntity {
         this.screenList = stack.getOrDefault(ModDataComponents.SCREEN_LIST.get(), false);
         this.theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         this.screenRotation = stack.getOrDefault(ModDataComponents.SCREEN_ROTATION.get(), 0) & 3;
-        this.homeApps = com.modpack.linktablet.Program.fromIds(
+        this.homeApps = com.modpack.linktablet.Programs.fromKeys(
                 stack.get(ModDataComponents.HOME_APPS.get()));
         setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
         setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
@@ -425,9 +428,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenRotation != 0) {
             stack.set(ModDataComponents.SCREEN_ROTATION.get(), screenRotation);
         }
-        if (!homeApps.equals(com.modpack.linktablet.Program.DEFAULT_HOME)) {
+        if (!homeApps.equals(com.modpack.linktablet.Programs.DEFAULT_HOME)) {
             stack.set(ModDataComponents.HOME_APPS.get(),
-                    com.modpack.linktablet.Program.ids(homeApps));
+                    com.modpack.linktablet.Programs.keys(homeApps));
         }
         if (!gauges.isEmpty()) {
             stack.set(ModDataComponents.TABLET_GAUGES.get(), gauges);
@@ -742,13 +745,17 @@ public class TabletBlockEntity extends BlockEntity {
         if (screenRotation != 0) {
             tag.putInt("screen_rotation", screenRotation);
         }
-        if (screenProgram != 0) {
-            tag.putByte("screen_program", screenProgram);
+        // Keys since the addon API (addon programs must persist);
+        // loadAdditional type-sniffs the pre-API byte/int-array forms
+        if (screenProgram != com.modpack.linktablet.Program.LAUNCHER) {
+            tag.putString("screen_program", screenProgram.key());
         }
-        if (!homeApps.equals(com.modpack.linktablet.Program.DEFAULT_HOME)) {
-            tag.putIntArray("home_apps",
-                    com.modpack.linktablet.Program.ids(homeApps).stream()
-                            .mapToInt(Integer::intValue).toArray());
+        if (!homeApps.equals(com.modpack.linktablet.Programs.DEFAULT_HOME)) {
+            net.minecraft.nbt.ListTag keys = new net.minecraft.nbt.ListTag();
+            for (com.modpack.linktablet.api.TabletProgram program : homeApps) {
+                keys.add(net.minecraft.nbt.StringTag.valueOf(program.key()));
+            }
+            tag.put("home_apps", keys);
         }
         if (mountPitch != 0 || mountYaw != 0) {
             tag.putFloat("mount_pitch", mountPitch);
@@ -783,11 +790,23 @@ public class TabletBlockEntity extends BlockEntity {
         this.soloScreen = tag.getBoolean("solo_screen");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
-        this.screenProgram = tag.getByte("screen_program");
-        this.homeApps = tag.contains("home_apps")
-                ? com.modpack.linktablet.Program.fromIds(
-                        java.util.Arrays.stream(tag.getIntArray("home_apps")).boxed().toList())
-                : com.modpack.linktablet.Program.DEFAULT_HOME;
+        // Type sniff: string forms are current, byte/int-array forms are
+        // the pre-API 1.10.0 dev format (decoded forever, never rewritten
+        // until the next save)
+        this.screenProgram = tag.contains("screen_program", Tag.TAG_STRING)
+                ? com.modpack.linktablet.Programs.byKey(tag.getString("screen_program"))
+                : com.modpack.linktablet.Program.byId(tag.getByte("screen_program"));
+        if (tag.contains("home_apps", Tag.TAG_LIST)) {
+            net.minecraft.nbt.ListTag keys = tag.getList("home_apps", Tag.TAG_STRING);
+            List<String> list = new java.util.ArrayList<>(keys.size());
+            for (int i = 0; i < keys.size(); i++) list.add(keys.getString(i));
+            this.homeApps = com.modpack.linktablet.Programs.fromKeys(list);
+        } else if (tag.contains("home_apps", Tag.TAG_INT_ARRAY)) {
+            this.homeApps = com.modpack.linktablet.Program.fromIds(
+                    java.util.Arrays.stream(tag.getIntArray("home_apps")).boxed().toList());
+        } else {
+            this.homeApps = com.modpack.linktablet.Programs.DEFAULT_HOME;
+        }
         this.mountPitch = tag.getFloat("mount_pitch");
         this.mountYaw = tag.getFloat("mount_yaw");
         this.customName = tag.contains("custom_name")

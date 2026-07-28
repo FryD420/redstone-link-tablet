@@ -34,7 +34,7 @@ public final class OverlayPin {
 
     /** Whether the given GUI view is pinned showing the given program
      * (1.10.0: the pin is per-app — a clock pin is not a signals pin). */
-    public static boolean isPinned(SignalView guiView, com.modpack.linktablet.Program program) {
+    public static boolean isPinned(SignalView guiView, com.modpack.linktablet.api.TabletProgram program) {
         MiniTabletWindow window = NoteWindows.find(MiniTabletWindow.class);
         if (window == null) return false;
         return window.program() == program
@@ -48,7 +48,7 @@ public final class OverlayPin {
 
     /** Pins (or re-pins) the given tablet showing the given program;
      * replaces any existing pin — there is ONE overlay window. */
-    public static void pin(SignalView guiView, com.modpack.linktablet.Program program) {
+    public static void pin(SignalView guiView, com.modpack.linktablet.api.TabletProgram program) {
         MiniTabletWindow existing = NoteWindows.find(MiniTabletWindow.class);
         if (existing != null) {
             NoteWindows.remove(existing);
@@ -90,7 +90,7 @@ public final class OverlayPin {
     /** Descriptor grows an {@code @<programKey>} suffix for non-signals
      * pins (1.10.0) — absent means Signals, so every pre-1.10 pin
      * restores unchanged. */
-    public static void persist(SignalView view, com.modpack.linktablet.Program program) {
+    public static void persist(SignalView view, com.modpack.linktablet.api.TabletProgram program) {
         String suffix = program == com.modpack.linktablet.Program.SIGNALS
                 ? "" : "@" + program.key();
         if (view instanceof SignalView.Slot slot) {
@@ -106,17 +106,17 @@ public final class OverlayPin {
         ClientPrefs.setOverlayPin("");
     }
 
-    private record Pin(SignalView view, com.modpack.linktablet.Program program) {
+    private record Pin(SignalView view, com.modpack.linktablet.api.TabletProgram program) {
     }
 
     private static Pin parse(String descriptor) {
         // Program suffix first; the launcher is a legitimate pin target
         // (the app dock), and byKey folds unknown future keys onto it —
         // a downgrade still shows a usable dock instead of losing the pin
-        com.modpack.linktablet.Program program = com.modpack.linktablet.Program.SIGNALS;
+        com.modpack.linktablet.api.TabletProgram program = com.modpack.linktablet.Program.SIGNALS;
         int at = descriptor.indexOf('@');
         if (at >= 0) {
-            program = com.modpack.linktablet.Program.byKey(descriptor.substring(at + 1));
+            program = com.modpack.linktablet.Programs.byKey(descriptor.substring(at + 1));
             descriptor = descriptor.substring(0, at);
         }
         try {

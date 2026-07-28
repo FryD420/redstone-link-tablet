@@ -31,9 +31,9 @@ public sealed interface SignalView {
     }
 
     /** The tablet's home-screen roster (1.10.0), tile order; absent
-     * data reads as {@link com.modpack.linktablet.Program#DEFAULT_HOME}. */
-    default List<com.modpack.linktablet.Program> homeApps() {
-        return com.modpack.linktablet.Program.DEFAULT_HOME;
+     * data reads as {@link com.modpack.linktablet.Programs#DEFAULT_HOME}. */
+    default List<com.modpack.linktablet.api.TabletProgram> homeApps() {
+        return com.modpack.linktablet.Programs.DEFAULT_HOME;
     }
 
     /** The tablet's gauges (1.10.0 OS suite); absent data reads empty. */
@@ -97,10 +97,10 @@ public sealed interface SignalView {
         }
 
         @Override
-        public List<com.modpack.linktablet.Program> homeApps() {
+        public List<com.modpack.linktablet.api.TabletProgram> homeApps() {
             Minecraft mc = Minecraft.getInstance();
-            return mc.player == null ? com.modpack.linktablet.Program.DEFAULT_HOME
-                    : com.modpack.linktablet.Program.fromIds(mc.player.getItemInHand(hand)
+            return mc.player == null ? com.modpack.linktablet.Programs.DEFAULT_HOME
+                    : com.modpack.linktablet.Programs.fromKeys(mc.player.getItemInHand(hand)
                             .get(ModDataComponents.HOME_APPS.get()));
         }
 
@@ -142,8 +142,8 @@ public sealed interface SignalView {
         }
 
         @Override
-        public List<com.modpack.linktablet.Program> homeApps() {
-            return com.modpack.linktablet.Program.fromIds(
+        public List<com.modpack.linktablet.api.TabletProgram> homeApps() {
+            return com.modpack.linktablet.Programs.fromKeys(
                     stack().get(ModDataComponents.HOME_APPS.get()));
         }
 
@@ -197,10 +197,10 @@ public sealed interface SignalView {
         }
 
         @Override
-        public List<com.modpack.linktablet.Program> homeApps() {
+        public List<com.modpack.linktablet.api.TabletProgram> homeApps() {
             TabletBlockEntity be = resolved();
             return be != null ? be.getHomeApps()
-                    : com.modpack.linktablet.Program.DEFAULT_HOME;
+                    : com.modpack.linktablet.Programs.DEFAULT_HOME;
         }
 
         @Override

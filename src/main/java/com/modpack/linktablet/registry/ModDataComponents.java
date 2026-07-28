@@ -47,12 +47,20 @@ public class ModDataComponents {
                     .networkSynchronized(ScreenTheme.STREAM_CODEC)
                     .build());
 
-    /** Ordered home-screen program ids (1.10.0 settable roster);
-     * absent = Signals only ({@code Program.DEFAULT_HOME}, never written). */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<Integer>>> HOME_APPS =
-            DATA_COMPONENTS.register("home_apps", () -> DataComponentType.<List<Integer>>builder()
-                    .persistent(Codec.INT.listOf())
-                    .networkSynchronized(ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()))
+    /** Ordered home-screen program KEYS (1.10.0 settable roster; string
+     * keys since the addon API so addon programs persist too); absent =
+     * Signals only ({@code Programs.DEFAULT_HOME}, never written). The
+     * int-list alternative decodes the pre-API dev format forever (the
+     * Frequency LEGACY_CODEC precedent) — encode always writes keys. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<String>>> HOME_APPS =
+            DATA_COMPONENTS.register("home_apps", () -> DataComponentType.<List<String>>builder()
+                    .persistent(Codec.either(Codec.STRING.listOf(), Codec.INT.listOf()).xmap(
+                            either -> either.map(
+                                    keys -> keys,
+                                    ids -> com.modpack.linktablet.Programs.keys(
+                                            com.modpack.linktablet.Program.fromIds(ids))),
+                            com.mojang.datafixers.util.Either::left))
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()))
                     .build());
 
     /** The list of gauges stored on a tablet (1.10.0 OS suite);

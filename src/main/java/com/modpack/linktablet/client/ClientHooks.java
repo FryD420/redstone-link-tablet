@@ -29,19 +29,19 @@ public class ClientHooks {
     /** Held/slot open (1.10.0): resumes wherever the tablet was last —
      * first ever open lands on the launcher. */
     public static void openResumed(SignalView view) {
-        openProgram(Program.byKey(ClientPrefs.lastProgram()), view);
+        openProgram(com.modpack.linktablet.Programs.byKey(ClientPrefs.lastProgram()), view);
     }
 
     /** Opens a program screen with the open sound, remembering it as
      * the resume target (held/slot views only — kiosk GUIs don't count,
      * their nav lives on the block entity). */
-    public static void openProgram(Program program, SignalView view) {
+    public static void openProgram(com.modpack.linktablet.api.TabletProgram program, SignalView view) {
         UISounds.open();
         showProgram(program, view);
     }
 
     /** Return trip into a program (onClose paths) — no open sound. */
-    public static void returnToProgram(Program program, SignalView view) {
+    public static void returnToProgram(com.modpack.linktablet.api.TabletProgram program, SignalView view) {
         showProgram(program, view);
     }
 
@@ -72,7 +72,7 @@ public class ClientHooks {
      * opens that program's screen bound to the block, client-side only —
      * the secret-game precedent. Resolves the controller like
      * {@link #openTabletBlockScreen}. */
-    public static void openBlockProgram(Program program, BlockPos pos) {
+    public static void openBlockProgram(com.modpack.linktablet.api.TabletProgram program, BlockPos pos) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null
                 && mc.level.getBlockEntity(pos) instanceof com.modpack.linktablet.block.TabletBlockEntity be) {
@@ -84,7 +84,7 @@ public class ClientHooks {
         openProgram(program, new SignalView.Block(pos));
     }
 
-    private static void showProgram(Program program, SignalView view) {
+    private static void showProgram(com.modpack.linktablet.api.TabletProgram program, SignalView view) {
         if (!(view instanceof SignalView.Block)) {
             ClientPrefs.setLastProgram(program.key());
         } else {
@@ -93,28 +93,39 @@ public class ClientHooks {
             // the wall screen at the same program. Server no-ops when
             // already there (face taps arrive pre-switched).
             PacketDistributor.sendToServer(new ModNetworking.SetProgramPayload(
-                    view.target(), program.id()));
+                    view.target(), program.key()));
         }
         Minecraft.getInstance().setScreen(screenFor(program, view));
     }
 
-    private static net.minecraft.client.gui.screens.Screen screenFor(Program program, SignalView view) {
-        // Game apps (third test pass: every game is its own program):
-        // launch through the SecretGames dispatch; ESC goes Home — the
-        // tile is the door, unlike secret-pip launches which return to
-        // the signals grid they hide on
-        String game = program.gameId();
-        if (game != null) {
-            return com.modpack.linktablet.client.screen.SecretGames.createApp(game, view);
+    private static net.minecraft.client.gui.screens.Screen screenFor(
+            com.modpack.linktablet.api.TabletProgram program, SignalView view) {
+        if (program instanceof Program builtin) {
+            // Game apps (third test pass: every game is its own program):
+            // launch through the SecretGames dispatch; ESC goes Home — the
+            // tile is the door, unlike secret-pip launches which return to
+            // the signals grid they hide on
+            String game = builtin.gameId();
+            if (game != null) {
+                return com.modpack.linktablet.client.screen.SecretGames.createApp(game, view);
+            }
+            return switch (builtin) {
+                case SIGNALS -> new TabletScreen(view);
+                case CLOCK -> new com.modpack.linktablet.client.screen.ClockScreen(view);
+                case CALCULATOR -> new com.modpack.linktablet.client.screen.CalculatorScreen(view);
+                case GAUGES -> new com.modpack.linktablet.client.screen.GaugesScreen(view);
+                case STORE -> new com.modpack.linktablet.client.screen.StoreScreen(view);
+                default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
+            };
         }
-        return switch (program) {
-            case SIGNALS -> new TabletScreen(view);
-            case CLOCK -> new com.modpack.linktablet.client.screen.ClockScreen(view);
-            case CALCULATOR -> new com.modpack.linktablet.client.screen.CalculatorScreen(view);
-            case GAUGES -> new com.modpack.linktablet.client.screen.GaugesScreen(view);
-            case STORE -> new com.modpack.linktablet.client.screen.StoreScreen(view);
-            default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
-        };
+        // Addon programs (the API): the registered client makes the
+        // screen; a program whose client mod is missing degrades to the
+        // launcher — the same downgrade story as unknown keys
+        var client = ProgramClients.get(program.key());
+        if (client != null) {
+            return client.createScreen(new ProgramHostImpl(view, program));
+        }
+        return new com.modpack.linktablet.client.screen.LauncherScreen(view);
     }
 
     public static void openTabletBlockScreen(BlockPos pos) {
