@@ -298,7 +298,9 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     private void save() {
         // Classic flow: staged items count without pressing Add
         commitStagedFrequency();
-        if (frequencies.isEmpty()) return;
+        // Frequency OR links (1.10.0): links-only scene masters save
+        // too — mirrors the button gate AND the server's upsert gate
+        if (frequencies.isEmpty() && links.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "Signal" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
         // linkId 0 on the wire: the server restores the stored id (edits)
