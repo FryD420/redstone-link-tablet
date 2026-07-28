@@ -3,7 +3,21 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-26 — v1.9.1 LIVE EVERYWHERE)
+## Status (2026-07-28 — v1.10.0 TAGGED + PUSHED, uploads pending)
+
+- **v1.10.0 TAGGED + PUSHED 2026-07-28** (commit b5d1941, tag
+  v1.10.0, merged to main; user modpack-tested same day "tested and
+  works"): the tablet OS + App Store + Clock/Calculator/Gauges +
+  public game apps, the ADDON API (+ docs/API.md tutorial), SIGNAL
+  LINKS (incl. frequency-less scene masters), FOLLOW MODE, sparse
+  placed-tile polish. Registrar "18" — PAIRING BREAK vs 1.9.x.
+  REMAINING: user uploads to both platforms + pastes DESCRIPTION.md
+  (text current; 📸 slots inert), announcement (both links, pairing-
+  break warning); screenshot shoot queued (4 slots). Untested
+  corners (dedicated-server gauges, multiplayer follow) ride the
+  tester crew — reactive hotfix posture.
+
+## Previous status (2026-07-26 — v1.9.1)
 
 - **v1.9.1 LIVE 2026-07-26** (tagged, pushed, uploaded to both
   platforms, Discord announcement posted — all same day): JEI/EMI
