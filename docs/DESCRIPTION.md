@@ -266,9 +266,8 @@ Controller. Mounted tablets transmit from the block instead.
   frequency slots.
 - **Mod developers:** the tablet has an addon API — register your own app and
   it appears in the App Store with your name, icon, and description, complete
-  with optional HUD-overlay and wall-screen support. See the
-  `com.modpack.linktablet.api` package on
-  [GitHub](https://github.com/FryD420/redstone-link-tablet).
+  with optional HUD-overlay and wall-screen support. Tutorial and worked
+  example: [API guide](https://github.com/FryD420/redstone-link-tablet/blob/main/docs/API.md).
 - MIT licensed, free to use in any modpack.
 
 Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-link-tablet).

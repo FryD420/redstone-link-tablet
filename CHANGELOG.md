@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.10.0 — 2026-07-28
 
 - The tablet now boots to a **Home screen** (the start of the tablet
   "OS"): a launcher with the **Signals** app — today's whole toggle
