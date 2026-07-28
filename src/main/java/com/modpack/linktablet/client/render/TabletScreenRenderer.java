@@ -200,6 +200,17 @@ public final class TabletScreenRenderer {
         float offU = (cols - usedCols) * (tileW + SPACE) / 2f;
         float offV = (sl.rows() - TabletScreenMath.usedRows(count, cols, sl.rows()))
                 * (tileH + SPACE) / 2f;
+        if (!list && count == 1) {
+            // Lone tile: the bespoke centered square (loneTileRect is
+            // the one source — hit tail and slider bar read it too).
+            // Redirecting tileW/tileH/offU/offV here feeds every pass
+            // below without touching their placement expressions.
+            float[] lone = TabletScreenMath.loneTileRect(glassW, glassH);
+            tileW = lone[2];
+            tileH = lone[2];
+            offU = lone[0] - (TabletScreenMath.GLASS_U0 + SPACE);
+            offV = lone[1] - (TabletScreenMath.GLASS_V0 + SPACE);
+        }
         boolean labels = !list && sl.k() * sl.m() <= LABEL_CELLS_MAX;
         float textH = labels ? Mth.clamp(tileH * 0.16f, 1.1f, 2f) : 0f;
         // Bottom strip of each big tile reserved for the name label

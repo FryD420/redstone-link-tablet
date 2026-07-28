@@ -204,6 +204,22 @@ public final class TabletScreenMath {
         return Math.min(rows, (Math.max(1, visible) + uc - 1) / uc);
     }
 
+    /**
+     * Lone-tile rect (2026-07-28 user tuning): a single signal renders
+     * as a centered SQUARE at 1.5× the sparse-cap cell — reads as an
+     * app icon rather than a poster or a lost thumbnail. {@code
+     * {u0, v0, size}} in absolute glass texels; renderer, hit tail,
+     * and the slider-bar span all use THIS rect.
+     */
+    public static float[] loneTileRect(float gw, float gh) {
+        float minSpan = Math.min(gw, gh);
+        float size = Math.min(1.5f * tileSize(minSpan, 2), minSpan - 2 * SPACE);
+        return new float[]{
+                GLASS_U0 + (gw - size) / 2f,
+                GLASS_V0 + (gh - size) / 2f,
+                size};
+    }
+
     // ------------------------------------------------------------------
     // Screen content rotation (wrench): the layout lives in a "logical"
     // glass whose axes turn with the content — landscape when the
@@ -542,6 +558,17 @@ public final class TabletScreenMath {
             // renderer's offsets exactly
             SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
             int visible = visibleSignals(signalCount, false, w, h);
+            if (visible == 1) {
+                // Lone tile: the bespoke centered square is the target
+                float[] lone = loneTileRect((float) gw, (float) gh);
+                double cu2 = GLASS_U0 + pu;
+                double cv2 = GLASS_V0 + pv;
+                if (cu2 < lone[0] || cu2 >= lone[0] + lone[2]
+                        || cv2 < lone[1] || cv2 >= lone[1] + lone[2]) {
+                    return null;
+                }
+                return new PipHit(0, (float) (GLASS_U0 + pu));
+            }
             int uc = usedCols(visible, sl.cols());
             int ur = usedRows(visible, sl.cols(), sl.rows());
             double cellW = gw / sl.cols();
@@ -575,6 +602,14 @@ public final class TabletScreenMath {
         }
         SurfaceLayout sl = surfaceLayout(signalCount, w, h, rot);
         int visible = visibleSignals(signalCount, false, w, h);
+        if (visible == 1) {
+            // Lone slider: the bar spans the bespoke centered square
+            float gh = w * h == 1 ? glassH(rot)
+                    : (rot & 1) == 0 ? surfaceGlassH(h) : surfaceGlassW(w);
+            float[] lone = loneTileRect(gw, gh);
+            float inset = sliderInset(lone[2]);
+            return new float[]{lone[0] + inset, lone[0] + lone[2] - inset};
+        }
         int uc = usedCols(visible, sl.cols());
         float tileW = tileSize(gw, sl.cols());
         float offU = (sl.cols() - uc) * (tileW + SPACE) / 2f;
