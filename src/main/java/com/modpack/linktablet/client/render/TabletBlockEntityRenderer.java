@@ -191,8 +191,28 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                 null, stand, 1f, 1f, 1f, packedLight, packedOverlay);
         poseStack.popPose();
 
-        // Tablet on the ball: quaternion from the shared basis
-        TabletScreenMath.MountBasis basis = be.mountBasis();
+        // Tablet on the ball: quaternion from the RENDER basis — the
+        // synced angles smoothed client-side so follow-mode updates
+        // (and wrench flips) glide instead of snapping. Hit tests keep
+        // be.mountBasis() (the raw synced angles): clicks stay
+        // server-agreed, pixels catch up within a few frames — the
+        // accepted trade from the follow-mode design.
+        long now = net.minecraft.Util.getMillis();
+        float dt = be.renderLerpMillis == 0 ? 1f
+                : Math.min((now - be.renderLerpMillis) / 1000f, 1f);
+        be.renderLerpMillis = now;
+        if (Float.isNaN(be.renderPitch)) {
+            be.renderPitch = be.getMountPitch();
+            be.renderYaw = be.getMountYaw();
+        } else {
+            // Exponential approach, ~90% of the way in a quarter second
+            float step = 1f - (float) Math.pow(0.0001f, dt);
+            be.renderPitch = net.minecraft.util.Mth.rotLerp(step, be.renderPitch, be.getMountPitch());
+            be.renderYaw = net.minecraft.util.Mth.rotLerp(step, be.renderYaw, be.getMountYaw());
+        }
+        TabletScreenMath.MountBasis basis = TabletScreenMath.mountBasis(
+                be.getBlockPos(), be.mountAttachNormal(), be.renderPitch, be.renderYaw,
+                state.getValue(TabletBlock.LANDSCAPE));
         Vec3 pivot = TabletScreenMath.MountBasis.pivot(be.getBlockPos(), be.mountAttachNormal())
                 .subtract(Vec3.atLowerCornerOf(be.getBlockPos()));
         poseStack.pushPose();

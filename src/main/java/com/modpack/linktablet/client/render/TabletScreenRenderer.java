@@ -121,7 +121,8 @@ public final class TabletScreenRenderer {
                     program.displayName().getString(),
                     List.of(), true, false, Signal.MAX_STRENGTH, program.chipColor(),
                     java.util.Optional.ofNullable(program.iconItem()),
-                    false, 0, Signal.MAX_STRENGTH, "", false, Signal.MIN_PULSE_TICKS));
+                    false, 0, Signal.MAX_STRENGTH, "", false, Signal.MIN_PULSE_TICKS,
+                    0, List.of()));
         }
         return tiles;
     }

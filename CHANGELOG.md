@@ -54,6 +54,20 @@
   driving), Calculator a working mini pad, and the launcher pins an
   app dock — one click on the dock opens that app. Signals pins work
   exactly as before, and existing pins carry over.
+- **Signal links** — signals can now drive other signals: in the edit
+  screen, the new **Links** button lists your other signals; set each
+  one to *turn ON*, *turn OFF*, or *follow* (copy the tapped signal's
+  new state). Tapping the source anywhere — GUI, pinned overlay, or a
+  placed screen — drives its targets too, chains included (loops are
+  safe). Timer signals fire their pulse when linked-on; linked tiles
+  wear a small chain glyph. A signal with links doesn't even need a
+  frequency — make pure scene master buttons that only drive other
+  signals.
+- **Follow mode** — power a tablet on its Swivel Mount with redstone
+  and the screen tracks the nearest player, enchanting-table-book
+  style, gliding smoothly. Cut the power and it stays exactly where
+  it's pointing — aim it by walking, freeze it with a lever. Wrench
+  gestures still work while powered.
 - **Addon API**: other mods can now register their own tablet
   programs — each shows up in the App Store with its name, icon, and
   description, joins Home rosters, opens its screen from tiles and

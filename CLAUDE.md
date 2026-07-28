@@ -194,6 +194,27 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   `-Dlinktablet.example=true` (user decision: keep the dev store
   shelf clean; enable it whenever the api/ surface changes).
 
+- Signal links (1.10.0): `Signal.linkId` is minted ONLY in
+  handleUpsert's ensure-ids pass (clients always send 0; the server
+  restores the stored id BEFORE `sanitized()` so self-link pruning
+  sees it). `SignalLinks.propagate` is the ONE traversal — both
+  mutation sites (handleToggle + TabletBlock's tap branch) call it,
+  never fork it. Targets resolve by id; id 0 never matches. v1 scope:
+  toggle sources only; toggle targets chain, timer targets fire and
+  are terminal, momentary/slider skipped. Signals may have EMPTY
+  frequencies when they carry links (scene masters — the upsert gate
+  is freqs-OR-links; empty-freq rendering is safe, the launcher's
+  synthetic tiles prove it). Registrar "18".
+- Follow mode (1.10.0): `followPowered` is TRANSIENT (neighborChanged
+  + onLoad re-derive, never NBT); the BE ticker is gated on the
+  MOUNTED blockstate in `TabletBlock.getTicker` (chunks rebuild
+  tickers on state change — unmounted tablets never tick). The
+  2° threshold in followTick is the packet-spam guard (aimAt syncs
+  the FULL BE NBT). Renderer glides via `renderPitch/renderYaw`
+  (client fields on the BE) but hit tests keep `mountBasis()` from
+  the synced angles — pixels may trail clicks mid-glide BY DESIGN;
+  never lerp the hit basis.
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in

@@ -367,6 +367,19 @@ public class TabletScreen extends Screen {
         graphics.pose().popPose();
     }
 
+    /** Tiny chain glyph (8x9, two interlocked links) — the signal-links
+     * indicator (1.10.0). Display only; links are edited in the edit
+     * screen's Links overlay. */
+    private void drawChainGlyph(GuiGraphics graphics, int gx, int gy, int frame, int hole) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200); // above 3D block icons
+        graphics.fill(gx, gy, gx + 5, gy + 5, frame);
+        graphics.fill(gx + 1, gy + 1, gx + 4, gy + 4, hole);
+        graphics.fill(gx + 3, gy + 4, gx + 8, gy + 9, frame);
+        graphics.fill(gx + 4, gy + 5, gx + 7, gy + 8, hole);
+        graphics.pose().popPose();
+    }
+
     // ------------------------------------------------------------------
     // Rearrange mode
     // ------------------------------------------------------------------
@@ -693,6 +706,13 @@ public class TabletScreen extends Screen {
             }
         }
 
+        // Chain glyph (1.10.0 signal links), below the note SLOT — a
+        // stable position whether the note affordance shows or not
+        if (signal.hasLinks()) {
+            int cy = y + (signal.frequencies().size() > 1 ? 13 : 3) + 12;
+            drawChainGlyph(graphics, x + 3, cy, theme.textMuted, theme.surfaceLo);
+        }
+
         // Name (ellipsized to tile width; full name via hover tooltip)
         String name = SignalTilePainter.label(graphics, font, theme, signal.name(), x, y, TILE_SIZE, TILE_GAP);
         if (hovered && !name.equals(signal.name())) {
@@ -784,6 +804,13 @@ public class TabletScreen extends Screen {
             if (noteHovered) {
                 hoveredNoteGlyph = true;
             }
+        }
+
+        // Chain glyph (1.10.0 signal links), left of the note slot
+        if (signal.hasLinks()) {
+            int controlReserve = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
+            int gx = x + w - 4 - controlReserve - 12 - 11;
+            drawChainGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, theme.textMuted, theme.surfaceLo);
         }
     }
 

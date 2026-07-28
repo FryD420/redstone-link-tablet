@@ -16,6 +16,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -255,13 +256,29 @@ public class TabletBlockEntity extends BlockEntity {
      * Face-me aiming: points the screen from the ball pivot at the given
      * eye position, clamped so the panel never tilts more than
      * {@link TabletScreenMath#MOUNT_MAX_TILT} away from the attach face.
+     * Always applies and syncs — the wrench gesture's shape; the follow
+     * tick goes through {@link #computeAim} + a threshold instead.
      */
     public void aimAt(net.minecraft.world.phys.Vec3 eye) {
+        float[] angles = computeAim(eye);
+        if (angles == null) return;
+        this.mountPitch = angles[0];
+        this.mountYaw = angles[1];
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /** The one aim derivation (wrench AND follow): eye point → clamped
+     * {pitch, yaw}, or null when the eye sits on the pivot. */
+    @Nullable
+    private float[] computeAim(net.minecraft.world.phys.Vec3 eye) {
         net.minecraft.core.Direction attach = mountAttachNormal();
         net.minecraft.world.phys.Vec3 pivot =
                 TabletScreenMath.MountBasis.pivot(worldPosition, attach);
         net.minecraft.world.phys.Vec3 toEye = eye.subtract(pivot);
-        if (toEye.lengthSqr() < 1.0E-6) return;
+        if (toEye.lengthSqr() < 1.0E-6) return null;
         net.minecraft.world.phys.Vec3 normal = toEye.normalize();
 
         // Clamp the tilt toward the attach face's normal
@@ -280,13 +297,64 @@ public class TabletBlockEntity extends BlockEntity {
         }
 
         double horiz = Math.sqrt(normal.x * normal.x + normal.z * normal.z);
-        this.mountPitch = (float) Math.toDegrees(-Math.atan2(normal.y, horiz));
-        this.mountYaw = (float) Math.toDegrees(Math.atan2(-normal.x, normal.z));
-        setChanged();
-        if (level != null) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        return new float[]{
+                (float) Math.toDegrees(-Math.atan2(normal.y, horiz)),
+                (float) Math.toDegrees(Math.atan2(-normal.x, normal.z))};
     }
+
+    // ---- Redstone follow mode (1.10.0) -------------------------------
+
+    /** Follow cadence/feel — server-side; tune with the user's feel-test. */
+    private static final int FOLLOW_INTERVAL_TICKS = 3;
+    private static final double FOLLOW_RANGE = 8.0;
+    /** Below this angular move the tick applies nothing: aimAt syncs the
+     * FULL BE NBT, so the threshold is the packet-spam guard. */
+    private static final float FOLLOW_THRESHOLD_DEG = 2.0f;
+
+    /**
+     * Redstone power near the mount — TRANSIENT (never saved): pushed by
+     * {@link TabletBlock#neighborChanged}, re-derived in {@link #onLoad}.
+     */
+    private boolean followPowered;
+
+    public void setFollowPowered(boolean powered) {
+        this.followPowered = powered;
+    }
+
+    /**
+     * Server tick for MOUNTED tablets only (the mod's first BE ticker —
+     * TabletBlock.getTicker gates it on the blockstate, so unmounted
+     * tablets don't tick at all). A POWERED mount tracks the nearest
+     * player like the enchanting table's book; unpowered stays put.
+     */
+    public void followTick() {
+        if (!followPowered || level == null || level.isClientSide) return;
+        if ((level.getGameTime() % FOLLOW_INTERVAL_TICKS) != 0) return;
+        net.minecraft.world.phys.Vec3 pivot =
+                TabletScreenMath.MountBasis.pivot(worldPosition, mountAttachNormal());
+        net.minecraft.world.entity.player.Player nearest = level.getNearestPlayer(
+                pivot.x, pivot.y, pivot.z, FOLLOW_RANGE, false);
+        if (nearest == null || nearest.isSpectator()) return;
+        float[] angles = computeAim(nearest.getEyePosition());
+        if (angles == null) return;
+        float dPitch = Math.abs(Mth.degreesDifference(mountPitch, angles[0]));
+        float dYaw = Math.abs(Mth.degreesDifference(mountYaw, angles[1]));
+        if (dPitch < FOLLOW_THRESHOLD_DEG && dYaw < FOLLOW_THRESHOLD_DEG) return;
+        this.mountPitch = angles[0];
+        this.mountYaw = angles[1];
+        setChanged();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+    }
+
+    // ---- Client-only render glide (follow mode, 1.10.0) --------------
+    // The RENDERER's smoothed angles — hit tests keep the synced
+    // mountPitch/mountYaw (mountBasis()), so clicks stay server-agreed;
+    // pixels glide toward them. NaN = snap on first frame.
+
+    /** @see com.modpack.linktablet.client.render.TabletBlockEntityRenderer */
+    public float renderPitch = Float.NaN;
+    public float renderYaw = Float.NaN;
+    public long renderLerpMillis;
 
     public ScreenTheme getTheme() {
         return theme;
@@ -669,6 +737,9 @@ public class TabletBlockEntity extends BlockEntity {
         // whose members no longer point back, reschedules a rescan.
         // Unloaded neighbors defer judgment — their own onLoad re-checks.
         if (!(level instanceof ServerLevel serverLevel)) return;
+        // Follow mode (1.10.0): the powered flag is transient — re-read
+        // the neighborhood on load (neighborChanged keeps it live after)
+        this.followPowered = serverLevel.hasNeighborSignal(worldPosition);
         boolean stale =
                 (isSurfacePart()
                         && serverLevel.isLoaded(getControllerPos())

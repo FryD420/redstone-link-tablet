@@ -577,7 +577,9 @@ public class ModNetworking {
         // "17": 1.10.0 addon API — programs travel by string KEY:
         // SetHomeAppsPayload carries keys, SetProgramPayload a key
         // (still inside the 1.10.0 pairing break).
-        PayloadRegistrar registrar = event.registrar("17");
+        // "18": 1.10.0 signal links — Signal grew linkId + links on the
+        // wire (still inside the 1.10.0 pairing break).
+        PayloadRegistrar registrar = event.registrar("18");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -769,6 +771,12 @@ public class ModNetworking {
         if (signal.timed()) return;     // timers use TimedSignalPayload
         boolean nowActive = !signal.active();
         signals.set(payload.index(), signal.withActive(nowActive));
+        // Signal links (1.10.0): the tap also drives linked targets —
+        // ONE shared helper with TabletBlock's world-tap branch
+        com.modpack.linktablet.frequency.SignalLinks.propagate(signals, payload.index(),
+                (index, target) -> TabletTransmitterHandler.startTimed(player,
+                        payload.target().mainHand(), payload.target().pos().orElse(null),
+                        index, target.frequencies(), target.strength(), target.pulseTicks()));
         host.save(signals);
 
         // Faint click other nearby players can hear (the toggling player
@@ -800,16 +808,29 @@ public class ModNetworking {
     private static void handleUpsert(UpsertSignalPayload payload, IPayloadContext context) {
         SignalHost host = resolve(context.player(), payload.target());
         if (host == null) return;
-        Signal signal = payload.signal().sanitized();
-        if (signal.frequencies().isEmpty()) return;
+        // Never trust a client-supplied id: the stored signal's id wins
+        // (edits), adds start at 0 for the ensure-ids mint below. Id is
+        // restored BEFORE sanitized() so self-link pruning sees it.
         List<Signal> signals = host.signals();
+        if (payload.index() != -1
+                && (payload.index() < 0 || payload.index() >= signals.size())) return;
+        int storedId = payload.index() == -1 ? 0 : signals.get(payload.index()).linkId();
+        Signal signal = payload.signal().withLinkId(storedId).sanitized();
+        // A signal needs a frequency OR links (1.10.0): links-only
+        // signals are legitimate scene masters that transmit nothing
+        // themselves (empty-frequency rendering is proven — the kiosk
+        // launcher tiles are frequency-less synthetic signals)
+        if (signal.frequencies().isEmpty() && signal.links().isEmpty()) return;
         if (payload.index() == -1) {
             if (signals.size() >= host.maxSignals()) return;
             signals.add(signal);
         } else {
-            if (payload.index() < 0 || payload.index() >= signals.size()) return;
             signals.set(payload.index(), signal);
         }
+        // Ensure-ids pass (1.10.0 links): the ONLY mint site — one edit
+        // round retrofits every pre-links signal on the tablet
+        com.modpack.linktablet.frequency.SignalLinks.ensureIds(signals,
+                context.player().getRandom());
         host.save(signals);
     }
 

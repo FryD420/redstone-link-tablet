@@ -149,6 +149,34 @@ byline**. What shipped:
   the int→key switch — type-sniff) and a store Get/Remove
   regression.
 
+## Signal links + follow mode — IN CODE 2026-07-28 (batched into
+## 1.10.0 by user decision; registrar "17"→"18")
+
+- **Signal links**: `Signal` grew `linkId` (server-minted in
+  handleUpsert's ensure-ids pass ONLY; clients send 0) + `links`
+  (`Signal.Link` target-id/mode ON|OFF|FOLLOW, ordinal-coded,
+  MAX_LINKS 8) — both optionalFieldOf + appended at the END of the
+  hand-rolled stream codec (old NBT/untouched signals unchanged).
+  `SignalLinks.propagate` = the ONE BFS traversal (visited-id set:
+  loops safe, chains work; toggle targets chain, timer targets fire
+  their pulse and are terminal, momentary/slider skipped) — called
+  from BOTH mutation sites (handleToggle + TabletBlock tap branch).
+  UI: Links ChromeButton right of the icon slot → `LinkPickerOverlay`
+  (ZonePicker pattern; rows cycle none→ON→OFF→FOLLOW; id-0 rows inert
+  with "save it once first" — the ensure-ids pass self-heals);
+  chain glyph on GUI tiles/rows (world tiles skip it).
+- **Follow mode**: powered Swivel Mount tracks the nearest player
+  (≤8 blocks, every 3rd tick, 2° threshold — the packet-spam guard).
+  `followPowered` transient (neighborChanged + onLoad); ticker gated
+  on MOUNTED in getTicker (the mod's FIRST BE ticker; unmounted never
+  ticks); `computeAim` extracted from aimAt (wrench keeps always-sync).
+  Client: BER glides `renderPitch/renderYaw` toward the synced angles
+  (exponential, rotLerp) — hit tests keep the raw `mountBasis()`.
+- Docs: CHANGELOG entries added; DESCRIPTION.md rewritten for the
+  full 1.10.0 story (OS section, links bullet, follow paragraph,
+  addon-API dev note; games still unmentioned; two optional new 📸
+  slots). CLAUDE.md gotchas added.
+
 ## OS suite S6 (in-world regression pass — still owed)
 
 - **EVERYTHING IS UNCOMMITTED on `tablet-overlay`** — two huge days
@@ -260,6 +288,21 @@ byline**. What shipped:
   - Regressions: signals grid/list/reorder/sliders/momentary/timer,
     merged surfaces, mounted taps, secret games, JEI/EMI drags,
     pre-1.10 world upgrade (kiosks boot to launcher, old pins fine).
+  - **Signal links (2026-07-28)**: link A→B in all three modes, tap A
+    from GUI + overlay + placed screen, chain A→B→C, loop A→B→A (must
+    not hang), timer target fires its pulse, chain glyph on tiles and
+    rows, "save it once first" row heals after saving that signal,
+    remove a target then tap the source (stale link no-ops),
+    **frequency-less links-only signal** saves and drives targets
+    (user request from first look, 2026-07-28 — Save enables on
+    links alone, server gate is freqs-OR-links).
+  - **Follow mode (2026-07-28)**: powered mounted tablet tracks you
+    smoothly (no jitter standing still — the 2° threshold), freezes
+    on power-off, resumes on power-on, wrench re-aim/flip still work
+    while powered, taps land after the glide settles, works on floor/
+    wall/ceiling mounts, chunk reload keeps following (onLoad
+    re-derives power). MULTIPLAYER FEEL-TEST (per design): two
+    players near one powered mount — it picks the nearest.
 - CHANGELOG "Unreleased" already covers the whole suite. Listing text
   (DESCRIPTION.md) still describes 1.9.0 — refresh it before release.
 
@@ -308,7 +351,9 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
    above); remaining work is the user's in-world pass (S6) and,
    post-release, announcing the API to addon authors (maybe a short
    API.md / wiki page — not written yet, javadoc is the doc for now).
-1. **Redstone follow mode (queued 2026-07-22, user-requested; now ships
+1. ~~Redstone follow mode~~ — **DONE IN CODE 2026-07-28, batched into
+   1.10.0** (see the section above; the original design notes follow
+   for reference). **(queued 2026-07-22, user-requested; now ships
    AFTER the launcher, user decision 2026-07-27)** — a
    POWERED mounted tablet tracks the nearest player like the
    enchanting-table book. Design agreed: SERVER-driven (the mount
@@ -324,7 +369,9 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
    shoot)** — rewrite DESCRIPTION.md's "recipe" section (~184-194) to
    the manufacturing story and replace recipe.png with an
    assembly-line or JEI-chain shot; then paste to both listings.
-3. **Signal links — signals toggling other signals (scoped
+3. ~~Signal links~~ — **DONE IN CODE 2026-07-28, batched into 1.10.0**
+   (user decision — the open registrar break made it free; see the
+   section above; original scoping follows for reference). **(scoped
    2026-07-25 as "app links", renamed with the 1.10.0 rename)** —
    state-level linking: tapping signal A also flips B (tile lights,
    transmits B's own strength/freqs). NOTE signals are already

@@ -10,14 +10,40 @@
 
 **A smart-home control panel for your Create contraptions.**
 
-The **Link Tablet** is a handheld device with an app-style touchscreen that drives
+The **Link Tablet** is a handheld device with a real touchscreen OS that drives
 [Create](https://modrinth.com/mod/create)'s Redstone Links remotely. Lights, doors,
 trains, farms, the entire factory — name them, give them an icon, and control them
-from one screen, anywhere in link range. Mount tablets side by side and they merge
-into one **wall-sized display**; pin a **mini-tablet to your HUD** and flip switches
-without ever opening a GUI.
+from one screen, anywhere in link range. It boots to a **Home screen of apps** —
+signals, gauges, a clock, a calculator, with more from the built-in **App Store** —
+mounts on walls where tablets merge into one **wall-sized display**, and pins a
+**mini-tablet to your HUD** so you can flip switches without ever opening a GUI.
 
 ![The tablet GUI over a floating-island vista — a slider, a timer, and toggle signals in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
+
+## A pocket OS
+
+The tablet opens to a **Home screen** — an app launcher you arrange yourself.
+The **App Store** tile lists everything installed with a description and a
+one-click Get/Remove; your Home screen is yours, per tablet. The apps:
+
+- **Signals** — the control grid below; every tablet starts with it.
+- **Clock** — daily **alarms**, a **world clock** with every real timezone
+  (searchable), a **countdown timer**, and a **stopwatch**. Alarms and timers
+  ring even with the tablet closed, and keep real wall-clock time across
+  sessions. A placed tablet showing the Clock is a **wall clock** — big digital
+  time and date on the glass, merged walls included.
+- **Calculator** — a proper four-function calculator with click buttons and
+  full keyboard entry; a placed tablet shows its **live tape on the wall**.
+- **Gauges** — the reverse of Signals: **live dials that listen** on Redstone
+  Link frequencies and show the received 0–15. Name each dial, pick its channel
+  and color. Held tablets hear what you'd hear; placed tablets hear what a real
+  link at that spot would — and merged walls make great **factory dashboards**.
+
+Placed tablets show whatever app they're on right on the glass — tap it to open
+the app, **tap the bezel ring to go Home** — and the wall screen follows your
+GUI navigation, so the kiosk and the menu always agree.
+
+<!-- 📸 SCREENSHOT (optional, 1.10.0): the Home screen GUI next to a placed wall-clock tablet and a gauges wall — "it's an OS" in one image -->
 
 ## Signals, not levers
 
@@ -35,6 +61,12 @@ without ever opening a GUI.
     switches off by itself. Tap again to restart the clock.
 - **Scenes** — one signal can drive up to 8 frequencies at once ("Shut down the
   factory", "Open all doors").
+- **Signal links** — signals can drive each other: link up to 8 targets per
+  signal and set each to *turn ON*, *turn OFF*, or *follow* the tapped signal's
+  new state. One tap on "Night mode" turns the lights off, the alarm perimeter
+  on, and fires the door-timer — links chain, loops are safe, and linked tiles
+  wear a little chain glyph. A linked signal doesn't even need a frequency of
+  its own: make pure **scene master buttons** that only drive other signals.
 - **Per-signal strength** — when several signals drive the same frequency, the
   strongest wins, exactly like stacked Redstone Links.
 
@@ -79,9 +111,11 @@ you can see two of them pinned in the screenshot up top.
 
 ## Pin it to your HUD
 
-The pin button in the tablet GUI keeps a **floating mini-tablet on your screen
-while you play** — live signal rows with real switches, draggable anywhere, and it
-remembers its spot and pin across sessions. Press the **"Use Pinned Tablet" key
+The pin button keeps a **floating mini-tablet on your screen while you play** —
+and it's **per-app**: pin Signals for live switch rows, pin Gauges for a
+heads-up dial cluster (a vehicle dashboard while you drive), pin the Clock, pin
+a working Calculator mini-pad, or pin the launcher itself as an app dock. The
+window is draggable anywhere and remembers its spot and pin across sessions. Press the **"Use Pinned Tablet" key
 (default B)** to free your mouse chat-style and tap toggles, drag sliders, or
 hold buttons — mid-mining, mid-flight, no GUI ever opens. It's also clickable
 with the normal cursor over your inventory or chat, and a right-click on any
@@ -138,6 +172,14 @@ The tilted glass stays fully touchable — taps, holds, and click-and-slide all
 land exactly where you're looking. Mounted tablets keep to themselves (they
 never merge into a wall display), so they're perfect as angled standalone
 consoles in front of one.
+
+And here's the party trick: **power the mount with redstone and the screen
+follows you** — it smoothly tracks the nearest player like the enchanting
+table's book, gliding as you walk the control room. Cut the power and it
+freezes exactly where it's pointing: aim it by standing in the right spot,
+lock it with a lever.
+
+<!-- 📸 SCREENSHOT (optional, 1.10.0): follow mode — ideally a short GIF of a powered swivel tablet tracking the player past a console; a still with lever + angled tablet works too -->
 
 ## One screen, many tablets
 
@@ -222,6 +264,11 @@ Controller. Mounted tablets transmit from the block instead.
 - Frequency-card mods (component-based frequency items) work out of the box.
 - Optional **JEI and EMI** integration: drag ingredients straight into the
   frequency slots.
+- **Mod developers:** the tablet has an addon API — register your own app and
+  it appears in the App Store with your name, icon, and description, complete
+  with optional HUD-overlay and wall-screen support. See the
+  `com.modpack.linktablet.api` package on
+  [GitHub](https://github.com/FryD420/redstone-link-tablet).
 - MIT licensed, free to use in any modpack.
 
 Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-link-tablet).
@@ -230,7 +277,15 @@ Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-li
 
 ## Shooting checklist (not part of the description)
 
-### 1.7.0 + 1.8.0 refresh — TO SHOOT (text is done through 1.8.0, slots are placeholders above)
+### 1.10.0 additions — text is CURRENT through 1.10.0 (OS/store/links/follow
+### rewrite 2026-07-28); two OPTIONAL new slots joined the queue:
+
+- ⬜ **pocket OS** (optional) — Home screen GUI beside a placed wall-clock
+  tablet and a gauges wall; one image that says "it's an OS".
+- ⬜ **follow mode** (optional) — GIF of a powered swivel tablet tracking the
+  player past a console (a still with a lever works if GIFs are a pain).
+
+### 1.7.0 + 1.8.0 refresh — TO SHOOT (slots are placeholders above)
 
 - ⬜ **multiblock wall** — a merged surface (3×2 or 4×3) in a factory
   setting: dyed bezel, good tile variety, ideally mid-tap on the glass.

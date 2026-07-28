@@ -477,6 +477,13 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 if (!level.isClientSide) {
                     List<Signal> updated = new ArrayList<>(signals);
                     updated.set(index, signal.withActive(!signal.active()));
+                    // Signal links (1.10.0): the tap also drives linked
+                    // targets — ONE shared helper with handleToggle
+                    com.modpack.linktablet.frequency.SignalLinks.propagate(updated, index,
+                            (timedIndex, timedTarget) -> com.modpack.linktablet.compat
+                                    .TabletTransmitterHandler.startTimed(player, true,
+                                            controllerPos, timedIndex, timedTarget.frequencies(),
+                                            timedTarget.strength(), timedTarget.pulseTicks()));
                     target.setSignals(updated);
                     // Unlike the GUI path, the clicker has no UI sound
                     // here, so nobody is excluded.
@@ -671,5 +678,35 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new TabletBlockEntity(pos, state);
+    }
+
+    // ------------------------------------------------------------------
+    // Redstone follow mode (1.10.0): a POWERED mounted tablet tracks the
+    // nearest player. Power is a transient BE flag (re-derived on load);
+    // the ticker exists ONLY for mounted states — the chunk rebuilds its
+    // ticker on every blockstate change, so plain tablets never tick.
+    // ------------------------------------------------------------------
+
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos,
+                                   net.minecraft.world.level.block.Block neighborBlock,
+                                   BlockPos neighborPos, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+        if (!level.isClientSide
+                && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
+            be.setFollowPowered(level.hasNeighborSignal(pos));
+        }
+    }
+
+    @Override
+    @org.jetbrains.annotations.Nullable
+    public <T extends BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T> getTicker(
+            Level level, BlockState state,
+            net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
+        if (level.isClientSide || !state.getValue(MOUNTED)
+                || type != com.modpack.linktablet.registry.ModBlockEntities.TABLET.get()) {
+            return null;
+        }
+        return (tickLevel, tickPos, tickState, be) -> ((TabletBlockEntity) be).followTick();
     }
 }

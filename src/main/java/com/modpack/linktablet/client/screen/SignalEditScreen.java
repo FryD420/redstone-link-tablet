@@ -102,6 +102,10 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     private int pulseTicks = Signal.DEFAULT_PULSE_TICKS;
     /** Carried through unchanged — notes are edited from the home screen. */
     private String note = "";
+    /** Staged signal links (1.10.0), edited via the Links overlay; the
+     * server restores this signal's own id and re-sanitizes on save. */
+    private final List<Signal.Link> links = new ArrayList<>();
+    private LinkPickerOverlay linkPicker;
     private boolean draggingStrength = false;
     private boolean draggingPulse = false;
     /** Range-row knob being dragged: -1 none, 0 min, 1 max. */
@@ -131,6 +135,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             this.timed = existing.timed();
             this.pulseTicks = existing.pulseTicks();
             this.note = existing.note();
+            this.links.addAll(existing.links());
         } else if (menu.contentHolder.prefill1().isEmpty() != menu.contentHolder.prefill2().isEmpty()) {
             // Half-set link prefill: commit the lone-item frequency directly
             this.frequencies.add(Frequency.of(menu.contentHolder.prefill1(), menu.contentHolder.prefill2()));
@@ -191,6 +196,17 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                 picker.open(width, height, stack ->
                                 iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
                         true), this::theme));
+
+        // Signal links (1.10.0): the free rect right of the icon slot
+        linkPicker = new LinkPickerOverlay(font);
+        Button linksButton = new ChromeButton(left + RIGHT_COL + 28, top + 26, 56, 20,
+                Component.translatable("gui.linktablet.links.button"), b ->
+                linkPicker.open(width, height,
+                        LinkPickerOverlay.candidates(view().signals(), index), links),
+                this::theme);
+        linksButton.setTooltip(Tooltip.create(
+                Component.translatable("gui.linktablet.links.button.tooltip")));
+        addRenderableWidget(linksButton);
 
         // Save / Cancel / Remove, right of the inventory block
         saveButton = new ChromeButton(left + BTN_X, top + 146, BTN_W, 20,
@@ -285,8 +301,11 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         if (frequencies.isEmpty()) return;
         String name = nameBox.getValue().isBlank() ? "Signal" : nameBox.getValue().strip();
         Optional<ResourceLocation> icon = iconItem.map(BuiltInRegistries.ITEM::getKey);
+        // linkId 0 on the wire: the server restores the stored id (edits)
+        // or mints one (adds) — clients never choose ids
         Signal signal = new Signal(name, List.copyOf(frequencies), wasActive, momentary, strength,
-                color, icon, slider, sliderMin, sliderMax, note, timed, pulseTicks);
+                color, icon, slider, sliderMin, sliderMax, note, timed, pulseTicks,
+                0, List.copyOf(links));
         UISounds.confirm();
         PacketDistributor.sendToServer(
                 new ModNetworking.UpsertSignalPayload(menu.contentHolder.target(), index, signal));
@@ -304,8 +323,10 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     @Override
     protected void containerTick() {
-        // Need at least one committed or staged frequency to save
-        saveButton.active = !frequencies.isEmpty() || stagedValid();
+        // Need a frequency to save — OR a link (1.10.0): a signal may
+        // carry no frequency at all and exist purely to drive other
+        // signals (a scene master button)
+        saveButton.active = !frequencies.isEmpty() || stagedValid() || !links.isEmpty();
         addFreqButton.active = stagedValid() && frequencies.size() < Signal.MAX_FREQUENCIES;
     }
 
@@ -322,6 +343,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (picker.mouseClicked(mouseX, mouseY, button)) return true;
+        if (linkPicker.mouseClicked(mouseX, mouseY, button)) return true;
         int rightX = leftPos + RIGHT_COL;
 
         // Open color popup swallows every click until it closes
@@ -401,7 +423,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (picker.isOpen()) return true;
+        if (picker.isOpen() || linkPicker.isOpen()) return true;
         if (draggingKnob != -1) {
             setRangeFromMouse(mouseX);
             return true;
@@ -419,7 +441,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (picker.isOpen()) return true;
+        if (picker.isOpen() || linkPicker.isOpen()) return true;
         if (draggingKnob != -1) {
             int landed = draggingKnob == 0 ? sliderMin : sliderMax;
             draggingKnob = -1;
@@ -442,12 +464,14 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (picker.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+        if (linkPicker.mouseScrolled(mouseX, mouseY, scrollY)) return true;
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (picker.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (linkPicker.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (keyCode == 256) { // ESC always exits (checked before the write guard)
             onClose();
             return true;
@@ -464,6 +488,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
         if (picker.charTyped(codePoint, modifiers)) return true;
+        if (linkPicker.charTyped(codePoint, modifiers)) return true;
         return super.charTyped(codePoint, modifiers);
     }
 
@@ -677,7 +702,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             graphics.pose().popPose();
         }
 
-        if (!picker.isOpen() && !colorPopupOpen) {
+        if (!picker.isOpen() && !linkPicker.isOpen() && !colorPopupOpen) {
             if (hoveredChip) {
                 graphics.renderTooltip(font,
                         Component.translatable("gui.linktablet.edit_signal.chip_remove"), mouseX, mouseY);
@@ -697,6 +722,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         }
 
         picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
+        linkPicker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
     }
 
     @Override

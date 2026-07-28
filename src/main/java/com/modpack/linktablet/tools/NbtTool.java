@@ -95,7 +95,8 @@ public final class NbtTool {
         Signal signal = new Signal("Lamp",
                 List.of(Frequency.of(Items.REDSTONE_TORCH, Items.REDSTONE_TORCH)),
                 false, false, Signal.MAX_STRENGTH, 0xFFF9801D, Optional.empty(), false,
-                0, Signal.MAX_STRENGTH, "", false, Signal.DEFAULT_PULSE_TICKS);
+                0, Signal.MAX_STRENGTH, "", false, Signal.DEFAULT_PULSE_TICKS,
+                0, List.of());
         Signal.CODEC.listOf().encodeStart(NbtOps.INSTANCE, List.of(signal))
                 .result().ifPresent(t -> tag.put("apps", t)); // frozen BE key
         return tag;
