@@ -3,19 +3,20 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-28 — v1.10.0 TAGGED + PUSHED, uploads pending)
+## Status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
 
-- **v1.10.0 TAGGED + PUSHED 2026-07-28** (commit b5d1941, tag
-  v1.10.0, merged to main; user modpack-tested same day "tested and
-  works"): the tablet OS + App Store + Clock/Calculator/Gauges +
-  public game apps, the ADDON API (+ docs/API.md tutorial), SIGNAL
-  LINKS (incl. frequency-less scene masters), FOLLOW MODE, sparse
-  placed-tile polish. Registrar "18" — PAIRING BREAK vs 1.9.x.
-  REMAINING: user uploads to both platforms + pastes DESCRIPTION.md
-  (text current; 📸 slots inert), announcement (both links, pairing-
-  break warning); screenshot shoot queued (4 slots). Untested
-  corners (dedicated-server gauges, multiplayer follow) ride the
-  tester crew — reactive hotfix posture.
+- **v1.10.0 LIVE 2026-07-29** (tagged + pushed 2026-07-28, commit
+  b5d1941, tag v1.10.0, merged to main; user modpack-tested "tested
+  and works"; **uploaded to both platforms + announced —
+  user-confirmed 2026-07-29**): the tablet OS + App Store +
+  Clock/Calculator/Gauges + public game apps, the ADDON API
+  (+ docs/API.md tutorial), SIGNAL LINKS (incl. frequency-less scene
+  masters), FOLLOW MODE, sparse placed-tile polish. Registrar "18" —
+  PAIRING BREAK vs 1.9.x. The 1.10.0 DESCRIPTION.md text is pasted
+  on both listings (2026-07-29). REMAINING: screenshot shoot queued
+  (4 slots). Untested corners (dedicated-server gauges, multiplayer
+  follow) ride the tester crew — reactive hotfix posture. No coding
+  item queued — next dev work is tester reports or a new feature.
 
 ## Previous status (2026-07-26 — v1.9.1)
 

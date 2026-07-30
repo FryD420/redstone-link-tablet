@@ -8,6 +8,12 @@
 
 ---
 
+<p align="center"><img src="https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/banner.png" alt="Create: Redstone Link Tablet"></p>
+
+<p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
+
+---
+
 **A smart-home control panel for your Create contraptions.**
 
 The **Link Tablet** is a handheld device with a real touchscreen OS that drives
@@ -20,7 +26,9 @@ mounts on walls where tablets merge into one **wall-sized display**, and pins a
 
 ![The tablet GUI over a floating-island vista — a slider, a timer, and toggle signals in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
 
-## A pocket OS
+---
+
+## 📱 A pocket OS
 
 The tablet opens to a **Home screen** — an app launcher you arrange yourself.
 The **App Store** tile lists everything installed with a description and a
@@ -45,7 +53,9 @@ GUI navigation, so the kiosk and the menu always agree.
 
 <!-- 📸 SCREENSHOT (optional, 1.10.0): the Home screen GUI next to a placed wall-clock tablet and a gauges wall — "it's an OS" in one image -->
 
-## Signals, not levers
+---
+
+## 🎛️ Signals, not levers
 
 - **Up to 32 signals per tablet** (and 32 more per tablet on merged multi-tablet
   screens), each with a name, color, an optional item icon, and its own state —
@@ -73,7 +83,9 @@ GUI navigation, so the kiosk and the menu always agree.
 You can see all of them working in the screenshot above — a slider mid-drag, a
 timer, and toggles side by side.
 
-## Real Create frequencies
+---
+
+## 📡 Real Create frequencies
 
 Signals tune to Create's item-pair frequencies — anything a Redstone Link or Linked
 Controller can trigger, the tablet can too:
@@ -87,11 +99,14 @@ Controller can trigger, the tablet can too:
 - Frequencies carry the **full item, components included** — frequency-card mods
   (Create Unique Cards and friends), dyed items, and renamed gear all count as
   distinct channels, exactly matching what Create's links distinguish.
-- **Quick-add:** right-click any Redstone Link (or anything with a link
-  frequency, like elevator contacts) while holding the tablet — the editor opens
-  with that frequency pre-filled and a name suggested. Just hit Save.
 
-## Sliders you can feel
+> 📋 **Tip — quick-add:** right-click any Redstone Link (or anything with a link
+> frequency, like elevator contacts) while holding the tablet — the editor opens
+> with that frequency pre-filled and a name suggested. Just hit Save.
+
+---
+
+## 🎚️ Sliders you can feel
 
 Sliders drag live in the GUI, and on a placed tablet you **click-and-slide right
 on the glass**: hold the button on a slider's tile and sweep your crosshair — the
@@ -99,7 +114,9 @@ value tracks it exactly. Every slider shows its numeric signal level wherever it
 renders, and you can limit one to a min/max range — set a minimum above 0 and
 that machine never fully turns off.
 
-## Sticky notes for your factory
+---
+
+## 📝 Sticky notes for your factory
 
 Every signal can carry a free-text note, opened from a little glyph on its tile.
 Notes are **floating windows**: drag them by the title bar, open several at once,
@@ -109,7 +126,9 @@ politely stay out of settings menus and other screens where they don't belong.
 Perfect for "flush the sorter before enabling" warnings or a train schedule —
 you can see two of them pinned in the screenshot up top.
 
-## Pin it to your HUD
+---
+
+## 📌 Pin it to your HUD
 
 The pin button keeps a **floating mini-tablet on your screen while you play** —
 and it's **per-app**: pin Signals for live switch rows, pin Gauges for a
@@ -128,7 +147,9 @@ carried one and it follows the item around your inventory.
 
 <!-- 📸 SCREENSHOT: the pinned mini-tablet on the HUD during gameplay — mining or riding a train, a slider mid-drag, hotbar visible so it reads as "playing, not in a menu" -->
 
-## The screen is real
+---
+
+## ✨ The screen is real
 
 The tablet's physical screen isn't a texture — it renders your actual signals,
 live, on both the held and the placed tablet. Tiles size themselves to the signal
@@ -140,7 +161,9 @@ And on a placed tablet, **the screen is touchable**: tap a signal right on the
 glass to toggle it, hold a Hold button, slide a slider — no GUI needed. Tap the
 bezel for the full interface.
 
-## Place it on the wall
+---
+
+## 🧱 Place it on the wall
 
 Sneak + right-click any surface to mount the tablet on a wall, floor, or
 ceiling — it becomes a block that transmits from its own position while the
@@ -153,7 +176,9 @@ landscape.
 
 ![A shaded Create factory hall with a wall-mounted tablet showing its live switch list](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mounted-factory2.png)
 
-## Aim it anywhere
+---
+
+## 🎯 Aim it anywhere
 
 Flat against the wall not doing it for you? Craft a **Swivel Mount** — an iron
 nugget atop two brass sheets — and place the empty stand on any floor, wall, or
@@ -181,7 +206,9 @@ lock it with a lever.
 
 <!-- 📸 SCREENSHOT (optional, 1.10.0): follow mode — ideally a short GIF of a powered swivel tablet tracking the player past a console; a still with lever + angled tablet works too -->
 
-## One screen, many tablets
+---
+
+## 🖥️ One screen, many tablets
 
 Mount tablets side by side — same wall, floor, or ceiling; new ones
 auto-match their neighbor's orientation — and they **merge into one big
@@ -193,6 +220,8 @@ and every merged tablet raises the signal cap by another 32. Dye the lead
 tablet and the whole frame dyes; wrench the glass and the whole screen's
 content rotates.
 
+<p align="center"><strong style="color:#f2c94c; font-size:1.3em;">🧮 A 4×3 wall = 12 merged tablets — 384 signals on one screen</strong></p>
+
 Merging is always safe: every tablet keeps its own signals dormant and gets
 them back the moment it's split off. And it's always your choice — a
 **chain-link button** in the screen header breaks a merged surface back
@@ -201,7 +230,9 @@ build a bank of separate dashboards side by side.
 
 <!-- 📸 SCREENSHOT: a merged tablet wall (3×2 or 4×3) in a factory setting, dyed bezel, a good mix of signal tiles — the new hero candidate; bonus if a hand is mid-tap on the glass -->
 
-## Make it yours
+---
+
+## 🎨 Make it yours
 
 - **8 UI themes** — Dark, Light, AMOLED, Brass, Terminal, PurpleFox, Parchment,
   and Avionics — stored per tablet, recoloring the GUI and the physical screen
@@ -221,7 +252,9 @@ build a bank of separate dashboards side by side.
 
 ![All 16 dyed tablet cases mounted on a wooden wall, several screens lit](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/dyed-cases2.png)
 
-## Getting started
+---
+
+## 🏭 Getting started
 
 The tablet comes off a real assembly line — this is brass-age manufacturing,
 not crafting. Shape a **Tablet Case** from five brass sheets, then send it down
@@ -255,7 +288,9 @@ While a signal is on and the tablet is anywhere in your inventory, you are the
 transmitter — range and chunk behavior match Create's handheld Linked
 Controller. Mounted tablets transmit from the block instead.
 
-## Compatibility
+---
+
+## 📦 Compatibility
 
 - **Minecraft 1.21.1 · NeoForge · Java 21 · requires Create 6.x** (server and client).
 - Full multiplayer support: server-authoritative edits, per-player transmitters.
@@ -264,17 +299,42 @@ Controller. Mounted tablets transmit from the block instead.
 - Frequency-card mods (component-based frequency items) work out of the box.
 - Optional **JEI and EMI** integration: drag ingredients straight into the
   frequency slots.
-- **Mod developers:** the tablet has an addon API — register your own app and
-  it appears in the App Store with your name, icon, and description, complete
-  with optional HUD-overlay and wall-screen support. Tutorial and worked
-  example: [API guide](https://github.com/FryD420/redstone-link-tablet/blob/main/docs/API.md).
 - MIT licensed, free to use in any modpack.
 
-Source, issues, and changelog on [GitHub](https://github.com/FryD420/redstone-link-tablet).
+---
+
+## ❤️ Credits
+
+Huge thanks to the [Create](https://www.curseforge.com/minecraft/mc-mods/create) team — this addon stands on their Redstone Link network and visual language. Go support the original mod!
+
+Banner lettering uses the community [Minecraft Ten](https://modrinth.com/resourcepack/mc10) font art by xllifi (CC-BY 4.0).
+
+Enjoying the tablet? You can [drop a tip](https://streamelements.com/fryd42/tip) ☕ — thank you!
+
+---
+
+Created by **FryD42** · **MIT licensed** — free to use in any modpack.
 
 ---
 
 ## Shooting checklist (not part of the description)
+
+NOTE (2026-07-29, user decision): the listing description EXCLUDES GitHub —
+no source/issues/changelog link in the paste content. The raw.githubusercontent
+image embeds stay (that's just hosting, invisible in the rendered page).
+The ADDON-API developer bullet was removed entirely (same decision — its only
+docs link was GitHub); the API is announced to addon authors elsewhere.
+
+### Banner (2026-07-29, Claude-generated — no shoot needed)
+
+- ✅ **banner.png** — Create-addon-style logo banner (Minecraft Ten lettering,
+  GUI + tablet-back flanks, blurred game-tablet wall). Regenerate after edits
+  to `docs/banner.html` with:
+  `chrome --headless --screenshot=docs/images/banner.png --window-size=1200,436 --default-background-color=00000000 --hide-scrollbars --virtual-time-budget=8000 --allow-file-access-from-files docs/banner.html`
+  (`docs/banner-font-ascii.png` is the Minecraft Ten sheet, CC-BY 4.0 xllifi —
+  keep the Credits line if the lettering stays.) NOTE: the listing embed serves
+  from the `main` branch — **push banner.png to main BEFORE re-pasting the
+  listings** or the image 404s.
 
 ### 1.10.0 additions — text is CURRENT through 1.10.0 (OS/store/links/follow
 ### rewrite 2026-07-28); two OPTIONAL new slots joined the queue:
