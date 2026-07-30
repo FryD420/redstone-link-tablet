@@ -13,7 +13,9 @@ at the repo root (auto-loaded every Claude session).
   (+ docs/API.md tutorial), SIGNAL LINKS (incl. frequency-less scene
   masters), FOLLOW MODE, sparse placed-tile polish. Registrar "18" —
   PAIRING BREAK vs 1.9.x. The 1.10.0 DESCRIPTION.md text is pasted
-  on both listings (2026-07-29). REMAINING: screenshot shoot queued
+  on both listings (2026-07-29), and the LISTING RESTYLE (logo
+  banner + badges + emoji headers; no GitHub links, no API mention)
+  is pasted and live on both same day. REMAINING: screenshot shoot queued
   (4 slots). Untested corners (dedicated-server gauges, multiplayer
   follow) ride the tester crew — reactive hotfix posture. No coding
   item queued — next dev work is tester reports or a new feature.
@@ -446,6 +448,16 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
 
 ## Parked (don't propose unless the user re-raises)
 
+- **Orbital Cannon launch-control app** — parked 2026-07-29 mid-
+  brainstorm ("I have an idea for this for later", before any design
+  decisions). KEY FINDING from the context pass: **API v1 has no
+  transmit surface** — ProgramHost is theme/name/goHome/pin only, and
+  there's no addon networking. Any signal-firing addon app must either
+  bring its OWN payload + Create hookup (own IRedstoneLinkable like
+  compat/VirtualTransmitter — addons are full mods, viable) or wait
+  for an API v2 transmit/frequency surface (permanent commitment —
+  design carefully when it happens). Packaging question (standalone
+  addon vs built-in vs addon+API-v2) was asked but never answered.
 - **Factory gauges / data programs** — parked 2026-07-22 ("just a
   thought"). Scoped in-session, three tiers: (1) Gauge signal type that
   LISTENS on a link frequency and shows received 0–15 as a dial —
