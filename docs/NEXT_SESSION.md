@@ -3,7 +3,7 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-03 — v1.10.1 hotfix built, awaiting user modpack test)
+## Status (2026-08-03 — v1.10.1 tagged; uploads pending)
 
 - **v1.10.1 (Sable/Create-Aeronautics compat hotfix)** — first tester
   bug report against 1.10.0: swivel-mounted tablets on a physicalized
@@ -15,10 +15,12 @@ at the repo root (auto-loaded every Claude session).
   computeAim guard + localized payload range checks/sounds/drops (see
   CLAUDE.md gotcha). VERIFIED in dev: wrench re-aim tracks (~20
   samples), bezel landscape flip both ways, soft-dep boot without
-  Sable clean. NOT yet exercised on a sub-level: pip taps + slider
-  drags (payload-validation path) — user is poking those in the
-  modpack test. Release: changelog + bump done; commit/tag/push after
-  the user's modpack pass.
+  Sable clean; pip taps confirmed by the user on the physicalized
+  tablet in a second dev pass ("ok it works", 2026-08-03). Release:
+  committed (64539af), tagged v1.10.1, pushed same day. REMAINING:
+  user uploads to CurseForge + Modrinth and updates the family
+  server/pack (server-side halves matter: aim math + payload range
+  checks — update BOTH sides).
 
 ## Previous status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
 
