@@ -88,12 +88,24 @@ public class ModNetworking {
         }
     }
 
+    /**
+     * Payload range check, Sable-aware (1.10.1): a physicalized tablet's
+     * pos is plot-space while the player is world-space — localize the
+     * eye first or every payload for a vehicle tablet fails validation.
+     * Identity (and free) for normal tablets.
+     */
+    private static double tabletDistSqr(Player player, BlockPos pos) {
+        net.minecraft.world.phys.Vec3 eye = com.modpack.linktablet.compat.SableCompat
+                .localizeNear(player.level(), pos, player.getEyePosition());
+        return eye.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
     @Nullable
     private static SignalHost resolve(Player player, SignalTarget target) {
         if (target.pos().isPresent()) {
             BlockPos pos = target.pos().get();
             if (!player.level().isLoaded(pos)) return null;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
             if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
             // Merged surfaces: edits land on the controller (a stale
@@ -408,7 +420,7 @@ public class ModNetworking {
         if (target.pos().isPresent()) {
             BlockPos pos = target.pos().get();
             if (!player.level().isLoaded(pos)) return null;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
             if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
             TabletBlockEntity be = clicked.resolveController();
@@ -536,7 +548,7 @@ public class ModNetworking {
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
-        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+        if (tabletDistSqr(player, pos)
                 > MAX_BLOCK_DISTANCE_SQ) return;
         if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
             TabletBlockEntity controller = be.resolveController();
@@ -645,7 +657,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();
@@ -673,7 +685,7 @@ public class ModNetworking {
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
-        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+        if (tabletDistSqr(player, pos)
                 > MAX_BLOCK_DISTANCE_SQ) return;
         if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
             com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
@@ -856,7 +868,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();
@@ -881,7 +893,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();

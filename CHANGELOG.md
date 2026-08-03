@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.1 — 2026-08-03
+
+- **Create: Aeronautics compat**: tablets on physicalized contraptions
+  (Sable sub-levels) now work. Swivel-mounted tablets no longer fling
+  to one fixed angle the moment the vehicle is assembled — wrench
+  re-aiming, the bezel landscape flip, screen taps, slider drags, and
+  the pinned mini-window all track correctly on a moving build, and
+  interaction sounds play at the vehicle instead of 20 million blocks
+  away. Works with Sable installed or not (soft compat, no new
+  dependency); tablets that were already stuck un-stick with one
+  wrench.
+- Safety net for the same bug class: a mounted tablet now refuses to
+  store an aim computed from an implausible position instead of
+  clamping to garbage, so future physics mods can't corrupt a stored
+  aim either.
+
 ## 1.10.0 — 2026-07-28
 
 - The tablet now boots to a **Home screen** (the start of the tablet

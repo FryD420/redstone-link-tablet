@@ -215,6 +215,20 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   the synced angles — pixels may trail clicks mid-glide BY DESIGN;
   never lerp the hit basis.
 
+- Sable/Create-Aeronautics compat (1.10.1): a physicalized tablet's
+  `worldPosition` is a Sable PLOT coordinate (~20.5M blocks out) while
+  players stay in world space — every mounted ray path, payload
+  range check, and sound position must localize through
+  `compat/SableCompat` (reflection soft-dep, jar-in-jar `Pose3dc`, no
+  compile dep — the shim self-disables on any bind failure).
+  `localizeNear` is the one auto-detect rule (points near the block
+  pass through free); look VECTORS can't self-detect — transform them
+  iff the paired eye moved (`==` check). `computeAim`'s 32-block guard
+  is the backstop: never let a frame-mismatched aim be stored. Sable's
+  interaction dispatch itself works — only coordinates mix. Dev repro:
+  CA + Sable jars live in `run/mods`; physics assembler on a block,
+  activate.
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in

@@ -270,15 +270,29 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    /** Beyond this eye→pivot distance the aim is refused (guard, 1.10.1):
+     * reach is ~5 blocks and follow range 8 — anything past this is a
+     * coordinate-frame mismatch (Sable sub-level without working compat)
+     * and clamping it would overwrite the stored aim with garbage. */
+    private static final double AIM_GUARD_DIST_SQ = 32 * 32;
+
     /** The one aim derivation (wrench AND follow): eye point → clamped
-     * {pitch, yaw}, or null when the eye sits on the pivot. */
+     * {pitch, yaw}, or null when the eye sits on the pivot — or (1.10.1)
+     * when it's implausibly far after Sable localization (see guard). */
     @Nullable
     private float[] computeAim(net.minecraft.world.phys.Vec3 eye) {
         net.minecraft.core.Direction attach = mountAttachNormal();
         net.minecraft.world.phys.Vec3 pivot =
                 TabletScreenMath.MountBasis.pivot(worldPosition, attach);
+        // Sable sub-level (1.10.1): the block may live in the plot frame
+        // while the player is in world space — bring the eye over first
+        if (level != null) {
+            eye = com.modpack.linktablet.compat.SableCompat.localizeNear(
+                    level, worldPosition, eye);
+        }
         net.minecraft.world.phys.Vec3 toEye = eye.subtract(pivot);
-        if (toEye.lengthSqr() < 1.0E-6) return null;
+        if (toEye.lengthSqr() < 1.0E-6
+                || toEye.lengthSqr() > AIM_GUARD_DIST_SQ) return null;
         net.minecraft.world.phys.Vec3 normal = toEye.normalize();
 
         // Clamp the tilt toward the attach face's normal
@@ -332,8 +346,14 @@ public class TabletBlockEntity extends BlockEntity {
         if ((level.getGameTime() % FOLLOW_INTERVAL_TICKS) != 0) return;
         net.minecraft.world.phys.Vec3 pivot =
                 TabletScreenMath.MountBasis.pivot(worldPosition, mountAttachNormal());
+        // Sable sub-level (1.10.1): players live in world space — search
+        // where the block APPEARS, not its plot position (computeAim
+        // brings the found eye back into the plot frame)
+        net.minecraft.world.phys.Vec3 searchAt =
+                com.modpack.linktablet.compat.SableCompat.toWorldPoint(
+                        level, worldPosition, pivot);
         net.minecraft.world.entity.player.Player nearest = level.getNearestPlayer(
-                pivot.x, pivot.y, pivot.z, FOLLOW_RANGE, false);
+                searchAt.x, searchAt.y, searchAt.z, FOLLOW_RANGE, false);
         if (nearest == null || nearest.isSpectator()) return;
         float[] angles = computeAim(nearest.getEyePosition());
         if (angles == null) return;

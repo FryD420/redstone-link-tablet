@@ -3,7 +3,24 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
+## Status (2026-08-03 — v1.10.1 hotfix built, awaiting user modpack test)
+
+- **v1.10.1 (Sable/Create-Aeronautics compat hotfix)** — first tester
+  bug report against 1.10.0: swivel-mounted tablets on a physicalized
+  contraption (Sable sub-level) flung to yaw=75 (the MOUNT_MAX_TILT
+  clamp) and couldn't be re-aimed. Root cause proven numerically in
+  the dev client (CA + Sable 2.0.3 jars now live in `run/mods` for
+  repro): plot-frame block vs world-frame player, 28.9M-block aim
+  vector. Fix = `compat/SableCompat` reflection shim + 32-block
+  computeAim guard + localized payload range checks/sounds/drops (see
+  CLAUDE.md gotcha). VERIFIED in dev: wrench re-aim tracks (~20
+  samples), bezel landscape flip both ways, soft-dep boot without
+  Sable clean. NOT yet exercised on a sub-level: pip taps + slider
+  drags (payload-validation path) — user is poking those in the
+  modpack test. Release: changelog + bump done; commit/tag/push after
+  the user's modpack pass.
+
+## Previous status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
 
 - **v1.10.0 LIVE 2026-07-29** (tagged + pushed 2026-07-28, commit
   b5d1941, tag v1.10.0, merged to main; user modpack-tested "tested
