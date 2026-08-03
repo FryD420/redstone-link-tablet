@@ -91,6 +91,10 @@ public class TabletReceiverHandler {
                 // ships — player receivers need no eager push
                 receiver = new VirtualReceiver(freq, level, player.blockPosition(), power -> {});
                 Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(level, receiver);
+                // 1.10.2: Create's add-time evaluation skips non-
+                // LinkBehaviour members — read once so the first GUI
+                // frame shows a static channel instead of 0
+                receiver.readInitial();
                 current.put(freq, receiver);
             } else {
                 receiver.update(level, player.blockPosition());

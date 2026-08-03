@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.2 — 2026-08-03
+
+- **Dedicated servers**: the Create: Aeronautics compat from 1.10.1
+  failed to activate on dedicated servers (it worked in singleplayer),
+  so vehicle tablets there still couldn't be aimed. Fixed — if you run
+  a server, update BOTH sides to 1.10.2 and skip 1.10.1 entirely.
+- **Gauges**: a freshly placed gauge tablet now shows the channel's
+  current signal immediately. Before, it displayed 0 until the signal
+  next changed, which on a steady channel looked like a frozen dial.
+  Same fix applies to the first reading in the tablet menu.
+
 ## 1.10.1 — 2026-08-03
 
 - **Create: Aeronautics compat**: tablets on physicalized contraptions

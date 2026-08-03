@@ -3,7 +3,26 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-03 — v1.10.1 tagged; uploads pending)
+## Status (2026-08-03 — v1.10.2 tagged; upload 1.10.2 ONLY, skip 1.10.1)
+
+- **v1.10.2 (same-day hotfix stack on 1.10.1)**: (a) 1.10.1's Sable
+  shim NEVER BOUND on dedicated servers — `getMethod` enumeration hit
+  the client-only `getContainer(ClientLevel)` overload and NeoForge's
+  dist cleaner threw; repro'd + fixed with exact-signature
+  `findStatic`/`findVirtual` lookups, verified on dev `runServer` AND
+  the user's BisectHosting server symptom. (b) Placed-gauge frozen
+  dial: Create's `addToNetwork` never delivers the initial value to
+  non-LinkBehaviour members → `VirtualReceiver.readInitial()`.
+  Also diagnosed (NOT bugs): three "always 15" reports = a creative-
+  mode tablet ITEM copy in the inventory transmitting alongside the
+  placed block (stacked-transmitter design); CA/Sable handles Create's
+  link network across the plot boundary natively (vehicle gauges read
+  world transmitters — verified live). Both fixes user-verified in
+  dev ("both worked"). 1.10.1 was never uploaded — upload 1.10.2 only.
+  Roadmap seed from today: a "who's transmitting on this frequency"
+  debug view (phantom-copy confusion bit 3× in one day).
+
+## Previous status (2026-08-03 — v1.10.1 tagged; uploads pending)
 
 - **v1.10.1 (Sable/Create-Aeronautics compat hotfix)** — first tester
   bug report against 1.10.0: swivel-mounted tablets on a physicalized

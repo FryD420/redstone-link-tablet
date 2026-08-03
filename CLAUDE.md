@@ -221,6 +221,12 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   range check, and sound position must localize through
   `compat/SableCompat` (reflection soft-dep, jar-in-jar `Pose3dc`, no
   compile dep — the shim self-disables on any bind failure).
+  BIND RULE (1.10.2): `findStatic`/`findVirtual` with explicit
+  MethodTypes, NEVER `getMethod` — reflection's method enumeration
+  resolves every overload's parameter types, and `getContainer
+  (ClientLevel)` kills NeoForge's dist cleaner on DEDICATED servers
+  (1.10.1 shipped broken there; singleplayer masked it — always
+  boot-check compat via `runServer` too, run/ is shared).
   `localizeNear` is the one auto-detect rule (points near the block
   pass through free); look VECTORS can't self-detect — transform them
   iff the paired eye moved (`==` check). `computeAim`'s 32-block guard
@@ -228,6 +234,18 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   interaction dispatch itself works — only coordinates mix. Dev repro:
   CA + Sable jars live in `run/mods`; physics assembler on a block,
   activate.
+
+- Create link receivers (1.10.2): Create's `addToNetwork` evaluation
+  pushes the current power into the new member ONLY if it's a
+  `LinkBehaviour` (bytecode-checked, 6.0.10 `updateNetworkOf` — the
+  general loop skips the actor), so `VirtualReceiver.readInitial()`
+  must follow every `addToNetwork` or a receiver joining a static
+  channel reads 0 until the next change (the "frozen placed gauge").
+  Also: a tablet ITEM in any inventory transmits its toggled-ON
+  signals from the player every tick — in creative, placing keeps the
+  item, and the phantom copy pins receivers at max (three
+  "bug" reports in one day were this; it's stacked-transmitter
+  behavior working as designed).
 
 ## Release process
 

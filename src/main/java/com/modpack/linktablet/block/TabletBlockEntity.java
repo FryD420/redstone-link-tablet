@@ -460,8 +460,11 @@ public class TabletBlockEntity extends BlockEntity {
                     power -> onGaugeReading(freq, power));
             Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(serverLevel, receiver);
             receivers.put(freq, receiver);
-            // addToNetwork re-evaluates the channel, so the initial
-            // value arrives through the change hook right away
+            // Create's add-time evaluation never reaches a non-
+            // LinkBehaviour member (1.10.2 fix) — read the channel once
+            // ourselves so a gauge placed on a static signal shows it
+            // immediately instead of freezing at 0 until the next change
+            receiver.readInitial();
             gaugeValues.put(freq, receiver.getReceivedStrength());
         }
     }

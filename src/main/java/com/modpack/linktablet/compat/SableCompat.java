@@ -72,6 +72,13 @@ public final class SableCompat {
             boolean ready = false;
             if (net.neoforged.fml.ModList.get().isLoaded("sable")) {
                 try {
+                    // findStatic/findVirtual with EXPLICIT MethodTypes, never
+                    // getMethod: reflection's method ENUMERATION resolves the
+                    // parameter types of every overload, and SubLevelContainer
+                    // has a client-only getContainer(ClientLevel) — on a
+                    // DEDICATED server that detonates NeoForge's dist cleaner
+                    // (repro'd 2026-08-03; 1.10.1 shipped broken there).
+                    // Exact-signature lookups load only what they're asked for.
                     MethodHandles.Lookup lookup = MethodHandles.publicLookup();
                     Class<?> container = Class.forName(
                             "dev.ryanhcode.sable.api.sublevel.SubLevelContainer");
@@ -81,20 +88,31 @@ public final class SableCompat {
                             "dev.ryanhcode.sable.sublevel.SubLevel");
                     Class<?> pose = Class.forName(
                             "dev.ryanhcode.sable.companion.math.Pose3dc");
-                    getContainer = lookup.unreflect(
-                            container.getMethod("getContainer", Level.class));
-                    inBounds = lookup.unreflect(
-                            container.getMethod("inBounds", BlockPos.class));
-                    getPlot = lookup.unreflect(
-                            container.getMethod("getPlot", ChunkPos.class));
-                    getSubLevel = lookup.unreflect(plot.getMethod("getSubLevel"));
-                    logicalPose = lookup.unreflect(subLevel.getMethod("logicalPose"));
-                    toLocalPoint = lookup.unreflect(
-                            pose.getMethod("transformPositionInverse", Vec3.class));
-                    toLocalDir = lookup.unreflect(
-                            pose.getMethod("transformNormalInverse", Vec3.class));
-                    toWorldPoint = lookup.unreflect(
-                            pose.getMethod("transformPosition", Vec3.class));
+                    Class<?> poseImpl = Class.forName(
+                            "dev.ryanhcode.sable.companion.math.Pose3d");
+                    getContainer = lookup.findStatic(container, "getContainer",
+                            java.lang.invoke.MethodType.methodType(container, Level.class));
+                    inBounds = lookup.findVirtual(container, "inBounds",
+                            java.lang.invoke.MethodType.methodType(boolean.class, BlockPos.class));
+                    getPlot = lookup.findVirtual(container, "getPlot",
+                            java.lang.invoke.MethodType.methodType(plot, ChunkPos.class));
+                    getSubLevel = lookup.findVirtual(plot, "getSubLevel",
+                            java.lang.invoke.MethodType.methodType(subLevel));
+                    // SubLevel declares logicalPose() twice (Pose3d + a Pose3dc
+                    // bridge) — exact lookups must name one; try the impl first
+                    try {
+                        logicalPose = lookup.findVirtual(subLevel, "logicalPose",
+                                java.lang.invoke.MethodType.methodType(poseImpl));
+                    } catch (NoSuchMethodException bridgeOnly) {
+                        logicalPose = lookup.findVirtual(subLevel, "logicalPose",
+                                java.lang.invoke.MethodType.methodType(pose));
+                    }
+                    toLocalPoint = lookup.findVirtual(pose, "transformPositionInverse",
+                            java.lang.invoke.MethodType.methodType(Vec3.class, Vec3.class));
+                    toLocalDir = lookup.findVirtual(pose, "transformNormalInverse",
+                            java.lang.invoke.MethodType.methodType(Vec3.class, Vec3.class));
+                    toWorldPoint = lookup.findVirtual(pose, "transformPosition",
+                            java.lang.invoke.MethodType.methodType(Vec3.class, Vec3.class));
                     ready = true;
                     LOG.info("Sable detected — sub-level coordinate compat active");
                 } catch (Throwable t) {

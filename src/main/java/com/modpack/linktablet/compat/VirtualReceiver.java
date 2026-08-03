@@ -58,6 +58,29 @@ public class VirtualReceiver implements IRedstoneLinkable {
         }
     }
 
+    /**
+     * One-shot read of the channel's CURRENT power, for right after
+     * {@code addToNetwork}: Create's add-time evaluation pushes into the
+     * new member only when it's a {@code LinkBehaviour} (bytecode-checked
+     * against Create 6.0.10's {@code updateNetworkOf} — the general loop
+     * skips the actor), so a virtual receiver joining a static channel
+     * would sit at 0 until the next transmitter change. Same rules as
+     * Create's scan (alive + range + max), delivered through the normal
+     * change hook so the sync path stays one road.
+     */
+    public void readInitial() {
+        int power = 0;
+        for (IRedstoneLinkable other
+                : Create.REDSTONE_LINK_NETWORK_HANDLER.getNetworkOf(level, this)) {
+            if (other != this && other.isAlive()
+                    && RedstoneLinkNetworkHandler.withinRange(this, other)) {
+                power = Math.max(power, other.getTransmittedStrength());
+                if (power >= 15) break;
+            }
+        }
+        setReceivedStrength(power);
+    }
+
     public void removeFromNetwork() {
         this.alive = false;
         Create.REDSTONE_LINK_NETWORK_HANDLER.removeFromNetwork(this.level, this);
