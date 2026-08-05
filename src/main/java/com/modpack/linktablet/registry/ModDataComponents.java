@@ -71,6 +71,14 @@ public class ModDataComponents {
                     .networkSynchronized(com.modpack.linktablet.frequency.Gauge.STREAM_CODEC.apply(ByteBufCodecs.list()))
                     .build());
 
+    /** Frequency Monitor probe channel (1.11.0); absent = none
+     * (never written empty — the theme idiom). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.modpack.linktablet.frequency.Frequency>> MONITOR_PROBE =
+            DATA_COMPONENTS.register("monitor_probe", () -> DataComponentType.<com.modpack.linktablet.frequency.Frequency>builder()
+                    .persistent(com.modpack.linktablet.frequency.Frequency.CODEC)
+                    .networkSynchronized(com.modpack.linktablet.frequency.Frequency.STREAM_CODEC)
+                    .build());
+
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCREEN_ROTATION =
             DATA_COMPONENTS.register("screen_rotation", () -> DataComponentType.<Integer>builder()

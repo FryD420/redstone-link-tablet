@@ -707,7 +707,28 @@ public class ModNetworking {
     }
 
     private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {
-        // stub — real handler lands with the scanner
+        Player player = context.player();
+        com.modpack.linktablet.frequency.Frequency probe = payload.probe();
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setMonitorProbe(probe);
+                }
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            if (probe.isEmpty()) {
+                stack.remove(ModDataComponents.MONITOR_PROBE.get());
+            } else {
+                stack.set(ModDataComponents.MONITOR_PROBE.get(), probe);
+            }
+        }
     }
 
     private static void handleMonitorSnapshot(MonitorSnapshotPayload payload, IPayloadContext context) {

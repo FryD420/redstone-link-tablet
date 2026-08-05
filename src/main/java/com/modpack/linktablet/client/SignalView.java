@@ -54,6 +54,12 @@ public sealed interface SignalView {
         return ClientGaugeReadings.strength(gauges.get(index).frequency());
     }
 
+    /** Frequency Monitor probe channel (1.11.0); absent data reads
+     * {@link com.modpack.linktablet.frequency.Frequency#EMPTY}. */
+    default com.modpack.linktablet.frequency.Frequency monitorProbe() {
+        return com.modpack.linktablet.frequency.Frequency.EMPTY;
+    }
+
     /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
     @org.jetbrains.annotations.Nullable
     default net.minecraft.network.chat.Component customName() {
@@ -111,6 +117,15 @@ public sealed interface SignalView {
             return mc.player.getItemInHand(hand)
                     .getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of());
         }
+
+        @Override
+        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return com.modpack.linktablet.frequency.Frequency.EMPTY;
+            return mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.MONITOR_PROBE.get(),
+                            com.modpack.linktablet.frequency.Frequency.EMPTY);
+        }
     }
 
     /**
@@ -150,6 +165,12 @@ public sealed interface SignalView {
         @Override
         public List<com.modpack.linktablet.frequency.Gauge> gauges() {
             return stack().getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of());
+        }
+
+        @Override
+        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
+            return stack().getOrDefault(ModDataComponents.MONITOR_PROBE.get(),
+                    com.modpack.linktablet.frequency.Frequency.EMPTY);
         }
 
         public ItemStack stack() {
@@ -213,6 +234,12 @@ public sealed interface SignalView {
         public int gaugeReading(int index) {
             TabletBlockEntity be = resolved();
             return be != null ? be.gaugeReading(index) : 0;
+        }
+
+        @Override
+        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getMonitorProbe() : com.modpack.linktablet.frequency.Frequency.EMPTY;
         }
 
         /** The BE that owns this position's data (controller when merged). */
