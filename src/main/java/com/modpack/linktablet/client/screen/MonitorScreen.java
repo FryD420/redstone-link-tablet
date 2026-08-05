@@ -53,6 +53,7 @@ public class MonitorScreen extends Screen {
     private double scroll = 0;
     private ItemStack probeStack1 = ItemStack.EMPTY;
     private ItemStack probeStack2 = ItemStack.EMPTY;
+    private boolean subscribed = false;
 
     public MonitorScreen(SignalView view) {
         super(Component.translatable("program.linktablet.monitor"));
@@ -69,12 +70,19 @@ public class MonitorScreen extends Screen {
         Frequency probe = view.monitorProbe();
         probeStack1 = probe.icon1();
         probeStack2 = probe.icon2();
-        ClientMonitorSnapshot.acquire(view.target());
+        // Vanilla Screen.resize() re-calls init() WITHOUT calling removed()
+        // first — guard so a window resize while open doesn't bump the
+        // consumer count with no matching release (orphaned subscription).
+        if (!subscribed) {
+            ClientMonitorSnapshot.acquire(view.target());
+            subscribed = true;
+        }
     }
 
     @Override
     public void removed() {
         ClientMonitorSnapshot.release();
+        subscribed = false;
         super.removed();
     }
 
