@@ -115,6 +115,7 @@ public class ClientHooks {
                 case CALCULATOR -> new com.modpack.linktablet.client.screen.CalculatorScreen(view);
                 case GAUGES -> new com.modpack.linktablet.client.screen.GaugesScreen(view);
                 case STORE -> new com.modpack.linktablet.client.screen.StoreScreen(view);
+                case MONITOR -> new com.modpack.linktablet.client.screen.MonitorScreen(view);
                 default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
             };
         }
