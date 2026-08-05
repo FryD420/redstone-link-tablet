@@ -739,6 +739,18 @@ public class TabletBlockEntity extends BlockEntity {
             refreshTransmitters();
             refreshReceivers();
             updateLit();
+            // Promoted (back) into a controller/standalone: the dormant
+            // screenProgram may already read MONITOR from before it was
+            // demoted — re-register the same way onLoad does, or a
+            // surface split leaves the face showing Monitor with a
+            // registry entry that was dropped on demotion and never
+            // recreated (setCurrentProgram only fires on an actual
+            // program change, which a role change isn't).
+            if (level instanceof ServerLevel
+                    && screenProgram == com.modpack.linktablet.Program.MONITOR
+                    && !isSurfacePart()) {
+                com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+            }
         }
     }
 
