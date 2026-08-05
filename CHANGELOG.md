@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- New app: **Frequency Monitor** — see who's actually transmitting or
+  listening on a Redstone Link channel. Every frequency your signals
+  and gauges use gets a live member list: Create link blocks, placed
+  tablets, and tablets sitting in a player's inventory (named by
+  owner, so a creative phantom copy shows up as "Tablet (PlayerName)"
+  right next to the real placed one — the exact confusion behind the
+  1.10.2 "gauge pinned at 15" reports). Each member shows strength,
+  a listening/transmitting badge, and in-range vs. out-of-range
+  against your tablet's position, plus a channel summary (transmitter
+  count + effective power). A probe row lets you inspect any other
+  channel by its two frequency items without your tablet transmitting
+  or listening on it. Distributed through the App Store, same as
+  Clock/Calculator/Gauges. Placed tablets get a compact one-line-per-
+  channel summary on the kiosk face (tap it to open the full screen),
+  and the overlay pin shows the same compact lines in the mini
+  window.
+- New payloads for the Monitor push the wire registrar **"18" →
+  "19" — a pairing break**: update client and server together.
+
 ## 1.10.2 — 2026-08-03
 
 - **Dedicated servers**: the Create: Aeronautics compat from 1.10.1

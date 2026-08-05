@@ -3,7 +3,72 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-03 — v1.10.2 tagged; upload 1.10.2 ONLY, skip 1.10.1)
+## Status (2026-08-05 — Frequency Monitor 1.11.0 IN CODE, registrar "19", release held)
+
+- **Frequency Monitor** (`Program.MONITOR`, id 26, key `"monitor"`) —
+  all 9 plan tasks done: Program + lang (T1); `MonitorChannels.
+  channelsOf` the one channel-derivation table, probe→signal
+  freqs→gauge freqs deduped by Create identity (T2); wire types
+  `MonitorSubscribePayload`/`SetProbePayload`/`MonitorSnapshotPayload`
+  + client `ClientMonitorSnapshot` store, 40-tick heartbeat, registrar
+  **"18"→"19" — PAIRING BREAK** (T3); `monitor_probe` component + BE
+  NBT, never written empty (T4); `compat/MonitorScanner` — 4-tick
+  polls of Create's `networksIn`, member classification (link block /
+  placed tablet / inventory tablet via `ownerName` on both handlers /
+  other), range via Create's `withinRange` on RAW positions with
+  DISPLAYED coords Sable-localized, 100-tick viewer expiry, 64-member
+  wire cap (T5); `MonitorScreen` — probe ghost slots, channel+member
+  rows, pin, resize-guarded subscription (T6); kiosk face —
+  `monitor_counts`/`monitor_power` update-tag sync, three-pass
+  `renderMonitorFace`, re-registers on surface-split promotion (T7);
+  `MonitorOverlayContent` compact rows (T8); this docs pass (T9).
+  **All 9 tasks are COMMITTED on `tablet-overlay`** (11 commits ahead
+  of `origin/tablet-overlay`, not pushed — see `git log`); the T9
+  docs commit (this CHANGELOG/NEXT_SESSION/CLAUDE.md update) lands
+  right after. `mod_version` stays `1.10.2` in `gradle.properties` —
+  **release is user-gated**, no bump yet, so the built jar is still
+  named `linktablet-1.10.2.jar` even though it carries 1.11.0-dev
+  code.
+- **Known limitations** (from task reviews, carried forward — not
+  bugs, just v1 scope):
+  (a) the client snapshot store is single-target: opening
+  `MonitorScreen` on tablet A while an overlay pin watches tablet B
+  rebinds the store to A (last-wins), so the overlay shows A's data
+  under B's title. Candidate future fix: visually flag a retargeted
+  overlay.
+  (b) the 64-member wire cap keeps the first-encountered members, not
+  the strongest, on a degenerate 65+-member channel.
+  (c) up to a 4-tick empty flash when a kiosk switches onto the
+  Monitor program (summary hasn't synced yet).
+  (d) the F2 visual pass on `renderMonitorFace` and the 8px overlay
+  icons has NOT been run in a client yet — first thing to check in
+  the in-world pass below.
+- **`./gradlew build` green** (T9 gate) — jar at
+  `build/libs/linktablet-1.10.2.jar`.
+- **Remaining before release**: the user's in-world test pass (matrix
+  below), then version bump + CHANGELOG date + tag/push, then the
+  user uploads to both platforms — see `CLAUDE.md`'s Release process.
+
+**Test matrix (dev pass)** — copied verbatim from
+`docs/superpowers/specs/2026-08-05-frequency-monitor-design.md`:
+
+- One channel with: a gauge, a real Create Redstone Link, and a
+  creative phantom tablet copy in the inventory → three member rows,
+  correctly classified; phantom row disappears when the item is
+  dropped.
+- Probe an unrelated channel the tablet doesn't use.
+- Range gating: walk a transmitter out of range → out-of-range badge,
+  effective power drops.
+- Dedicated server pass (`runServer`) — payloads + classification.
+- Kiosk face summary on flat, merged, and mounted tablets; face tap
+  opens the GUI; pre-1.11 world's kiosks unaffected.
+- Overlay pin shows live summaries; pin survives relog (`@monitor`
+  descriptor).
+- Old-world load: tablets without `monitor_probe` untouched;
+  1.10.x ↔ 1.11.0 client/server mismatch cleanly refuses (registrar
+  break, expected).
+
+## Previous status (2026-08-03 — v1.10.2 tagged; upload 1.10.2 ONLY, skip 1.10.1)
 
 - **v1.10.2 (same-day hotfix stack on 1.10.1)**: (a) 1.10.1's Sable
   shim NEVER BOUND on dedicated servers — `getMethod` enumeration hit

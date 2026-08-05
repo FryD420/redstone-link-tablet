@@ -247,6 +247,20 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   "bug" reports in one day were this; it's stacked-transmitter
   behavior working as designed).
 
+- Frequency Monitor (1.11.0): `MonitorChannels.channelsOf` is the ONE
+  channel table (probe, then signal freqs, then gauge freqs, deduped
+  by Create identity) — the server scanner (`compat/MonitorScanner`),
+  BE summaries, kiosk face renderer, and GUI all index against the
+  same derived list; index-mapped wire forms depend on that ordering,
+  never fork it. Range math runs on RAW positions (Create's own
+  `RedstoneLinkNetworkHandler.withinRange` — same Sable-transparent
+  rule as the 1.10.1/1.10.2 network math); only the DISPLAYED
+  distance/coords localize, through `SableCompat.localizeNear`.
+  Member `ownerName` classification (inventory-tablet attribution —
+  the phantom-copy diagnosis) lives on both `TabletTransmitterHandler`
+  and `TabletReceiverHandler`, not duplicated elsewhere. New payloads
+  bumped the registrar "18"→"19" — a pairing break.
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in
