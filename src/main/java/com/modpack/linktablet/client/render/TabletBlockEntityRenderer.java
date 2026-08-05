@@ -121,6 +121,12 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                         be.getGauges(), gaugeReadings(be),
                         be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
                         packedLight, surfaceW, surfaceH, caseTint);
+                case MONITOR -> TabletScreenRenderer.renderMonitorFace(poseStack, buffers,
+                        com.modpack.linktablet.frequency.MonitorChannels.channelsOf(
+                                be.getSignals(), be.getGauges(), be.getMonitorProbe()),
+                        be.monitorCounts(), be.monitorPower(),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
                 // Launcher faces honor list mode too (test pass 2) — plain
                 // rows, since roster rows are doors, not toggles
                 case LAUNCHER, SIGNALS -> TabletScreenRenderer.render(poseStack, buffers, signals,

@@ -106,6 +106,18 @@ public class TabletBlockEntity extends BlockEntity {
      * when unset. */
     private Frequency monitorProbe = Frequency.EMPTY;
 
+    /**
+     * Frequency Monitor summary (1.11.0, block half): index-aligned with
+     * {@code MonitorChannels.channelsOf(signals, gauges, monitorProbe)},
+     * written by {@link com.modpack.linktablet.compat.MonitorScanner}'s
+     * level-tick scan. Transient like {@link #gaugeValues}/{@link
+     * #heldPips}: synced via the update tag only, never written to disk —
+     * a fresh load re-registers (if still on Monitor) and the next scan
+     * refills it.
+     */
+    private int[] monitorCounts = new int[0];
+    private int[] monitorPower = new int[0];
+
     /** Server-side receivers keyed by listened frequency (1.10.0). */
     private final Map<Frequency, com.modpack.linktablet.compat.VirtualReceiver> receivers = new HashMap<>();
 
@@ -196,10 +208,20 @@ public class TabletBlockEntity extends BlockEntity {
      * use-packet), so routing always derives from agreed state. */
     public void setCurrentProgram(com.modpack.linktablet.api.TabletProgram program) {
         if (screenProgram == program) return;
+        boolean wasMonitor = screenProgram == com.modpack.linktablet.Program.MONITOR;
         screenProgram = program;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+        // Frequency Monitor block registry (1.11.0): only a controller's
+        // program change ever needs to register — a part's screenProgram
+        // is dormant (the field exists on every BE, but only the
+        // controller's copy is ever shown/synced).
+        if (program == com.modpack.linktablet.Program.MONITOR) {
+            if (!isSurfacePart()) com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+        } else if (wasMonitor) {
+            com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         }
     }
 
@@ -504,6 +526,32 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    /** Counts, index-aligned with {@code MonitorChannels.channelsOf}:
+     * members transmitting (strength &gt; 0) and in range. */
+    public int[] monitorCounts() {
+        return monitorCounts;
+    }
+
+    /** Effective power per channel — the max strength among the members
+     * {@link #monitorCounts()} counted. */
+    public int[] monitorPower() {
+        return monitorPower;
+    }
+
+    /** Change hook from {@code MonitorScanner}'s block scan: store + sync
+     * (the {@code onGaugeReading} shape) — no disk write, the summary is
+     * transient and re-derives from the next scan after any load. */
+    public void setMonitorSummary(int[] counts, int[] power) {
+        if (java.util.Arrays.equals(monitorCounts, counts) && java.util.Arrays.equals(monitorPower, power)) {
+            return;
+        }
+        this.monitorCounts = counts;
+        this.monitorPower = power;
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** Copies signals, case color, screen layout, theme, and rotation from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
@@ -683,6 +731,10 @@ public class TabletBlockEntity extends BlockEntity {
         if (isSurfacePart()) {
             clearTransmitters();
             clearReceivers();
+            // Demoted into a part: screenProgram goes dormant even if it
+            // still reads MONITOR, so the block registry must drop it —
+            // the (new) controller registers itself independently.
+            com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         } else {
             refreshTransmitters();
             refreshReceivers();
@@ -786,6 +838,13 @@ public class TabletBlockEntity extends BlockEntity {
         // Follow mode (1.10.0): the powered flag is transient — re-read
         // the neighborhood on load (neighborChanged keeps it live after)
         this.followPowered = serverLevel.hasNeighborSignal(worldPosition);
+        // Frequency Monitor block registry (1.11.0): a controller loading
+        // back in already showing Monitor re-registers — setCurrentProgram
+        // only fires on an actual change, so a chunk reload needs its own
+        // hook (registerBlock no-ops harmlessly if already present).
+        if (screenProgram == com.modpack.linktablet.Program.MONITOR && !isSurfacePart()) {
+            com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+        }
         boolean stale =
                 (isSurfacePart()
                         && serverLevel.isLoaded(getControllerPos())
@@ -819,6 +878,7 @@ public class TabletBlockEntity extends BlockEntity {
     public void setRemoved() {
         clearTransmitters();
         clearReceivers();
+        com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         super.setRemoved();
     }
 
@@ -954,6 +1014,10 @@ public class TabletBlockEntity extends BlockEntity {
         for (int i = 0; i < readings.length && i < gauges.size(); i++) {
             gaugeValues.put(gauges.get(i).frequency(), readings[i]);
         }
+        // Monitor summary (1.11.0): sync tags only, like gauge_readings —
+        // an absent tag (disk load) naturally clears to empty arrays.
+        this.monitorCounts = tag.getIntArray("monitor_counts");
+        this.monitorPower = tag.getIntArray("monitor_power");
     }
 
     @Override
@@ -968,6 +1032,10 @@ public class TabletBlockEntity extends BlockEntity {
                 readings[i] = gaugeReading(i);
             }
             tag.putIntArray("gauge_readings", readings);
+        }
+        if (monitorCounts.length > 0) {
+            tag.putIntArray("monitor_counts", monitorCounts);
+            tag.putIntArray("monitor_power", monitorPower);
         }
         return tag;
     }

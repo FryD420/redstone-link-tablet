@@ -27,17 +27,22 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,7 +95,91 @@ public final class MonitorScanner {
     private static final Map<UUID, List<MonitorChannel>> LAST_SENT = new HashMap<>();
     private static final Map<UUID, Long> LAST_SYNC = new HashMap<>();
 
+    /** How often registered kiosk faces re-scan their channels (block half). */
+    private static final long BLOCK_SCAN_TICKS = 4;
+
+    /**
+     * Placed tablets currently showing the Monitor program (block half,
+     * 1.11.0) — identity set so a BE overriding equals/hashCode down the
+     * line can never dedupe two distinct blocks into one summary.
+     * Registered by {@link TabletBlockEntity#setCurrentProgram} and
+     * {@code onLoad}, unregistered on program change away, removal, or
+     * surface-part demotion — see the class it lives in for the exact
+     * hooks. {@link #onLevelTick} also self-heals: any entry that's gone
+     * {@code isRemoved()} or whose chunk unloaded gets swept before its
+     * channels are scanned, so the static set can't leak across world
+     * reloads (onLoad re-registers once the chunk comes back).
+     */
+    private static final Set<TabletBlockEntity> BLOCKS =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+
     private MonitorScanner() {
+    }
+
+    // ------------------------------------------------------------------
+    // Block registry (kiosk faces) — the 1.11.0 companion to the viewer
+    // half above: no subscription, no expiry, just "is this BE currently
+    // showing Monitor" tracked by the BE itself.
+    // ------------------------------------------------------------------
+
+    public static void registerBlock(TabletBlockEntity be) {
+        // setCurrentProgram/onLoad fire on BOTH logical sides — only the
+        // server BE instance ever gets scanned (onLevelTick filters to
+        // ServerLevel), so admitting a client BE here would just leak: it
+        // never matches a server level's tick pass, and a loaded client
+        // chunk never trips the stale-sweep's isLoaded() check either.
+        if (!(be.getLevel() instanceof ServerLevel)) return;
+        BLOCKS.add(be);
+    }
+
+    public static void unregisterBlock(TabletBlockEntity be) {
+        BLOCKS.remove(be);
+    }
+
+    @SubscribeEvent
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (level.getGameTime() % BLOCK_SCAN_TICKS != 0) return;
+
+        Iterator<TabletBlockEntity> it = BLOCKS.iterator();
+        while (it.hasNext()) {
+            TabletBlockEntity be = it.next();
+            Level beLevel = be.getLevel();
+            // Stale sweep runs on every level's own tick pass: a block
+            // broken (isRemoved), or its chunk no longer loaded (chunk
+            // unload never calls setRemoved) — onLoad re-registers if it
+            // comes back showing Monitor, so evicting here is safe.
+            if (be.isRemoved() || beLevel == null || !beLevel.isLoaded(be.getBlockPos())) {
+                it.remove();
+                continue;
+            }
+            if (beLevel != level) continue; // scanned on ITS OWN level's tick
+            scanBlock(level, be);
+        }
+    }
+
+    /** One registered controller's channels, reduced to counts + power,
+     * pushed to the BE only when changed (the {@code onGaugeReading} shape). */
+    private static void scanBlock(ServerLevel level, TabletBlockEntity be) {
+        List<Frequency> channels =
+                MonitorChannels.channelsOf(be.getSignals(), be.getGauges(), be.getMonitorProbe());
+        int n = channels.size();
+        int[] counts = new int[n];
+        int[] power = new int[n];
+        BlockPos anchor = be.getBlockPos();
+        for (int i = 0; i < n; i++) {
+            int count = 0;
+            int maxPower = 0;
+            for (MonitorMember member : scanChannel(level, channels.get(i), anchor)) {
+                if (member.strength() > 0 && member.inRange()) {
+                    count++;
+                    maxPower = Math.max(maxPower, member.strength());
+                }
+            }
+            counts[i] = count;
+            power[i] = maxPower;
+        }
+        be.setMonitorSummary(counts, power);
     }
 
     // ------------------------------------------------------------------
@@ -256,7 +345,7 @@ public final class MonitorScanner {
         return BlockPos.containing(local);
     }
 
-    private static List<MonitorMember> scanChannel(ServerLevel level, Frequency channel, BlockPos anchor) {
+    static List<MonitorMember> scanChannel(ServerLevel level, Frequency channel, BlockPos anchor) {
         Couple<RedstoneLinkNetworkHandler.Frequency> key = Couple.create(
                 RedstoneLinkNetworkHandler.Frequency.of(channel.stack1()),
                 RedstoneLinkNetworkHandler.Frequency.of(channel.stack2()));

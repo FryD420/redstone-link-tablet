@@ -747,6 +747,116 @@ public final class TabletScreenRenderer {
     }
 
     /**
+     * Kiosk Frequency Monitor face (1.11.0): one summary row per channel
+     * — both frequency item icons, a count "chip" (members transmitting
+     * and in range), and a power bar (the max strength among them) —
+     * the world-face digest of {@code MonitorScreen}'s channel header,
+     * without the member breakdown (a glance, not the full monitor).
+     * Counts/power arrive pre-reduced from the BE's synced summary
+     * ({@code MonitorScanner}'s block half scans the network on a
+     * server tick, never here); this face just draws what it's given.
+     * List-mode row rhythm, rows capped to what the glass fits — no
+     * scrolling on a placed face. Strict pass order: row/chip/bar quads,
+     * then both frequency icons, then the count and power numerals.
+     */
+    public static void renderMonitorFace(PoseStack poseStack, MultiBufferSource buffers,
+                                         List<com.modpack.linktablet.frequency.Frequency> channels,
+                                         int[] counts, int[] power, int rot, ScreenTheme theme,
+                                         boolean backlit, int packedLight, int surfaceW,
+                                         int surfaceH, int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        int total = Math.min(channels.size(), Math.min(counts.length, power.length));
+        int count = TabletScreenMath.visibleSignals(total, true, surfaceW, surfaceH);
+        if (count == 0) {
+            poseStack.popPose();
+            return;
+        }
+        VertexConsumer vc = base.vc();
+        PoseStack.Pose pose = base.pose();
+        int bgLight = base.bgLight();
+        float rowH = tileSize(base.glassH(), TabletScreenMath.LIST_ROWS * surfaceH);
+        float u0Row = TabletScreenMath.GLASS_U0 + SPACE;
+        float u1Row = base.u1() - SPACE;
+        // Two icons share the row's icon zone, so each gets half the
+        // single-icon list row's budget (Math.min, no forced floor —
+        // dense merged rows can shrink below the grid's ICON_MIN).
+        float iconSize = Math.min(LIST_ICON, rowH * 0.5f);
+        float barW = Mth.clamp((u1Row - u0Row) * 0.28f, 1.5f, 4f);
+        float chipInsetPx = rowH / 6f;
+        float chipSize = rowH - 2f * chipInsetPx;
+        Font font = Minecraft.getInstance().font;
+
+        // Pass 1 (quads): row plaque, count chip, power bar per channel
+        for (int i = 0; i < count; i++) {
+            float v0 = listV0(i, rowH);
+            float v1 = v0 + rowH;
+            boolean active = counts[i] > 0;
+            int lineLight = active ? LightTexture.FULL_BRIGHT : packedLight;
+
+            fillRect(pose, vc, u0Row, v0, u1Row, v1, LAYER, theme.screenTrack, packedLight);
+            raisedBevel(pose, vc, u0Row, v0, u1Row, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
+
+            float chipU0 = u1Row - SPACE - chipSize;
+            fillRect(pose, vc, chipU0, v0 + chipInsetPx, chipU0 + chipSize, v1 - chipInsetPx,
+                    LAYER * 2, active ? theme.accentDim : theme.switchOff, lineLight);
+
+            float barU1 = chipU0 - SPACE * 2f;
+            float barU0 = barU1 - barW;
+            float barV0 = v0 + (rowH - rowH * 0.3f) / 2f;
+            float barV1 = barV0 + rowH * 0.3f;
+            fillRect(pose, vc, barU0, barV0, barU1, barV1, LAYER * 2, theme.switchOff, packedLight);
+            if (power[i] > 0) {
+                float frac = Mth.clamp(power[i] / (float) com.modpack.linktablet.frequency.Gauge.MAX_VALUE, 0f, 1f);
+                fillRect(pose, vc, barU0, barV0, barU0 + (barU1 - barU0) * frac, barV1,
+                        LAYER * 2.5f, theme.accentDim, LightTexture.FULL_BRIGHT);
+            }
+            insetGroove(pose, vc, barU0, barV0, barU1, barV1, LAYER * 2.75f, theme.switchOff, packedLight);
+        }
+
+        // Pass 2 (items): both frequency icons, left of the row
+        for (int i = 0; i < count; i++) {
+            com.modpack.linktablet.frequency.Frequency freq = channels.get(i);
+            float v0 = listV0(i, rowH);
+            float cv = v0 + rowH / 2f;
+            boolean active = counts[i] > 0;
+            int light = active ? LightTexture.FULL_BRIGHT : packedLight;
+            float cu1 = u0Row + SPACE + iconSize / 2f;
+            float cu2 = cu1 + iconSize + 0.2f;
+            renderIcon(poseStack, buffers, freq.icon1(), cu1, cv, iconSize, light);
+            renderIcon(poseStack, buffers, freq.icon2(), cu2, cv, iconSize, light);
+        }
+
+        // Pass 3 (text): count numeral over its chip, power numeral by its bar
+        for (int i = 0; i < count; i++) {
+            float v0 = listV0(i, rowH);
+            boolean active = counts[i] > 0;
+            float chipU0 = u1Row - SPACE - chipSize;
+            String countText = String.valueOf(counts[i]);
+            float numH = Mth.clamp(chipSize * 0.55f, 0.7f, 1.6f);
+            float countW = font.width(countText) * numH / FONT_LINE;
+            drawLabel(poseStack, buffers, font, countText,
+                    chipU0 + (chipSize - countW) / 2f, v0 + (rowH - numH) / 2f,
+                    numH / 16f / FONT_LINE, false, false,
+                    active ? 0xFFFFFFFF : theme.textMuted, bgLight);
+
+            float barU1 = chipU0 - SPACE * 2f;
+            float barU0 = barU1 - barW;
+            // Left of the bar, vertically centered — the row is one line
+            // tall, so stacking the numeral above/below the bar (the
+            // GUI's two-line layout) would either crowd the row top or
+            // spill past its bottom.
+            String powerText = String.valueOf(power[i]);
+            float powH = Mth.clamp(rowH * 0.5f, 0.7f, 1.4f);
+            float powW = font.width(powerText) * powH / FONT_LINE;
+            drawLabel(poseStack, buffers, font, powerText, barU0 - 0.3f - powW,
+                    v0 + (rowH - powH) / 2f, powH / 16f / FONT_LINE, false, false,
+                    power[i] > 0 ? theme.textPrimary : theme.textMuted, bgLight);
+        }
+        poseStack.popPose();
+    }
+
+    /**
      * Kiosk clock face (1.10.0 OS suite): the shared screen base plus a
      * big digital wall clock — local time with a blinking colon, the
      * date beneath. Content is TEXT ONLY, so the strict pass order holds
