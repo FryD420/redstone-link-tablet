@@ -87,6 +87,7 @@ public class MiniTabletWindow implements FloatingWindow {
                 case CLOCK -> new ClockOverlayContent();
                 case CALCULATOR -> new CalculatorOverlayContent();
                 case GAUGES -> new GaugesOverlayContent(this::view);
+                case MONITOR -> new MonitorOverlayContent(this::view);
                 default -> new SignalsOverlayContent(this::view);
             };
         }

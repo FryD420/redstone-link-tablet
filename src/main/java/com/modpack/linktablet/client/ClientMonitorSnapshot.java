@@ -38,6 +38,14 @@ public final class ClientMonitorSnapshot {
         return channels;
     }
 
+    /** Whether a target is currently bound — false right after a relog
+     * (or before the first {@link #acquire}) zeroes it out. Lets a
+     * long-lived consumer (the overlay pin) tell "still subscribed"
+     * from "store was wiped out from under me, re-acquire". */
+    public static boolean hasTarget() {
+        return target != null;
+    }
+
     /** Register a consumer watching {@code newTarget}; retargeting
      * (a second consumer on a different tablet) rebinds everyone —
      * last opener wins, matching overlay right-click behavior. */
