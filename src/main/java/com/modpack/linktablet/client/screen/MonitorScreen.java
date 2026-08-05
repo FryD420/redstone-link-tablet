@@ -81,8 +81,13 @@ public class MonitorScreen extends Screen {
 
     @Override
     public void removed() {
-        ClientMonitorSnapshot.release();
-        subscribed = false;
+        // Guard against any future double-removed path bumping the shared
+        // consumer count's release below zero — release only matches an
+        // actual acquire.
+        if (subscribed) {
+            ClientMonitorSnapshot.release();
+            subscribed = false;
+        }
         super.removed();
     }
 

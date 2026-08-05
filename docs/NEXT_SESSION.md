@@ -35,7 +35,9 @@ at the repo root (auto-loaded every Claude session).
   `MonitorScreen` on tablet A while an overlay pin watches tablet B
   rebinds the store to A (last-wins), so the overlay shows A's data
   under B's title. Candidate future fix: visually flag a retargeted
-  overlay.
+  overlay. Reviewer's cheaper alternative: the overlay could render
+  skeleton rows whenever the snapshot store's bound target differs
+  from its own view target ("no live data" instead of "wrong data").
   (b) the 64-member wire cap keeps the first-encountered members, not
   the strongest, on a degenerate 65+-member channel.
   (c) up to a 4-tick empty flash when a kiosk switches onto the
@@ -43,6 +45,11 @@ at the repo root (auto-loaded every Claude session).
   (d) the F2 visual pass on `renderMonitorFace` and the 8px overlay
   icons has NOT been run in a client yet — first thing to check in
   the in-world pass below.
+  (e) tablets using more than 64 distinct frequencies (9+ signals × 8
+  freqs; merged surfaces raise the signal cap) hit the same wire cap
+  on the CHANNEL list itself — the snapshot truncates to the first 64
+  channels (prefix of `MonitorChannels.channelsOf`'s order), not the
+  channels currently most active.
 - **`./gradlew build` green** (T9 gate) — jar at
   `build/libs/linktablet-1.10.2.jar`.
 - **Remaining before release**: the user's in-world test pass (matrix
@@ -67,6 +74,19 @@ at the repo root (auto-loaded every Claude session).
 - Old-world load: tablets without `monitor_probe` untouched;
   1.10.x ↔ 1.11.0 client/server mismatch cleanly refuses (registrar
   break, expected).
+- Channel-count stress: 9+ signals × 8 distinct freqs (>64 channels)
+  — Monitor opens, first 64 shown, nobody kicked.
+- Probe edit while a kiosk face shows Monitor (≤4-tick row shift
+  settles).
+- Two players monitoring the same channel simultaneously (independent
+  snapshots/anchors).
+- Window resize with MonitorScreen open (subscription guard repro).
+- Sable: Monitor opened on a vehicle-mounted tablet — check the
+  displayed member coords read sensibly; decide if follow-up needed.
+- Surface merge→split while showing Monitor (face summary resumes on
+  the promoted controller).
+- Overlay pinned on tablet B, open+close MonitorScreen on tablet A
+  (documented limitation repro; B's heartbeat survives A closing).
 
 ## Previous status (2026-08-03 — v1.10.2 tagged; upload 1.10.2 ONLY, skip 1.10.1)
 

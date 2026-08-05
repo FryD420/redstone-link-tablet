@@ -283,6 +283,11 @@ public final class MonitorScanner {
         BlockPos anchor = viewer.target().pos().orElse(player.blockPosition());
         List<MonitorChannel> snapshot = new ArrayList<>();
         for (Frequency channel : channels) {
+            // MonitorSnapshotPayload's codec caps the channel list at 64
+            // (ByteBufCodecs.writeCount throws EncoderException past it) —
+            // truncate here rather than let encode disconnect the viewer.
+            // Truncation keeps prefix alignment with channelsOf's order.
+            if (snapshot.size() >= WIRE_CAP) break;
             snapshot.add(new MonitorChannel(channel, scanChannel(level, channel, anchor)));
         }
         if (snapshot.equals(LAST_SENT.get(uuid))) return;
