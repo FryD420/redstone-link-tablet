@@ -543,6 +543,93 @@ public class ModNetworking {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Frequency Monitor (1.11.0): read-only snapshots of Create's link
+    // network. Members are classified SERVER-side; labels travel as
+    // Components so block names localize on the client.
+    // ------------------------------------------------------------------
+    public static final byte MEMBER_LINK_BLOCK = 0;
+    public static final byte MEMBER_PLACED_TABLET = 1;
+    public static final byte MEMBER_PLAYER_TABLET = 2;
+    public static final byte MEMBER_OTHER = 3;
+
+    public record MonitorMember(byte type, Component label, BlockPos pos, int strength,
+                                boolean listening, boolean inRange) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorMember> STREAM_CODEC =
+                StreamCodec.of((buf, m) -> {
+                    buf.writeByte(m.type());
+                    net.minecraft.network.chat.ComponentSerialization.TRUSTED_STREAM_CODEC
+                            .encode(buf, m.label());
+                    BlockPos.STREAM_CODEC.encode(buf, m.pos());
+                    buf.writeVarInt(m.strength());
+                    buf.writeBoolean(m.listening());
+                    buf.writeBoolean(m.inRange());
+                }, buf -> new MonitorMember(
+                        buf.readByte(),
+                        net.minecraft.network.chat.ComponentSerialization.TRUSTED_STREAM_CODEC
+                                .decode(buf),
+                        BlockPos.STREAM_CODEC.decode(buf),
+                        buf.readVarInt(),
+                        buf.readBoolean(),
+                        buf.readBoolean()));
+    }
+
+    public record MonitorChannel(com.modpack.linktablet.frequency.Frequency frequency,
+                                 List<MonitorMember> members) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorChannel> STREAM_CODEC =
+                StreamCodec.composite(
+                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC,
+                        MonitorChannel::frequency,
+                        MonitorMember.STREAM_CODEC.apply(ByteBufCodecs.list(64)),
+                        MonitorChannel::members,
+                        MonitorChannel::new);
+    }
+
+    public record MonitorSubscribePayload(SignalTarget target, boolean active)
+            implements CustomPacketPayload {
+        public static final Type<MonitorSubscribePayload> TYPE = new Type<>(id("monitor_subscribe"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorSubscribePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, MonitorSubscribePayload::target,
+                        ByteBufCodecs.BOOL, MonitorSubscribePayload::active,
+                        MonitorSubscribePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record SetProbePayload(SignalTarget target,
+                                  com.modpack.linktablet.frequency.Frequency probe)
+            implements CustomPacketPayload {
+        public static final Type<SetProbePayload> TYPE = new Type<>(id("set_probe"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetProbePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetProbePayload::target,
+                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC,
+                        SetProbePayload::probe,
+                        SetProbePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record MonitorSnapshotPayload(List<MonitorChannel> channels)
+            implements CustomPacketPayload {
+        public static final Type<MonitorSnapshotPayload> TYPE = new Type<>(id("monitor_snapshot"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorSnapshotPayload> STREAM_CODEC =
+                MonitorChannel.STREAM_CODEC.apply(ByteBufCodecs.list(64))
+                        .map(MonitorSnapshotPayload::new, MonitorSnapshotPayload::channels);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void handleSetProgram(SetProgramPayload payload, IPayloadContext context) {
         Player player = context.player();
         if (payload.target().pos().isEmpty()) return;
@@ -591,7 +678,9 @@ public class ModNetworking {
         // (still inside the 1.10.0 pairing break).
         // "18": 1.10.0 signal links — Signal grew linkId + links on the
         // wire (still inside the 1.10.0 pairing break).
-        PayloadRegistrar registrar = event.registrar("18");
+        // "19": 1.11.0 Frequency Monitor — MonitorSubscribePayload,
+        // SetProbePayload, MonitorSnapshotPayload (second playToClient).
+        PayloadRegistrar registrar = event.registrar("19");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -609,6 +698,20 @@ public class ModNetworking {
         registrar.playToServer(RemoveGaugePayload.TYPE, RemoveGaugePayload.STREAM_CODEC, ModNetworking::handleRemoveGauge);
         registrar.playToClient(GaugeReadingsPayload.TYPE, GaugeReadingsPayload.STREAM_CODEC, ModNetworking::handleGaugeReadings);
         registrar.playToServer(SetProgramPayload.TYPE, SetProgramPayload.STREAM_CODEC, ModNetworking::handleSetProgram);
+        registrar.playToServer(MonitorSubscribePayload.TYPE, MonitorSubscribePayload.STREAM_CODEC,
+                com.modpack.linktablet.compat.MonitorScanner::handleSubscribe);
+        registrar.playToServer(SetProbePayload.TYPE, SetProbePayload.STREAM_CODEC,
+                ModNetworking::handleSetProbe);
+        registrar.playToClient(MonitorSnapshotPayload.TYPE, MonitorSnapshotPayload.STREAM_CODEC,
+                ModNetworking::handleMonitorSnapshot);
+    }
+
+    private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {
+        // stub — real handler lands with the scanner
+    }
+
+    private static void handleMonitorSnapshot(MonitorSnapshotPayload payload, IPayloadContext context) {
+        com.modpack.linktablet.client.ClientMonitorSnapshot.accept(payload.channels());
     }
 
     private static void handleUpsertGauge(UpsertGaugePayload payload, IPayloadContext context) {
