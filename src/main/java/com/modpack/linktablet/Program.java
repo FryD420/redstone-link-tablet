@@ -58,7 +58,10 @@ public enum Program implements com.modpack.linktablet.api.TabletProgram {
     G2048(22, "2048", 0xFFFED83D, "minecraft:gold_block", true),
     CRATES(23, "crates", 0xFF835432, "minecraft:barrel", true),
     LIFE(24, "life", 0xFF5E7C16, "minecraft:moss_block", true),
-    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting", true);
+    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting", true),
+    /** Frequency Monitor (1.11.0): read-only view of Create's link
+     * network — who transmits on each channel the tablet uses. */
+    MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass");
 
     private final byte id;
     private final String key;
