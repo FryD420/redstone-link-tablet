@@ -272,6 +272,20 @@ public class TabletTransmitterHandler {
         }
     }
 
+    /** Player owning this network member, or null — the Frequency
+     * Monitor's classification hook (1.11.0). */
+    @Nullable
+    public static String ownerName(com.simibubi.create.content.redstone.link.IRedstoneLinkable member,
+                                   net.minecraft.server.MinecraftServer server) {
+        for (Map.Entry<UUID, Map<Frequency, VirtualTransmitter>> entry : ACTIVE.entrySet()) {
+            if (entry.getValue().containsValue(member)) {
+                var player = server.getPlayerList().getPlayer(entry.getKey());
+                return player != null ? player.getGameProfile().getName() : null;
+            }
+        }
+        return null;
+    }
+
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         Map<HoldKey, Hold> holds = HELD.remove(event.getEntity().getUUID());

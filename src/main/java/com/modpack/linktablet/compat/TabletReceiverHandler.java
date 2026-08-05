@@ -15,6 +15,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,6 +127,20 @@ public class TabletReceiverHandler {
         PacketDistributor.sendToPlayer(player, new ModNetworking.GaugeReadingsPayload(readings));
         LAST_SENT.put(player.getUUID(), snapshot);
         LAST_SYNC.put(player.getUUID(), now);
+    }
+
+    /** Player owning this network member, or null — the Frequency
+     * Monitor's classification hook (1.11.0). */
+    @Nullable
+    public static String ownerName(com.simibubi.create.content.redstone.link.IRedstoneLinkable member,
+                                   net.minecraft.server.MinecraftServer server) {
+        for (Map.Entry<UUID, Map<Frequency, VirtualReceiver>> entry : ACTIVE.entrySet()) {
+            if (entry.getValue().containsValue(member)) {
+                var player = server.getPlayerList().getPlayer(entry.getKey());
+                return player != null ? player.getGameProfile().getName() : null;
+            }
+        }
+        return null;
     }
 
     @SubscribeEvent
