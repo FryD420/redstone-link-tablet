@@ -11,15 +11,22 @@
   1.10.2 "gauge pinned at 15" reports). Each member shows strength,
   a listening/transmitting badge, and in-range vs. out-of-range
   against your tablet's position, plus a channel summary (transmitter
-  count + effective power). A probe row lets you inspect any other
-  channel by its two frequency items without your tablet transmitting
-  or listening on it. Distributed through the App Store, same as
-  Clock/Calculator/Gauges. Placed tablets get a compact one-line-per-
-  channel summary on the kiosk face (tap it to open the full screen),
-  and the overlay pin shows the same compact lines in the mini
-  window.
+  count + effective power). Probes let you watch up to 8 extra
+  channels your tablet doesn't use: stage two frequency items, hit +,
+  and the channel joins the list (remove it from its row) — the same
+  add-flow as the signal editor. Distributed through the App Store,
+  same as Clock/Calculator/Gauges. Placed tablets get a compact
+  one-line-per-channel summary on the kiosk face (tap it to open the
+  full screen), and the overlay pin shows the same compact lines in
+  the mini window.
+- **JEI/EMI drag everywhere**: the ghost-drag that the signal editor
+  has had since 1.7.0 now also covers the gauge editor's frequency
+  slots and the Monitor's probe slots — drag an item straight from
+  the JEI/EMI panel onto any of them.
+- **App Store search** — a search box above the shelf filters the
+  catalog by name, description, or key.
 - New payloads for the Monitor push the wire registrar **"18" →
-  "19" — a pairing break**: update client and server together.
+  "20" — a pairing break**: update client and server together.
 
 ## 1.10.2 — 2026-08-03
 

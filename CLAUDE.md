@@ -248,18 +248,25 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   behavior working as designed).
 
 - Frequency Monitor (1.11.0): `MonitorChannels.channelsOf` is the ONE
-  channel table (probe, then signal freqs, then gauge freqs, deduped
-  by Create identity) — the server scanner (`compat/MonitorScanner`),
-  BE summaries, kiosk face renderer, and GUI all index against the
-  same derived list; index-mapped wire forms depend on that ordering,
-  never fork it. Range math runs on RAW positions (Create's own
+  channel table (probes in stored order, then signal freqs, then
+  gauge freqs, deduped by Create identity) — the server scanner
+  (`compat/MonitorScanner`), BE summaries, kiosk face renderer, and
+  GUI all index against the same derived list; index-mapped wire
+  forms depend on that ordering, never fork it. Probes are a LIST
+  (cap `MonitorChannels.MAX_PROBES` 8, `SetProbePayload` replaces the
+  whole list; the single-Frequency dev format decodes as a one-entry
+  list). Range math runs on RAW positions (Create's own
   `RedstoneLinkNetworkHandler.withinRange` — same Sable-transparent
   rule as the 1.10.1/1.10.2 network math); only the DISPLAYED
   distance/coords localize, through `SableCompat.localizeNear`.
   Member `ownerName` classification (inventory-tablet attribution —
   the phantom-copy diagnosis) lives on both `TabletTransmitterHandler`
   and `TabletReceiverHandler`, not duplicated elsewhere. New payloads
-  bumped the registrar "18"→"19" — a pairing break.
+  bumped the registrar "18"→"20" — a pairing break. JEI/EMI ghost
+  drag covers signal editor + gauge editor + Monitor probe slots via
+  public `*SlotArea`/`stage*` accessors (zero-area rect = closed
+  modal, the handlers skip it) — new item-slot surfaces should join
+  that pattern.
 
 ## Release process
 

@@ -3,7 +3,35 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-05 — Frequency Monitor 1.11.0 IN CODE, registrar "19", release held)
+## Status (2026-08-08 — 1.11.0 + first-test feedback round IN CODE, registrar "20", release held)
+
+- **Feedback round 1 (2026-08-08, from the user's first dev-client
+  session — 47 min, log clean)**: three user-requested changes, all
+  IN CODE + committed, build green, **awaiting the redone test
+  session**:
+  (a) **multi-probe** (user decision via AskUserQuestion: list of up
+  to 8, not single) — `monitor_probe` is now `List<Frequency>`
+  (component + BE NBT `monitor_probe` kept; the brief single-format
+  dev NBT decodes as a one-entry list), `SetProbePayload` carries the
+  whole list (registrar **"19"→"20"**, still inside the 1.11.0
+  pairing break), and `MonitorScreen` adopted the signal editor's
+  stage-then-Add picker flow (two staged slots + procedural "+" chip,
+  probe rows carry a remove cross; staged slots no longer auto-send).
+  (b) **JEI/EMI ghost drag everywhere applicable** — gauge editor
+  modal slots + Monitor probe staging slots joined the signal editor
+  as drop targets (`GaugesScreen.frequencySlotArea/stageFrequencyItem`,
+  `MonitorScreen.probeSlotArea/stageProbeItem`; zero-area rect =
+  closed modal). New item-slot surfaces should join this pattern.
+  (c) **App Store search** — ChromeEditBox row under the header
+  filters by name/description/key; panel height stays full-catalog
+  so it doesn't jump while typing; inventory key guarded while the
+  box is focused (the nameBox rule).
+  Redone-test additions to the matrix: probe add/remove flow (stage,
+  +, row cross, cap 8, dupe rejected with the deny tick), JEI drag
+  onto all three screens' slots (EMI too if present), store search
+  incl. "no matches" and ESC/inventory-key behavior.
+
+## Previous status (2026-08-05 — Frequency Monitor 1.11.0 IN CODE, registrar "19"→now "20", release held)
 
 - **Frequency Monitor** (`Program.MONITOR`, id 26, key `"monitor"`) —
   all 9 plan tasks done: Program + lang (T1); `MonitorChannels.
