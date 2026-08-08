@@ -260,7 +260,15 @@ public class StoreScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (searchBox.mouseClicked(mouseX, mouseY, button)) return true;
+        // Standalone EditBox (no widget registration): vanilla's
+        // mouseClicked repositions the cursor but NEVER focuses — focus
+        // normally comes from Screen's widget traversal, so a manual box
+        // must set it on the click path itself or typing stays gated off
+        // (canConsumeInput requires isFocused).
+        if (searchBox.mouseClicked(mouseX, mouseY, button)) {
+            searchBox.setFocused(true);
+            return true;
+        }
         searchBox.setFocused(false);
         if (button == 0 && overHomeBtn(mouseX, mouseY)) {
             UISounds.tick(1.2F);

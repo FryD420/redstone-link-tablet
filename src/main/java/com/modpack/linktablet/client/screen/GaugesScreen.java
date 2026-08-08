@@ -222,6 +222,11 @@ public class GaugesScreen extends Screen {
         nameBox.setMaxLength(Gauge.MAX_NAME_LENGTH);
         nameBox.setHint(Component.translatable("gui.linktablet.gauge.name"));
         nameBox.setValue(gauge != null ? gauge.name() : "");
+        // Standalone EditBox: nothing else ever focuses it (vanilla's
+        // mouseClicked never sets focus — that's the widget traversal's
+        // job, and this box isn't registered), so focus it here like
+        // PickerOverlay's search box or the name can never be typed.
+        nameBox.setFocused(true);
         UISounds.page();
     }
 
@@ -393,7 +398,12 @@ public class GaugesScreen extends Screen {
         if (picker.mouseClicked(mouseX, mouseY, button)) return true;
 
         if (editorOpen) {
-            if (nameBox.mouseClicked(mouseX, mouseY, button)) return true;
+            // Click-to-focus for the standalone box (see openEditor note)
+            if (nameBox.mouseClicked(mouseX, mouseY, button)) {
+                nameBox.setFocused(true);
+                return true;
+            }
+            nameBox.setFocused(false);
             if (over(mouseX, mouseY, edSlot1X(), edSlotY(), 18, 18)) {
                 UISounds.tick(1.3F);
                 picker.open(width, height, stack -> editStack1 = stack, true);
