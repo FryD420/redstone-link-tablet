@@ -18,6 +18,11 @@ public class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<SignalEditMenu>> SIGNAL_EDIT =
             MENUS.register("signal_edit", () -> IMenuTypeExtension.create(SignalEditMenu::create));
 
+    /** The Monitor's add-probe editor (1.11.0): SignalEditMenu reused —
+     * a container menu is what makes JEI/EMI panels appear at all. */
+    public static final DeferredHolder<MenuType<?>, MenuType<SignalEditMenu>> PROBE_EDIT =
+            MENUS.register("probe_edit", () -> IMenuTypeExtension.create(SignalEditMenu::createProbe));
+
     public static void register(IEventBus bus) {
         MENUS.register(bus);
     }

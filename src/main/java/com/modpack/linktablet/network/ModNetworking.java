@@ -622,6 +622,19 @@ public class ModNetworking {
         }
     }
 
+    /** Opens the Monitor's add-probe container menu (1.11.0 second
+     * tester round — a real menu is what makes JEI/EMI panels show). */
+    public record OpenProbeMenuPayload(SignalTarget target) implements CustomPacketPayload {
+        public static final Type<OpenProbeMenuPayload> TYPE = new Type<>(id("open_probe_menu"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, OpenProbeMenuPayload> STREAM_CODEC =
+                SignalTarget.STREAM_CODEC.map(OpenProbeMenuPayload::new, OpenProbeMenuPayload::target);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record MonitorSnapshotPayload(List<MonitorChannel> channels)
             implements CustomPacketPayload {
         public static final Type<MonitorSnapshotPayload> TYPE = new Type<>(id("monitor_snapshot"));
@@ -688,7 +701,9 @@ public class ModNetworking {
         // "20": 1.11.0 multi-probe — SetProbePayload carries the probe
         // LIST (cap 8; still inside the 1.11.0 pairing break, but each
         // wire growth gets its own fence).
-        PayloadRegistrar registrar = event.registrar("20");
+        // "21": 1.11.0 probe editor — OpenProbeMenuPayload added (the
+        // add-probe container menu; still inside the 1.11.0 break).
+        PayloadRegistrar registrar = event.registrar("21");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -710,8 +725,24 @@ public class ModNetworking {
                 com.modpack.linktablet.compat.MonitorScanner::handleSubscribe);
         registrar.playToServer(SetProbePayload.TYPE, SetProbePayload.STREAM_CODEC,
                 ModNetworking::handleSetProbe);
+        registrar.playToServer(OpenProbeMenuPayload.TYPE, OpenProbeMenuPayload.STREAM_CODEC,
+                ModNetworking::handleOpenProbeMenu);
         registrar.playToClient(MonitorSnapshotPayload.TYPE, MonitorSnapshotPayload.STREAM_CODEC,
                 ModNetworking::handleMonitorSnapshot);
+    }
+
+    /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
+     * validation (loaded + range + tablet), then the server opens the
+     * PROBE_EDIT container menu. */
+    private static void handleOpenProbeMenu(OpenProbeMenuPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (resolve(player, payload.target()) == null) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        SignalEditMenu.EditContext ctx = SignalEditMenu.EditContext.plain(payload.target(), -1);
+        serverPlayer.openMenu(new SimpleMenuProvider(
+                        (id, inv, p) -> new SignalEditMenu(ModMenus.PROBE_EDIT.get(), id, inv, ctx),
+                        Component.translatable("gui.linktablet.probe_edit.title")),
+                buf -> SignalEditMenu.EditContext.STREAM_CODEC.encode(buf, ctx));
     }
 
     private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {

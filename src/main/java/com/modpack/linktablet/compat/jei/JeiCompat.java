@@ -2,7 +2,7 @@ package com.modpack.linktablet.compat.jei;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.client.screen.GaugesScreen;
-import com.modpack.linktablet.client.screen.MonitorScreen;
+import com.modpack.linktablet.client.screen.ProbeEditScreen;
 import com.modpack.linktablet.client.screen.SignalEditScreen;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -38,16 +38,14 @@ public class JeiCompat implements IModPlugin {
         registration.addGhostIngredientHandler(SignalEditScreen.class, new FrequencyGhostHandler());
         // 1.11.0 (tester request: "that dragging feature should be
         // everywhere applicable"): the gauge editor's slots and the
-        // Monitor's probe staging slots are drop targets too
+        // add-probe editor's slots are drop targets too. The probe
+        // editor is a CONTAINER menu, so JEI's panel shows natively;
+        // GaugesScreen is a plain screen — its addGuiScreenHandler below
+        // makes the panel appear on JEI-only installs (EMI can't attach
+        // to plain screens at all — see EmiCompat).
         registration.addGhostIngredientHandler(GaugesScreen.class, new GaugeGhostHandler());
-        registration.addGhostIngredientHandler(MonitorScreen.class, new MonitorGhostHandler());
-        // Plain (non-container) screens: JEI hides its ingredient panel
-        // unless the screen declares its bounds — without these, the drop
-        // targets above have no visible drag SOURCE (second tester
-        // report: "make JEI pop up on the monitor screen").
+        registration.addGhostIngredientHandler(ProbeEditScreen.class, new ProbeGhostHandler());
         registration.addGuiScreenHandler(GaugesScreen.class,
-                screen -> guiProperties(screen, screen.panelBounds()));
-        registration.addGuiScreenHandler(MonitorScreen.class,
                 screen -> guiProperties(screen, screen.panelBounds()));
     }
 
@@ -107,13 +105,13 @@ public class JeiCompat implements IModPlugin {
         }
     }
 
-    private static class MonitorGhostHandler implements IGhostIngredientHandler<MonitorScreen> {
+    private static class ProbeGhostHandler implements IGhostIngredientHandler<ProbeEditScreen> {
 
         @Override
-        public <I> List<Target<I>> getTargetsTyped(MonitorScreen screen,
+        public <I> List<Target<I>> getTargetsTyped(ProbeEditScreen screen,
                                                    ITypedIngredient<I> ingredient, boolean doStart) {
-            return slotTargets(ingredient, 2, screen::probeSlotArea,
-                    (stack, slot) -> screen.stageProbeItem(slot, stack));
+            return slotTargets(ingredient, 2, screen::frequencySlotArea,
+                    (stack, slot) -> screen.stageFrequencyItem(slot, stack));
         }
 
         @Override

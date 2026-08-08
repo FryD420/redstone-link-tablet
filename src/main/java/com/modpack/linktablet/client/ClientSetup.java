@@ -73,6 +73,8 @@ public class ClientSetup {
     public static void onRegisterMenuScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
         event.register(com.modpack.linktablet.registry.ModMenus.SIGNAL_EDIT.get(),
                 com.modpack.linktablet.client.screen.SignalEditScreen::new);
+        event.register(com.modpack.linktablet.registry.ModMenus.PROBE_EDIT.get(),
+                com.modpack.linktablet.client.screen.ProbeEditScreen::new);
     }
 
     @SubscribeEvent

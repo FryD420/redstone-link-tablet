@@ -1,7 +1,7 @@
 package com.modpack.linktablet.compat.emi;
 
 import com.modpack.linktablet.client.screen.GaugesScreen;
-import com.modpack.linktablet.client.screen.MonitorScreen;
+import com.modpack.linktablet.client.screen.ProbeEditScreen;
 import com.modpack.linktablet.client.screen.SignalEditScreen;
 import dev.emi.emi.api.EmiDragDropHandler;
 import dev.emi.emi.api.EmiEntrypoint;
@@ -27,25 +27,17 @@ public class EmiCompat implements EmiPlugin {
     public void register(EmiRegistry registry) {
         registry.addDragDropHandler(SignalEditScreen.class, new FrequencyDragDropHandler());
         // 1.11.0 (tester request: "that dragging feature should be
-        // everywhere applicable"): the gauge editor's slots and the
-        // Monitor's probe staging slots are drop targets too
+        // everywhere applicable"): the add-probe editor is a CONTAINER
+        // menu, so EMI's index shows natively and this drag handler is
+        // reachable. NOTE: EMI (verified against 1.1.24's ScreenMixin)
+        // only ever attaches to AbstractContainerScreen — plain screens
+        // like GaugesScreen can't host its index, so the gauge-editor
+        // handler below only fires if a future EMI adds plain-screen
+        // support; JEI-only installs cover it via JeiCompat instead.
+        registry.addDragDropHandler(ProbeEditScreen.class, new SlotDragDropHandler<>(
+                ProbeEditScreen::frequencySlotArea, ProbeEditScreen::stageFrequencyItem));
         registry.addDragDropHandler(GaugesScreen.class, new SlotDragDropHandler<>(
                 GaugesScreen::frequencySlotArea, GaugesScreen::stageFrequencyItem));
-        registry.addDragDropHandler(MonitorScreen.class, new SlotDragDropHandler<>(
-                MonitorScreen::probeSlotArea, MonitorScreen::stageProbeItem));
-        // Plain (non-container) screens: EMI positions its index around
-        // declared bounds — without these, the drop targets above have no
-        // visible drag SOURCE (JeiCompat mirrors this via
-        // addGuiScreenHandler).
-        registry.addScreenBoundsProvider(GaugesScreen.class,
-                screen -> emiBounds(screen.panelBounds()));
-        registry.addScreenBoundsProvider(MonitorScreen.class,
-                screen -> emiBounds(screen.panelBounds()));
-    }
-
-    private static dev.emi.emi.api.widget.Bounds emiBounds(Rect2i panel) {
-        return new dev.emi.emi.api.widget.Bounds(
-                panel.getX(), panel.getY(), panel.getWidth(), panel.getHeight());
     }
 
     /** Generic two-slot handler over any screen exposing 18×18 slot

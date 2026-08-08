@@ -262,11 +262,15 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   Member `ownerName` classification (inventory-tablet attribution —
   the phantom-copy diagnosis) lives on both `TabletTransmitterHandler`
   and `TabletReceiverHandler`, not duplicated elsewhere. New payloads
-  bumped the registrar "18"→"20" — a pairing break. JEI/EMI ghost
-  drag covers signal editor + gauge editor + Monitor probe slots via
-  public `*SlotArea`/`stage*` accessors (zero-area rect = closed
-  modal, the handlers skip it) — new item-slot surfaces should join
-  that pattern.
+  bumped the registrar "18"→"21" — a pairing break. Probe adding goes
+  through `ProbeEditScreen` — a REAL container menu (`SignalEditMenu`
+  reused under the PROBE_EDIT type): JEI and EMI only attach their
+  ingredient panels to `AbstractContainerScreen` (verified against
+  EMI 1.1.24's ScreenMixin bytecode — plain screens can NEVER host
+  them), so any future screen wanting viewer drag must be a container
+  menu, not a plain Screen with drag accessors. The gauge editor's
+  plain-screen drag targets work on JEI-only installs (JEI's
+  addGuiScreenHandler shows the panel); under EMI they're inert.
 
 ## Release process
 
