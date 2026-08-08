@@ -22,6 +22,8 @@
   "program.linktablet.store": "App Store",
   "gui.linktablet.store.get": "Get",
   "gui.linktablet.store.remove": "Remove",
+  "gui.linktablet.store.search": "Search apps…",
+  "gui.linktablet.store.no_matches": "No apps match",
   "program.linktablet.signals": "Signals",
   "program.linktablet.signals.desc": "Toggle Redstone Links remotely",
   "program.linktablet.clock.desc": "Alarms, world clock, timer, stopwatch",
