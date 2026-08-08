@@ -12,17 +12,19 @@
   a listening/transmitting badge, and in-range vs. out-of-range
   against your tablet's position, plus a channel summary (transmitter
   count + effective power). Probes let you watch up to 8 extra
-  channels your tablet doesn't use: stage two frequency items, hit +,
-  and the channel joins the list (remove it from its row) — the same
-  add-flow as the signal editor. Distributed through the App Store,
-  same as Clock/Calculator/Gauges. Placed tablets get a compact
-  one-line-per-channel summary on the kiosk face (tap it to open the
-  full screen), and the overlay pin shows the same compact lines in
-  the mini window.
+  channels your tablet doesn't use: the + button opens an Add Probe
+  editor just like the signal editor — two frequency slots, your
+  inventory, an all-items search, and the JEI/EMI panel right there
+  to drag from. Remove a probe from its channel row. Distributed
+  through the App Store, same as Clock/Calculator/Gauges. Placed
+  tablets get a compact one-line-per-channel summary on the kiosk
+  face (tap it to open the full screen), and the overlay pin shows
+  the same compact lines in the mini window.
 - **JEI/EMI drag everywhere**: the ghost-drag that the signal editor
-  has had since 1.7.0 now also covers the gauge editor's frequency
-  slots and the Monitor's probe slots — drag an item straight from
-  the JEI/EMI panel onto any of them.
+  has had since 1.7.0 now also covers the Add Probe editor and the
+  gauge editor's frequency slots — drag an item straight from the
+  viewer panel onto any of them. (Gauge editor: JEI-only installs
+  show the panel there; EMI can't display on that screen yet.)
 - **App Store search** — a search box above the shelf filters the
   catalog by name, description, or key.
 - **Fixed**: the gauge editor's name field never accepted typing

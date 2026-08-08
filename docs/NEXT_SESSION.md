@@ -3,7 +3,29 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-08 — 1.11.0 + first-test feedback round IN CODE, registrar "20", release held)
+## Status (2026-08-08 evening — 1.11.0 feedback round 2 IN CODE + user-verified, registrar "21", release held)
+
+- **Round 2 (same day, from the redo sessions)**: (a) standalone
+  EditBox click-to-focus fix — the store search box ate clicks
+  without focusing (vanilla EditBox.mouseClicked never sets focus;
+  that's the widget traversal's job, and unregistered boxes must do
+  it on their own click path); audit found the GAUGE EDITOR'S NAME
+  FIELD had the same defect since 1.10.0 — it was NEVER typeable.
+  Both fixed (click-to-focus both, gauge modal focuses on open).
+  (b) **Add Probe container menu** — user report "JEI doesn't show on
+  the Monitor": BOTH viewers only attach to AbstractContainerScreen
+  (EMI 1.1.24 ScreenMixin gates on instanceof, bytecode-verified;
+  EMI also suppresses JEI's overlay when both installed), so the
+  plain-screen bounds APIs can never surface a panel — the earlier
+  addGuiScreenHandler/addScreenBoundsProvider attempt was a dead
+  end. Fix = the house pattern: `ProbeEditScreen` on `SignalEditMenu`
+  reused under the PROBE_EDIT menu type (ghost slots, all-items
+  search, inventory, Add), opened server-side via
+  OpenProbeMenuPayload (registrar **"20"→"21"**); MonitorScreen's +
+  opens it, inline staged slots removed. **USER-VERIFIED "works
+  well" 2026-08-08** (~3-min pass, log clean). Gauge editor stays a
+  plain screen: viewer drag there works JEI-only; converting it to a
+  container menu is the queued fix IF testers want EMI drag on it.
 
 - **Feedback round 1 (2026-08-08, from the user's first dev-client
   session — 47 min, log clean)**: three user-requested changes, all
