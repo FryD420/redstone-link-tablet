@@ -123,7 +123,7 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                         packedLight, surfaceW, surfaceH, caseTint);
                 case MONITOR -> TabletScreenRenderer.renderMonitorFace(poseStack, buffers,
                         com.modpack.linktablet.frequency.MonitorChannels.channelsOf(
-                                be.getSignals(), be.getGauges(), be.getMonitorProbe()),
+                                be.getSignals(), be.getGauges(), be.getMonitorProbes()),
                         be.monitorCounts(), be.monitorPower(),
                         be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
                         packedLight, surfaceW, surfaceH, caseTint);

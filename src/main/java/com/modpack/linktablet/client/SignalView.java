@@ -54,10 +54,10 @@ public sealed interface SignalView {
         return ClientGaugeReadings.strength(gauges.get(index).frequency());
     }
 
-    /** Frequency Monitor probe channel (1.11.0); absent data reads
-     * {@link com.modpack.linktablet.frequency.Frequency#EMPTY}. */
-    default com.modpack.linktablet.frequency.Frequency monitorProbe() {
-        return com.modpack.linktablet.frequency.Frequency.EMPTY;
+    /** Frequency Monitor probe channels (1.11.0, multi-probe); absent
+     * data reads an empty list. */
+    default List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+        return List.of();
     }
 
     /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
@@ -119,12 +119,11 @@ public sealed interface SignalView {
         }
 
         @Override
-        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.player == null) return com.modpack.linktablet.frequency.Frequency.EMPTY;
+            if (mc.player == null) return List.of();
             return mc.player.getItemInHand(hand)
-                    .getOrDefault(ModDataComponents.MONITOR_PROBE.get(),
-                            com.modpack.linktablet.frequency.Frequency.EMPTY);
+                    .getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
         }
     }
 
@@ -168,9 +167,8 @@ public sealed interface SignalView {
         }
 
         @Override
-        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
-            return stack().getOrDefault(ModDataComponents.MONITOR_PROBE.get(),
-                    com.modpack.linktablet.frequency.Frequency.EMPTY);
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+            return stack().getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
         }
 
         public ItemStack stack() {
@@ -237,9 +235,9 @@ public sealed interface SignalView {
         }
 
         @Override
-        public com.modpack.linktablet.frequency.Frequency monitorProbe() {
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
             TabletBlockEntity be = resolved();
-            return be != null ? be.getMonitorProbe() : com.modpack.linktablet.frequency.Frequency.EMPTY;
+            return be != null ? be.getMonitorProbes() : List.of();
         }
 
         /** The BE that owns this position's data (controller when merged). */

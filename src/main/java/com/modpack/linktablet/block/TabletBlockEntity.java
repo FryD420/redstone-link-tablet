@@ -102,9 +102,9 @@ public class TabletBlockEntity extends BlockEntity {
      */
     private List<com.modpack.linktablet.frequency.Gauge> gauges = List.of();
 
-    /** Frequency Monitor probe channel (1.11.0); {@link Frequency#EMPTY}
+    /** Frequency Monitor probe channels (1.11.0, multi-probe); empty
      * when unset. */
-    private Frequency monitorProbe = Frequency.EMPTY;
+    private List<Frequency> monitorProbes = List.of();
 
     /**
      * Frequency Monitor summary (1.11.0, block half): index-aligned with
@@ -513,13 +513,13 @@ public class TabletBlockEntity extends BlockEntity {
 
     // ---- Frequency Monitor probe (1.11.0) -----------------------------
 
-    public Frequency getMonitorProbe() {
-        return monitorProbe;
+    public List<Frequency> getMonitorProbes() {
+        return monitorProbes;
     }
 
-    public void setMonitorProbe(Frequency newProbe) {
-        if (monitorProbe.equals(newProbe)) return;
-        this.monitorProbe = newProbe;
+    public void setMonitorProbes(List<Frequency> newProbes) {
+        if (monitorProbes.equals(newProbes)) return;
+        this.monitorProbes = List.copyOf(newProbes);
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -562,7 +562,7 @@ public class TabletBlockEntity extends BlockEntity {
         this.homeApps = com.modpack.linktablet.Programs.fromKeys(
                 stack.get(ModDataComponents.HOME_APPS.get()));
         setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
-        setMonitorProbe(stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), Frequency.EMPTY));
+        setMonitorProbes(stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of()));
         setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
     }
 
@@ -594,8 +594,8 @@ public class TabletBlockEntity extends BlockEntity {
         if (!gauges.isEmpty()) {
             stack.set(ModDataComponents.TABLET_GAUGES.get(), gauges);
         }
-        if (!monitorProbe.isEmpty()) {
-            stack.set(ModDataComponents.MONITOR_PROBE.get(), monitorProbe);
+        if (!monitorProbes.isEmpty()) {
+            stack.set(ModDataComponents.MONITOR_PROBE.get(), monitorProbes);
         }
         return stack;
     }
@@ -919,8 +919,8 @@ public class TabletBlockEntity extends BlockEntity {
                     .encodeStart(NbtOps.INSTANCE, gauges)
                     .result().ifPresent(t -> tag.put("gauges", t));
         }
-        if (!monitorProbe.isEmpty()) {
-            Frequency.CODEC.encodeStart(NbtOps.INSTANCE, monitorProbe)
+        if (!monitorProbes.isEmpty()) {
+            Frequency.CODEC.listOf().encodeStart(NbtOps.INSTANCE, monitorProbes)
                     .result().ifPresent(t -> tag.put("monitor_probe", t));
         }
         if (caseColor != null) {
@@ -978,9 +978,16 @@ public class TabletBlockEntity extends BlockEntity {
         this.gauges = gaugesTag == null ? List.of()
                 : com.modpack.linktablet.frequency.Gauge.CODEC.listOf()
                         .parse(NbtOps.INSTANCE, gaugesTag).result().orElse(List.of());
+        // Multi-probe list; the single-Frequency compound is the brief
+        // pre-multi dev format (never released) — decoded as a one-entry
+        // list so dev worlds carry over.
         Tag monitorProbeTag = tag.get("monitor_probe");
-        this.monitorProbe = monitorProbeTag == null ? Frequency.EMPTY
-                : Frequency.CODEC.parse(NbtOps.INSTANCE, monitorProbeTag).result().orElse(Frequency.EMPTY);
+        this.monitorProbes = monitorProbeTag == null ? List.of()
+                : monitorProbeTag instanceof net.minecraft.nbt.ListTag
+                        ? Frequency.CODEC.listOf().parse(NbtOps.INSTANCE, monitorProbeTag)
+                                .result().orElse(List.of())
+                        : Frequency.CODEC.parse(NbtOps.INSTANCE, monitorProbeTag)
+                                .result().map(List::of).orElse(List.of());
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");

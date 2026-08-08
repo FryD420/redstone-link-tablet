@@ -88,7 +88,7 @@ public final class MonitorScanner {
     }
 
     /** One tablet's live signals/gauges/probe, re-read every poll. */
-    private record TabletData(List<Signal> signals, List<Gauge> gauges, Frequency probe) {
+    private record TabletData(List<Signal> signals, List<Gauge> gauges, List<Frequency> probes) {
     }
 
     private static final Map<UUID, Viewer> VIEWERS = new HashMap<>();
@@ -162,7 +162,7 @@ public final class MonitorScanner {
      * pushed to the BE only when changed (the {@code onGaugeReading} shape). */
     private static void scanBlock(ServerLevel level, TabletBlockEntity be) {
         List<Frequency> channels =
-                MonitorChannels.channelsOf(be.getSignals(), be.getGauges(), be.getMonitorProbe());
+                MonitorChannels.channelsOf(be.getSignals(), be.getGauges(), be.getMonitorProbes());
         int n = channels.size();
         int[] counts = new int[n];
         int[] power = new int[n];
@@ -231,7 +231,7 @@ public final class MonitorScanner {
             // gauges/probe, exactly like ModNetworking's edit payloads.
             TabletBlockEntity be = clicked.resolveController();
             if (be == null) return null;
-            return new TabletData(be.getSignals(), be.getGauges(), be.getMonitorProbe());
+            return new TabletData(be.getSignals(), be.getGauges(), be.getMonitorProbes());
         }
         ItemStack stack;
         if (target.slot().isPresent()) {
@@ -246,7 +246,7 @@ public final class MonitorScanner {
         return new TabletData(
                 stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()),
                 stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()),
-                stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), Frequency.EMPTY));
+                stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of()));
     }
 
     // ------------------------------------------------------------------
@@ -279,7 +279,7 @@ public final class MonitorScanner {
             return;
         }
 
-        List<Frequency> channels = MonitorChannels.channelsOf(data.signals(), data.gauges(), data.probe());
+        List<Frequency> channels = MonitorChannels.channelsOf(data.signals(), data.gauges(), data.probes());
         BlockPos anchor = viewer.target().pos().orElse(player.blockPosition());
         List<MonitorChannel> snapshot = new ArrayList<>();
         for (Frequency channel : channels) {

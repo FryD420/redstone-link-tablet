@@ -600,15 +600,20 @@ public class ModNetworking {
         }
     }
 
+    /** Replaces the tablet's whole probe list (multi-probe, cap
+     * {@code MonitorChannels.MAX_PROBES}) — add and remove both send
+     * the full list, the SetHomeAppsPayload shape. */
     public record SetProbePayload(SignalTarget target,
-                                  com.modpack.linktablet.frequency.Frequency probe)
+                                  List<com.modpack.linktablet.frequency.Frequency> probes)
             implements CustomPacketPayload {
         public static final Type<SetProbePayload> TYPE = new Type<>(id("set_probe"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SetProbePayload> STREAM_CODEC =
                 StreamCodec.composite(
                         SignalTarget.STREAM_CODEC, SetProbePayload::target,
-                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC,
-                        SetProbePayload::probe,
+                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC
+                                .apply(ByteBufCodecs.list(
+                                        com.modpack.linktablet.frequency.MonitorChannels.MAX_PROBES)),
+                        SetProbePayload::probes,
                         SetProbePayload::new);
 
         @Override
@@ -680,7 +685,10 @@ public class ModNetworking {
         // wire (still inside the 1.10.0 pairing break).
         // "19": 1.11.0 Frequency Monitor — MonitorSubscribePayload,
         // SetProbePayload, MonitorSnapshotPayload (second playToClient).
-        PayloadRegistrar registrar = event.registrar("19");
+        // "20": 1.11.0 multi-probe — SetProbePayload carries the probe
+        // LIST (cap 8; still inside the 1.11.0 pairing break, but each
+        // wire growth gets its own fence).
+        PayloadRegistrar registrar = event.registrar("20");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -708,7 +716,14 @@ public class ModNetworking {
 
     private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {
         Player player = context.player();
-        com.modpack.linktablet.frequency.Frequency probe = payload.probe();
+        // Sanitize: drop empties, dedupe by Create-network identity,
+        // cap — the fromKeys shape (never trust the client's list)
+        List<com.modpack.linktablet.frequency.Frequency> probes = new ArrayList<>();
+        for (com.modpack.linktablet.frequency.Frequency probe : payload.probes()) {
+            if (probe.isEmpty() || probes.contains(probe)) continue;
+            if (probes.size() >= com.modpack.linktablet.frequency.MonitorChannels.MAX_PROBES) break;
+            probes.add(probe);
+        }
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
@@ -716,17 +731,17 @@ public class ModNetworking {
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();
                 if (controller != null) {
-                    controller.setMonitorProbe(probe);
+                    controller.setMonitorProbes(probes);
                 }
             }
             return;
         }
         ItemStack stack = resolveStack(player, payload.target());
         if (!stack.isEmpty()) {
-            if (probe.isEmpty()) {
+            if (probes.isEmpty()) {
                 stack.remove(ModDataComponents.MONITOR_PROBE.get());
             } else {
-                stack.set(ModDataComponents.MONITOR_PROBE.get(), probe);
+                stack.set(ModDataComponents.MONITOR_PROBE.get(), List.copyOf(probes));
             }
         }
     }

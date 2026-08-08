@@ -71,12 +71,21 @@ public class ModDataComponents {
                     .networkSynchronized(com.modpack.linktablet.frequency.Gauge.STREAM_CODEC.apply(ByteBufCodecs.list()))
                     .build());
 
-    /** Frequency Monitor probe channel (1.11.0); absent = none
-     * (never written empty — the theme idiom). */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.modpack.linktablet.frequency.Frequency>> MONITOR_PROBE =
-            DATA_COMPONENTS.register("monitor_probe", () -> DataComponentType.<com.modpack.linktablet.frequency.Frequency>builder()
-                    .persistent(com.modpack.linktablet.frequency.Frequency.CODEC)
-                    .networkSynchronized(com.modpack.linktablet.frequency.Frequency.STREAM_CODEC)
+    /** Frequency Monitor probe channels (1.11.0, multi-probe by user
+     * decision — cap {@code MonitorChannels.MAX_PROBES}); absent = none
+     * (never written empty — the theme idiom). The single-Frequency
+     * alternative decodes the brief pre-multi dev format (never
+     * released, but dev worlds carry it). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<com.modpack.linktablet.frequency.Frequency>>> MONITOR_PROBE =
+            DATA_COMPONENTS.register("monitor_probe", () -> DataComponentType.<List<com.modpack.linktablet.frequency.Frequency>>builder()
+                    .persistent(Codec.withAlternative(
+                            com.modpack.linktablet.frequency.Frequency.CODEC.listOf(),
+                            com.modpack.linktablet.frequency.Frequency.CODEC.xmap(
+                                    List::of, list -> list.isEmpty()
+                                            ? com.modpack.linktablet.frequency.Frequency.EMPTY
+                                            : list.get(0))))
+                    .networkSynchronized(com.modpack.linktablet.frequency.Frequency.STREAM_CODEC
+                            .apply(ByteBufCodecs.list()))
                     .build());
 
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */

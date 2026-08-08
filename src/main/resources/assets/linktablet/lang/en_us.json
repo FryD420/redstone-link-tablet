@@ -76,7 +76,7 @@
   "gui.linktablet.gauge.save": "Save",
   "gui.linktablet.gauge.delete": "Delete",
   "gui.linktablet.monitor.probe": "Probe",
-  "gui.linktablet.monitor.probe.hint": "Set two items to watch any channel",
+  "gui.linktablet.monitor.probe.hint": "Pick two items, then + to watch a channel",
   "gui.linktablet.monitor.empty": "No channels — add signals, gauges, or a probe",
   "gui.linktablet.monitor.member.placed": "Placed tablet",
   "gui.linktablet.monitor.member.player": "Tablet (%s)",

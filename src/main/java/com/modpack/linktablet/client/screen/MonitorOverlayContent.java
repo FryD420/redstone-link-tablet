@@ -52,7 +52,7 @@ public class MonitorOverlayContent implements OverlayContent {
         List<ModNetworking.MonitorChannel> live = ClientMonitorSnapshot.channels();
         if (!live.isEmpty()) return live;
         SignalView v = view.get();
-        List<Frequency> known = MonitorChannels.channelsOf(v.signals(), v.gauges(), v.monitorProbe());
+        List<Frequency> known = MonitorChannels.channelsOf(v.signals(), v.gauges(), v.monitorProbes());
         if (known.isEmpty()) return List.of();
         List<ModNetworking.MonitorChannel> skeleton = new ArrayList<>(known.size());
         for (Frequency freq : known) {

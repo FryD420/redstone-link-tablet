@@ -51,8 +51,11 @@ public class MonitorScreen extends Screen {
             net.minecraft.client.Minecraft.getInstance().font);
 
     private double scroll = 0;
-    private ItemStack probeStack1 = ItemStack.EMPTY;
-    private ItemStack probeStack2 = ItemStack.EMPTY;
+    /** Staging slots for the NEXT probe — the signal editor's
+     * stage-then-Add flow (multi-probe, user decision): nothing
+     * transmits to the server until the add button commits the pair. */
+    private ItemStack staged1 = ItemStack.EMPTY;
+    private ItemStack staged2 = ItemStack.EMPTY;
     private boolean subscribed = false;
 
     public MonitorScreen(SignalView view) {
@@ -67,9 +70,6 @@ public class MonitorScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        Frequency probe = view.monitorProbe();
-        probeStack1 = probe.icon1();
-        probeStack2 = probe.icon2();
         // Vanilla Screen.resize() re-calls init() WITHOUT calling removed()
         // first — guard so a window resize while open doesn't bump the
         // consumer count with no matching release (orphaned subscription).
@@ -98,7 +98,7 @@ public class MonitorScreen extends Screen {
     private List<ModNetworking.MonitorChannel> channels() {
         List<ModNetworking.MonitorChannel> live = ClientMonitorSnapshot.channels();
         if (!live.isEmpty()) return live;
-        List<Frequency> known = MonitorChannels.channelsOf(view.signals(), view.gauges(), view.monitorProbe());
+        List<Frequency> known = MonitorChannels.channelsOf(view.signals(), view.gauges(), view.monitorProbes());
         if (known.isEmpty()) return List.of();
         List<ModNetworking.MonitorChannel> skeleton = new ArrayList<>(known.size());
         for (Frequency freq : known) {
@@ -246,6 +246,18 @@ public class MonitorScreen extends Screen {
         }
     }
 
+    private int addBtnX() {
+        return probeSlot2X() + 24;
+    }
+
+    /** Whether the staged pair could be committed as a new probe. */
+    private boolean stagedAddable() {
+        if (staged1.isEmpty() && staged2.isEmpty()) return false;
+        List<Frequency> probes = view.monitorProbes();
+        return probes.size() < MonitorChannels.MAX_PROBES
+                && !probes.contains(Frequency.of(staged1, staged2));
+    }
+
     private void renderProbeRow(GuiGraphics graphics, ScreenTheme theme) {
         int x = rowX();
         int top = probeTop();
@@ -258,18 +270,28 @@ public class MonitorScreen extends Screen {
         int slotY = probeSlotY();
         Chrome.slot(graphics, slot1X, slotY, theme.surfaceLo);
         Chrome.slot(graphics, slot2X, slotY, theme.surfaceLo);
-        if (!probeStack1.isEmpty()) {
-            graphics.renderItem(probeStack1, slot1X + 1, slotY + 1);
+        if (!staged1.isEmpty()) {
+            graphics.renderItem(staged1, slot1X + 1, slotY + 1);
         }
-        if (!probeStack2.isEmpty()) {
-            graphics.renderItem(probeStack2, slot2X + 1, slotY + 1);
+        if (!staged2.isEmpty()) {
+            graphics.renderItem(staged2, slot2X + 1, slotY + 1);
         }
         graphics.fill(slot1X, slotY + 18, slot1X + 18, slotY + 20, TabletScreen.FREQ1_COLOR);
         graphics.fill(slot2X, slotY + 18, slot2X + 18, slotY + 20, TabletScreen.FREQ2_COLOR);
 
-        if (probeStack1.isEmpty() && probeStack2.isEmpty()) {
+        // Add button — the signal editor's stage-then-commit flow, as a
+        // procedural plus chip (this screen is widget-free like the rest
+        // of its chrome)
+        boolean addable = stagedAddable();
+        int addX = addBtnX();
+        Chrome.slot(graphics, addX, slotY, addable ? theme.rowBgHover : theme.surfaceLo);
+        int plusColor = addable ? theme.accent : theme.textFaint;
+        graphics.fill(addX + 4, slotY + 8, addX + 14, slotY + 10, plusColor);
+        graphics.fill(addX + 8, slotY + 4, addX + 10, slotY + 14, plusColor);
+
+        if (staged1.isEmpty() && staged2.isEmpty()) {
             Component hint = Component.translatable("gui.linktablet.monitor.probe.hint");
-            int hintX = slot2X + 18 + 6;
+            int hintX = addX + 18 + 6;
             int budget = x + rowWidth() - 4 - hintX;
             String shown = TextFit.ellipsize(font, hint.getString(), Math.max(0, budget));
             graphics.drawString(font, shown, hintX, slotY + 5, theme.textFaint, theme.textShadow);
@@ -298,8 +320,20 @@ public class MonitorScreen extends Screen {
             }
         }
 
+        // Probe rows carry a remove cross top-right (the picker flow's
+        // other half — probes leave from the row they created)
+        boolean probeRow = view.monitorProbes().contains(freq);
+        int removeX = x + w - 12;
+        if (probeRow) {
+            int crossColor = theme.textFaint;
+            for (int d = 0; d < 6; d++) {
+                graphics.fill(removeX + d, y + 3 + d, removeX + d + 1, y + 4 + d, crossColor);
+                graphics.fill(removeX + 5 - d, y + 3 + d, removeX + 6 - d, y + 4 + d, crossColor);
+            }
+        }
+
         int textX = icon2X + 16 + 6;
-        int textBudget = x + w - 4 - textX;
+        int textBudget = (probeRow ? removeX - 4 : x + w - 4) - textX;
         Component summary = Component.translatable("gui.linktablet.monitor.transmitters", transmitting);
         String summaryText = TextFit.ellipsize(font, summary.getString(), Math.max(0, textBudget));
         graphics.drawString(font, summaryText, textX, y + 4,
@@ -372,9 +406,52 @@ public class MonitorScreen extends Screen {
     // Probe input
     // ------------------------------------------------------------------
 
-    private void sendProbe() {
+    private void sendProbes(List<Frequency> probes) {
         PacketDistributor.sendToServer(new ModNetworking.SetProbePayload(
-                view.target(), Frequency.of(probeStack1, probeStack2)));
+                view.target(), probes));
+    }
+
+    private void commitStagedProbe() {
+        if (!stagedAddable()) {
+            UISounds.tick(0.7F);
+            return;
+        }
+        List<Frequency> probes = new ArrayList<>(view.monitorProbes());
+        probes.add(Frequency.of(staged1, staged2));
+        sendProbes(probes);
+        staged1 = ItemStack.EMPTY;
+        staged2 = ItemStack.EMPTY;
+        UISounds.tick(1.6F);
+    }
+
+    private void removeProbe(Frequency freq) {
+        List<Frequency> probes = new ArrayList<>(view.monitorProbes());
+        if (!probes.remove(freq)) return;
+        sendProbes(probes);
+        UISounds.delete();
+    }
+
+    // ------------------------------------------------------------------
+    // JEI/EMI ghost-drag targets (compat/jei, compat/emi) — dropping an
+    // ingredient STAGES it, exactly like the signal editor's slots; the
+    // add button still commits.
+    // ------------------------------------------------------------------
+
+    /** Absolute 18×18 rect of staged probe slot 0/1. */
+    public net.minecraft.client.renderer.Rect2i probeSlotArea(int slot) {
+        return new net.minecraft.client.renderer.Rect2i(
+                slot == 0 ? probeSlot1X() : probeSlot2X(), probeSlotY(), 18, 18);
+    }
+
+    /** Stages a viewer-dragged ingredient into a probe slot (count 1). */
+    public void stageProbeItem(int slot, ItemStack stack) {
+        if (stack.isEmpty()) return;
+        if ((slot & 1) == 0) {
+            staged1 = stack.copyWithCount(1);
+        } else {
+            staged2 = stack.copyWithCount(1);
+        }
+        UISounds.tick(1.3F);
     }
 
     // ------------------------------------------------------------------
@@ -402,19 +479,32 @@ public class MonitorScreen extends Screen {
         }
         if (button == 0 && over(mouseX, mouseY, probeSlot1X(), probeSlotY(), 18, 18)) {
             UISounds.tick(1.3F);
-            picker.open(width, height, stack -> {
-                probeStack1 = stack;
-                sendProbe();
-            }, true);
+            picker.open(width, height, stack -> staged1 = stack, true);
             return true;
         }
         if (button == 0 && over(mouseX, mouseY, probeSlot2X(), probeSlotY(), 18, 18)) {
             UISounds.tick(1.3F);
-            picker.open(width, height, stack -> {
-                probeStack2 = stack;
-                sendProbe();
-            }, true);
+            picker.open(width, height, stack -> staged2 = stack, true);
             return true;
+        }
+        if (button == 0 && over(mouseX, mouseY, addBtnX(), probeSlotY(), 18, 18)) {
+            commitStagedProbe();
+            return true;
+        }
+        // Probe-row remove crosses live inside the scrolled viewport —
+        // walk rows exactly like render does, honoring the scissor bounds
+        if (button == 0 && mouseY >= listTop() && mouseY < listBottom()) {
+            List<Frequency> probes = view.monitorProbes();
+            int y = listTop() - (int) scroll;
+            for (ModNetworking.MonitorChannel channel : channels()) {
+                int h = channelHeight(channel);
+                if (probes.contains(channel.frequency())
+                        && over(mouseX, mouseY, rowX() + rowWidth() - 12, y + 3, 9, 9)) {
+                    removeProbe(channel.frequency());
+                    return true;
+                }
+                y += h + CHANNEL_GAP;
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
