@@ -25,6 +25,9 @@
   the JEI/EMI panel onto any of them.
 - **App Store search** — a search box above the shelf filters the
   catalog by name, description, or key.
+- **Fixed**: the gauge editor's name field never accepted typing
+  (since 1.10.0) — clicking it now focuses it, and it starts focused
+  when the editor opens.
 - New payloads for the Monitor push the wire registrar **"18" →
   "20" — a pairing break**: update client and server together.
 
