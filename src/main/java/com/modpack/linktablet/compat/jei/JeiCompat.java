@@ -41,6 +41,28 @@ public class JeiCompat implements IModPlugin {
         // Monitor's probe staging slots are drop targets too
         registration.addGhostIngredientHandler(GaugesScreen.class, new GaugeGhostHandler());
         registration.addGhostIngredientHandler(MonitorScreen.class, new MonitorGhostHandler());
+        // Plain (non-container) screens: JEI hides its ingredient panel
+        // unless the screen declares its bounds — without these, the drop
+        // targets above have no visible drag SOURCE (second tester
+        // report: "make JEI pop up on the monitor screen").
+        registration.addGuiScreenHandler(GaugesScreen.class,
+                screen -> guiProperties(screen, screen.panelBounds()));
+        registration.addGuiScreenHandler(MonitorScreen.class,
+                screen -> guiProperties(screen, screen.panelBounds()));
+    }
+
+    /** Record components named after IGuiProperties' accessors — the
+     * record implements the interface for free. */
+    private record ScreenBounds(Class<? extends net.minecraft.client.gui.screens.Screen> screenClass,
+                                int guiLeft, int guiTop, int guiXSize, int guiYSize,
+                                int screenWidth, int screenHeight)
+            implements mezz.jei.api.gui.handlers.IGuiProperties {
+    }
+
+    private static mezz.jei.api.gui.handlers.IGuiProperties guiProperties(
+            net.minecraft.client.gui.screens.Screen screen, Rect2i panel) {
+        return new ScreenBounds(screen.getClass(), panel.getX(), panel.getY(),
+                panel.getWidth(), panel.getHeight(), screen.width, screen.height);
     }
 
     /** Two-slot target list over any screen exposing 18×18 slot rects;

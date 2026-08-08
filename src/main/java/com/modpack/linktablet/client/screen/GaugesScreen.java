@@ -82,6 +82,14 @@ public class GaugesScreen extends Screen {
                 slot == 0 ? edSlot1X() : edSlot2X(), edSlotY(), 18, 18);
     }
 
+    /** The chrome panel's outer rect — JEI/EMI use it to position their
+     * ingredient panels around this plain (non-container) screen, which
+     * is what makes the drag SOURCE visible at all. */
+    public net.minecraft.client.renderer.Rect2i panelBounds() {
+        return new net.minecraft.client.renderer.Rect2i(
+                panelLeft() - 6, bodyTop() - 2, PANEL_W + 12, bodyHeight() + 4);
+    }
+
     /** Stages a viewer-dragged ingredient into an editor slot (count 1). */
     public void stageFrequencyItem(int slot, ItemStack stack) {
         if (!editorOpen || stack.isEmpty()) return;

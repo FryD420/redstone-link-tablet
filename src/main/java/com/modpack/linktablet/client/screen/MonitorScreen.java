@@ -443,6 +443,14 @@ public class MonitorScreen extends Screen {
                 slot == 0 ? probeSlot1X() : probeSlot2X(), probeSlotY(), 18, 18);
     }
 
+    /** The chrome panel's outer rect — JEI/EMI use it to position their
+     * ingredient panels around this plain (non-container) screen, which
+     * is what makes the drag SOURCE visible at all. */
+    public net.minecraft.client.renderer.Rect2i panelBounds() {
+        return new net.minecraft.client.renderer.Rect2i(
+                panelLeft() - 6, bodyTop() - 2, PANEL_W + 12, bodyHeight() + 4);
+    }
+
     /** Stages a viewer-dragged ingredient into a probe slot (count 1). */
     public void stageProbeItem(int slot, ItemStack stack) {
         if (stack.isEmpty()) return;

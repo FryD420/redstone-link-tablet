@@ -33,6 +33,19 @@ public class EmiCompat implements EmiPlugin {
                 GaugesScreen::frequencySlotArea, GaugesScreen::stageFrequencyItem));
         registry.addDragDropHandler(MonitorScreen.class, new SlotDragDropHandler<>(
                 MonitorScreen::probeSlotArea, MonitorScreen::stageProbeItem));
+        // Plain (non-container) screens: EMI positions its index around
+        // declared bounds — without these, the drop targets above have no
+        // visible drag SOURCE (JeiCompat mirrors this via
+        // addGuiScreenHandler).
+        registry.addScreenBoundsProvider(GaugesScreen.class,
+                screen -> emiBounds(screen.panelBounds()));
+        registry.addScreenBoundsProvider(MonitorScreen.class,
+                screen -> emiBounds(screen.panelBounds()));
+    }
+
+    private static dev.emi.emi.api.widget.Bounds emiBounds(Rect2i panel) {
+        return new dev.emi.emi.api.widget.Bounds(
+                panel.getX(), panel.getY(), panel.getWidth(), panel.getHeight());
     }
 
     /** Generic two-slot handler over any screen exposing 18×18 slot
