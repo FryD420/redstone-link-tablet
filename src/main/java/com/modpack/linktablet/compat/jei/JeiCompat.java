@@ -1,6 +1,8 @@
 package com.modpack.linktablet.compat.jei;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.client.screen.GaugesScreen;
+import com.modpack.linktablet.client.screen.MonitorScreen;
 import com.modpack.linktablet.client.screen.SignalEditScreen;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -34,6 +36,67 @@ public class JeiCompat implements IModPlugin {
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(SignalEditScreen.class, new FrequencyGhostHandler());
+        // 1.11.0 (tester request: "that dragging feature should be
+        // everywhere applicable"): the gauge editor's slots and the
+        // Monitor's probe staging slots are drop targets too
+        registration.addGhostIngredientHandler(GaugesScreen.class, new GaugeGhostHandler());
+        registration.addGhostIngredientHandler(MonitorScreen.class, new MonitorGhostHandler());
+    }
+
+    /** Two-slot target list over any screen exposing 18×18 slot rects;
+     * zero-area rects (closed modals) are skipped. */
+    private static <I> List<IGhostIngredientHandler.Target<I>> slotTargets(
+            ITypedIngredient<I> ingredient, int slots,
+            java.util.function.IntFunction<Rect2i> area,
+            java.util.function.ObjIntConsumer<ItemStack> stage) {
+        Optional<ItemStack> stack = ingredient.getIngredient(VanillaTypes.ITEM_STACK);
+        if (stack.isEmpty()) return List.of();
+        List<IGhostIngredientHandler.Target<I>> targets = new ArrayList<>(slots);
+        for (int slot = 0; slot < slots; slot++) {
+            Rect2i rect = area.apply(slot);
+            if (rect.getWidth() == 0) continue;
+            int target = slot;
+            targets.add(new IGhostIngredientHandler.Target<>() {
+                @Override
+                public Rect2i getArea() {
+                    return rect;
+                }
+
+                @Override
+                public void accept(I dropped) {
+                    stage.accept(stack.get(), target);
+                }
+            });
+        }
+        return targets;
+    }
+
+    private static class GaugeGhostHandler implements IGhostIngredientHandler<GaugesScreen> {
+
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(GaugesScreen screen,
+                                                   ITypedIngredient<I> ingredient, boolean doStart) {
+            return slotTargets(ingredient, 2, screen::frequencySlotArea,
+                    (stack, slot) -> screen.stageFrequencyItem(slot, stack));
+        }
+
+        @Override
+        public void onComplete() {
+        }
+    }
+
+    private static class MonitorGhostHandler implements IGhostIngredientHandler<MonitorScreen> {
+
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(MonitorScreen screen,
+                                                   ITypedIngredient<I> ingredient, boolean doStart) {
+            return slotTargets(ingredient, 2, screen::probeSlotArea,
+                    (stack, slot) -> screen.stageProbeItem(slot, stack));
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     private static class FrequencyGhostHandler implements IGhostIngredientHandler<SignalEditScreen> {

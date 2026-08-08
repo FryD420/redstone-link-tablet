@@ -68,6 +68,31 @@ public class GaugesScreen extends Screen {
         this.view = view;
     }
 
+    // ------------------------------------------------------------------
+    // JEI/EMI ghost-drag targets (compat/jei, compat/emi) — same staging
+    // path as the picker, nothing consumed. Zero-area when the editor
+    // modal is closed, so the handlers naturally have nowhere to drop.
+    // ------------------------------------------------------------------
+
+    /** Absolute 18×18 rect of editor frequency slot 0/1 — empty while
+     * the editor modal is closed. */
+    public net.minecraft.client.renderer.Rect2i frequencySlotArea(int slot) {
+        if (!editorOpen) return new net.minecraft.client.renderer.Rect2i(0, 0, 0, 0);
+        return new net.minecraft.client.renderer.Rect2i(
+                slot == 0 ? edSlot1X() : edSlot2X(), edSlotY(), 18, 18);
+    }
+
+    /** Stages a viewer-dragged ingredient into an editor slot (count 1). */
+    public void stageFrequencyItem(int slot, ItemStack stack) {
+        if (!editorOpen || stack.isEmpty()) return;
+        if ((slot & 1) == 0) {
+            editStack1 = stack.copyWithCount(1);
+        } else {
+            editStack2 = stack.copyWithCount(1);
+        }
+        UISounds.tick(1.3F);
+    }
+
     private ScreenTheme theme() {
         return view.theme();
     }
