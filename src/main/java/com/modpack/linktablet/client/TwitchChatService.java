@@ -84,10 +84,20 @@ public final class TwitchChatService {
         REFS.merge(c, 1, Integer::sum);
     }
 
+    /** Releases a ref. When the count hits zero, the released channel
+     * lingers ~5s via the face-expiry map ({@code FACE_EXPIRE_TICKS}) so
+     * same-frame defocus/re-acquire cycles (vanilla defocuses overlays on
+     * every screen close) don't bounce the socket. */
     public static void release(String channel) {
         String c = normalize(channel);
         if (c == null) return;
-        REFS.computeIfPresent(c, (k, v) -> v <= 1 ? null : v - 1);
+        REFS.computeIfPresent(c, (k, v) -> {
+            if (v <= 1) {
+                FACE_SEEN.put(c, clientTicks);
+                return null;
+            }
+            return v - 1;
+        });
     }
 
     /** Kiosk faces call this every rendered frame; expiry parts the
@@ -214,14 +224,30 @@ public final class TwitchChatService {
             }
         }
 
+        /** Guards against a dying worker's terminal status write clobbering
+         * a replacement worker's CONNECTING/LIVE state after a fast
+         * reconnect swap. */
+        private void setStatus(Status s) {
+            if (worker == this) status = s;
+        }
+
         void send(String line) {
+            if (out != null) {
+                try {
+                    write(line);
+                    return;
+                } catch (IOException e) {
+                    // Dead link: the reader will notice and reconnect;
+                    // fall through so the line isn't lost silently
+                }
+            }
             outbox.add(line);
         }
 
         @Override
         public void run() {
             while (!stop) {
-                status = Status.CONNECTING;
+                setStatus(Status.CONNECTING);
                 try (SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault()
                         .createSocket("irc.chat.twitch.tv", 6697)) {
                     this.socket = s;
@@ -238,7 +264,7 @@ public final class TwitchChatService {
                     outbox.clear();
                     for (String c : WANTED_SHARED) write("JOIN #" + c);
                     LOG.info("Connected to Twitch chat (anonymous, read-only)");
-                    status = Status.LIVE;
+                    setStatus(Status.LIVE);
                     backoff = BACKOFF_MIN_MS;
                     String line;
                     while (!stop && (line = in.readLine()) != null) {
@@ -251,7 +277,7 @@ public final class TwitchChatService {
                 out = null;
                 this.socket = null;
                 if (stop) break;
-                status = Status.OFFLINE;
+                setStatus(Status.OFFLINE);
                 try {
                     Thread.sleep(backoff);
                 } catch (InterruptedException e) {
@@ -259,7 +285,7 @@ public final class TwitchChatService {
                 }
                 backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
             }
-            status = Status.IDLE;
+            setStatus(Status.IDLE);
         }
 
         private void flushOutbox() throws IOException {
@@ -267,7 +293,7 @@ public final class TwitchChatService {
             while ((line = outbox.poll()) != null) write(line);
         }
 
-        private void write(String line) throws IOException {
+        private synchronized void write(String line) throws IOException {
             BufferedWriter w = out;
             if (w == null) return;
             w.write(line);
