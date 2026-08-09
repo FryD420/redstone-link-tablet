@@ -25,7 +25,7 @@ abstract class ArcadeScreen extends Screen {
     protected final String gameId;
     /** GUI launches return to the tablet home; world taps to the world. */
     private final boolean returnToTablet;
-    /** Set when launched from the Arcade hub (1.10.0): ESC returns to
+    /** Set when launched from the Arcade hub (1.11.0): ESC returns to
      * that program instead of the secret pip's signal grid. */
     @org.jetbrains.annotations.Nullable
     private com.modpack.linktablet.Program returnProgram;

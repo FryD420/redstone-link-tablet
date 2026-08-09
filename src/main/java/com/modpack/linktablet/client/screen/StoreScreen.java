@@ -39,14 +39,14 @@ public class StoreScreen extends Screen {
     private static final int HEADER = 34;
     private static final int ROW_H = 32;
     private static final int ROW_GAP = 4;
-    /** Fixed shelf viewport — the catalog scrolls (24 programs). */
+    /** Fixed shelf viewport — the catalog scrolls. */
     private static final int CONTENT_H = 160;
     private static final int BOTTOM_PAD = 8;
     private static final int MODE_BTN_SIZE = 12;
     private static final int BTN_W = 48;
     private static final int BTN_H = 16;
 
-    /** Search row height (1.11.0, tester request — 25-program catalog). */
+    /** Search row height (1.11.0, tester request). */
     private static final int SEARCH_H = 22;
 
     private final SignalView view;
