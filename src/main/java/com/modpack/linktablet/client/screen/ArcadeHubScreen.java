@@ -6,6 +6,7 @@ import com.modpack.linktablet.client.ClientPrefs;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.UISounds;
 import com.modpack.linktablet.client.screen.chrome.Chrome;
+import com.modpack.linktablet.network.ModNetworking;
 import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -193,6 +195,15 @@ public class ArcadeHubScreen extends Screen {
                 if (!overRow(mouseX, mouseY, i)) continue;
                 Program program = games.get(i);
                 UISounds.page();
+                if (view instanceof SignalView.Block) {
+                    // Kiosk-nav restore (final-review finding 2): mirrors
+                    // ClientHooks.showProgram's block branch, which the
+                    // consolidation into this hub dropped — a block-bound
+                    // launch should still point the wall screen at the
+                    // launched game, like every other block-bound nav does.
+                    PacketDistributor.sendToServer(new ModNetworking.SetProgramPayload(
+                            view.target(), program.key()));
+                }
                 Minecraft.getInstance().setScreen(
                         SecretGames.createApp(program.key(), view, Program.ARCADE));
                 return true;

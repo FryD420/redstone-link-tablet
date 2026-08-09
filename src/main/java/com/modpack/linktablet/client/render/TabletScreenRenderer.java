@@ -857,6 +857,64 @@ public final class TabletScreenRenderer {
         poseStack.popPose();
     }
 
+    /**
+     * Kiosk Paint face (1.11.0 "paint on walls"): the shared screen base
+     * plus the wall's own stitched picture — {@code PaintScreen#stitchArgb}
+     * is the ONE stitch (GUI and this face read the same helper so they
+     * never drift), palette-mapped ARGB per continuous cell, dimensions
+     * {@code surfaceW*PaintCanvas.COLS × surfaceH*PaintCanvas.ROWS}
+     * row-major. Blank cells (0) are skipped so the themed background
+     * shows through underneath; an entirely blank canvas shows the faint
+     * centered "Paint" door label instead — {@link #renderLabelFace}'s
+     * look, inlined here since the base is already open (can't call that
+     * method directly without opening a second, duplicate base). Fills
+     * only, no items, and the blank-canvas label is the only text, so the
+     * strict pass order (fills, then text) holds trivially.
+     */
+    public static void renderPaintFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       com.modpack.linktablet.block.TabletBlockEntity controller,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH, int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        int[] argb = com.modpack.linktablet.client.screen.PaintScreen.stitchArgb(controller);
+        boolean blank = true;
+        for (int c : argb) {
+            if (c != 0) { blank = false; break; }
+        }
+        if (blank) {
+            Font font = Minecraft.getInstance().font;
+            String label = com.modpack.linktablet.Program.PAINT.displayName().getString();
+            float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+            float textH = Mth.clamp(
+                    (base.glassW() - 2f) * FONT_LINE / Math.max(1, font.width(label)),
+                    0.8f, base.glassH() * 0.2f);
+            float top = TabletScreenMath.GLASS_V0 + (base.glassH() - textH) / 2f;
+            drawLabel(poseStack, buffers, font, label, cu, top, textH / 16f / FONT_LINE,
+                    true, false, theme.textMuted, base.bgLight());
+            poseStack.popPose();
+            return;
+        }
+        int cols = surfaceW * com.modpack.linktablet.PaintCanvas.COLS;
+        int rows = surfaceH * com.modpack.linktablet.PaintCanvas.ROWS;
+        VertexConsumer vc = base.vc();
+        PoseStack.Pose pose = base.pose();
+        int bgLight = base.bgLight();
+        float cellW = base.glassW() / cols;
+        float cellH = base.glassH() / rows;
+        for (int r = 0; r < rows; r++) {
+            int rowBase = r * cols;
+            float v0 = TabletScreenMath.GLASS_V0 + r * cellH;
+            for (int c = 0; c < cols; c++) {
+                int color = argb[rowBase + c];
+                if (color == 0) continue;
+                float u0 = TabletScreenMath.GLASS_U0 + c * cellW;
+                fillRect(pose, vc, u0, v0, u0 + cellW, v0 + cellH, LAYER, color, bgLight);
+            }
+        }
+        poseStack.popPose();
+    }
+
     /** Status hint for the Twitch face, mirroring {@code
      * TwitchOverlayContent#statusMessage}/{@code TwitchScreen#statusMessage}:
      * null means "show the chat wall" (LIVE with a non-empty buffer). */
