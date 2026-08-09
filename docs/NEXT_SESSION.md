@@ -3,7 +3,65 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-08 night — 1.11.0-beta.3 = beta.2 + Arcade consolidation, registrar still "22", release held)
+## Status (2026-08-09 — 1.11.0-beta.4 = beta.3 + paint on walls, registrar "22"→"23", release held)
+
+- **Paint on walls** (idea: Tommy) — the Paint app graduates from
+  session-only doodles to a persisted per-tablet canvas. `PaintCanvas`
+  (root package `com.modpack.linktablet` — the ONE geometry/mapping
+  home for GUI, stroke handler, and renderer; never fork it) owns the
+  20×14/280-cell layout and index math. **Slice rule**: there is no
+  merged-canvas object — every tablet always owns its own 20×14 slice
+  (`paint_canvas` component + BE NBT byte array, 0 = blank, never
+  written all-blank); a merged wall's picture is derived by stitching
+  member slices at edit/render time, so merge, split, pickup, and
+  break all Just Work with zero crop/discard/orphan risk. T1 landed
+  the canvas + persistence + item↔block round-trip; T2 the wire
+  (`PaintStrokePayload`/`PaintClearPayload`, registrar **"22"→"23"**,
+  continuous-space stroke indices for block targets, mapped to member
+  BEs via `TabletScreenMath.screenRight/screenDown`); T3 the
+  `PaintScreen` rework (adaptive cell size down to 2px on big walls,
+  stroke batching cap 64/packet, block screens re-read synced state
+  with a pending-stroke overlay); T4 `renderPaintFace` (fills-only,
+  faint "Paint" label when blank) plus a kiosk-nav regression fix
+  (hub game launches from block-bound GUIs now resend
+  `SetProgramPayload`, restoring the ability to SET a wall to Paint —
+  the Arcade consolidation had silently dropped that path).
+- **The rotation-review saga, one-liner**: quarter-turned paintings on
+  a merged wall rescale PER-AXIS by design (not remapped index-for-
+  index) — that's the exact-fill requirement on non-square glass, and
+  it took a 3-round review to settle. `renderPaintFace` doing no index
+  remap at any rotation is correct; don't "fix" it again.
+- **Known notes carried into the next session**: paint walls have NOT
+  yet been seen in a running client (F2 pass owed — hold a stroke,
+  merge/split/rotate a wall, confirm the mural). `mod_version` bumped
+  to `1.11.0-beta.4` this pass — tester distribution, final release
+  name still plain `1.11.0`.
+- **Commits state**: T1-T4 are committed on `tablet-overlay`; this
+  docs + version-bump commit lands right after. Not pushed this pass.
+
+**Test matrix (beta.4 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-09-paint-walls-design.md` "Test
+matrix (beta.4 additions)":
+
+- Paint on a held tablet → close → reopen (persists) → place the
+  tablet → the wall shows the picture.
+- Wall GUI painting: strokes appear live on the wall for a second
+  viewer; clear wipes the whole wall.
+- Merge two painted 1×1s → both slices show in place; paint across
+  the seam → both tablets' slices update; split → each carries its
+  piece; re-merge same arrangement → mural reassembles.
+- Rotation: rotated merged wall shows the picture correctly.
+- Pickup: break a painted tablet → place elsewhere → picture intact;
+  the item survives a chest round-trip.
+- Secret-pip Paint edits the same canvas (no more session-scratch).
+- Kiosk nav: wall GUI → Arcade → Paint sets the wall face; ESC back
+  to hub; Home exits; the wall keeps showing Paint.
+- Old-world load: tablets without `paint_canvas` untouched; registrar
+  "23" pairing break vs beta.3 (everyone swaps together).
+- Regression: other game launches from a wall GUI nav the face again
+  (restored behavior); held launches unchanged.
+
+## Previous status (2026-08-08 night — 1.11.0-beta.3 = beta.2 + Arcade consolidation, registrar still "22", release held)
 
 - **Arcade** (`Program.ARCADE`, id 28, key `"arcade"`) — the 19
   individual game apps collapse into one Arcade app: T1 `Program.

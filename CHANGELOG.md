@@ -40,9 +40,21 @@
 - **Fixed**: the gauge editor's name field never accepted typing
   (since 1.10.0) — clicking it now focuses it, and it starts focused
   when the editor opens.
-- New payloads for the Monitor and Twitch Chat push the wire registrar
-  **"18" → "22" — a pairing break**: update client and server
-  together.
+- **Paint on walls** (idea: Tommy) — the Paint app's canvas is no
+  longer session-only doodling: it persists on the tablet (20×14
+  cells of the 16-color signal palette), so a painting survives
+  closing the app, breaking and re-placing the tablet, and a trip
+  through a chest. Placed tablets show their canvas on the wall.
+  Merge several tablets into one surface and their canvases stitch
+  into a single mural spanning every member — paint across the seam
+  and each tablet's own slice updates; split the wall apart and each
+  tablet carries its own piece away; re-merge in the same arrangement
+  and the picture reassembles. Painting itself still happens through
+  the GUI (held, pip, or a wall's own menu) — the wall displays, it
+  doesn't take direct on-glass strokes, yet.
+- New payloads for the Monitor, Twitch Chat, and Paint push the wire
+  registrar **"18" → "23" — a pairing break**: update client and
+  server together.
 - **Arcade** — the 19 individual game apps are now one **Arcade** app:
   a shelf with each game's best score, tap to play, ESC back to the
   shelf. Existing tiles on your Home screen for a game (Snake, 2048,

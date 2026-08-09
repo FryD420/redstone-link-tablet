@@ -290,6 +290,26 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   channel choice on a placed tablet carries the same trust model as
   editing its signals (whoever can open the GUI controls the wall).
 
+- Paint on walls (1.11.0, idea: Tommy): `PaintCanvas` (root package)
+  is the ONE geometry/mapping home — GUI, stroke handler, and renderer
+  all go through it; never fork the layout/index math into a second
+  copy. Disk form is FROZEN once shipped: `paint_canvas` component +
+  BE NBT byte array, 280 cells (20×14), 0 = blank, never written
+  all-blank. Slice rule: there is NO merged-canvas object — every
+  tablet always owns its own 20×14 slice; a merged wall's picture is
+  derived by stitching member slices at edit/render time (merge,
+  split, pickup, break all Just Work, no crop/discard/orphan). Strokes
+  are wire-encoded in CONTINUOUS surface space for block targets (the
+  server maps continuous index → member BE + local cell via
+  `TabletScreenMath.screenRight/screenDown`, the surfaceLayout
+  precedent) and in local 20×14 space for held/1×1 targets — don't
+  conflate the two spaces. `renderPaintFace` does NO index remap at
+  any rotation — the per-axis rescale on quarter turns is the correct,
+  exact-fill behavior on non-square glass (settled after a 3-round
+  review derivation); if a painting looks "off" after a rotation,
+  suspect the caller, not the renderer, and don't re-add a remap.
+  Registrar "18"→"23".
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in
