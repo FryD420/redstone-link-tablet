@@ -107,21 +107,46 @@ public final class EmoteTextures {
 
     private static void load(TwitchEmotes.Emote emote) {
         try {
-            HttpResponse<byte[]> resp = HTTP.send(
+            HttpResponse<java.io.InputStream> resp = HTTP.send(
                     HttpRequest.newBuilder(URI.create(emote.url()))
                             .timeout(Duration.ofSeconds(15)).build(),
-                    HttpResponse.BodyHandlers.ofByteArray());
+                    HttpResponse.BodyHandlers.ofInputStream());
             if (resp.statusCode() != 200) throw new IOException("http " + resp.statusCode());
-            if (resp.body().length > MAX_BYTES) throw new IOException(resp.body().length + " bytes");
-            Decoded d = decode(resp.body());
+            byte[] body = readBounded(resp.body());
+            Decoded d = decode(body);
             NativeImage sheet = toSheet(d);
-            Minecraft.getInstance().execute(() -> install(emote.cacheKey(), sheet, d.delaysMs()));
+            Minecraft.getInstance().execute(() -> {
+                try {
+                    install(emote.cacheKey(), sheet, d.delaysMs());
+                } catch (RuntimeException e) {
+                    LOG.info("Emote {} unavailable ({})", emote.name(), e.getMessage());
+                    LOADING.remove(emote.cacheKey());
+                    FAILED.add(emote.cacheKey());
+                }
+            });
         } catch (Exception e) {
             LOG.info("Emote {} unavailable ({})", emote.name(), e.getMessage());
             Minecraft.getInstance().execute(() -> {
                 LOADING.remove(emote.cacheKey());
                 FAILED.add(emote.cacheKey());
             });
+        }
+    }
+
+    /** Reads the body in ~8 KB chunks, aborting as soon as MAX_BYTES would
+     * be exceeded — enforces the download cap while streaming instead of
+     * after a full buffer is already in memory. */
+    private static byte[] readBounded(java.io.InputStream in) throws IOException {
+        try (in; java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192];
+            int total = 0;
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                total += n;
+                if (total > MAX_BYTES) throw new IOException("over " + MAX_BYTES + " bytes");
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
         }
     }
 
@@ -135,7 +160,11 @@ public final class EmoteTextures {
             try {
                 reader.setInput(in, false, false);
                 if (!"gif".equalsIgnoreCase(reader.getFormatName())) {
-                    return new Decoded(List.of(toArgb(reader.read(0))), new int[]{0});
+                    BufferedImage img = reader.read(0);
+                    int w = img.getWidth();
+                    int h = img.getHeight();
+                    if (w < 1 || h < 1 || w > 128 || h > 128) throw new IOException(w + "x" + h);
+                    return new Decoded(List.of(toArgb(img)), new int[]{0});
                 }
                 return decodeGif(reader);
             } finally {
