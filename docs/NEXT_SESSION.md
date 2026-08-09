@@ -3,6 +3,27 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
+## ▶ START HERE next session (state as of 2026-08-09 end of day)
+
+- **1.11.0-beta.5 is with the testers** (jar + checklist sent
+  2026-08-09; pairs with beta.4, registrar "23"). The whole 1.11.0
+  train: Frequency Monitor + multi-probe container editor, Twitch
+  Chat, Arcade consolidation, Paint on walls (Paint its own app),
+  App Store search, focus fixes. All pushed through `1161234`.
+- **Beta.5 additions user-verified in dev**: Paint store row, compact
+  Twitch chat walls, bezel-clean text on all four edges (three
+  screenshot-driven fix rounds, all confirmed "perfect").
+- **Remaining before RELEASE** (all user-gated): tester verdicts
+  across beta.2–5 matrices (below); the dedicated-server `runServer`
+  pass (Monitor classification + Twitch on a server — never run);
+  listing refresh (DESCRIPTION.md still describes 1.10.x — none of
+  1.11.0 is in the listing text) + the long-queued screenshot shoot;
+  then version → 1.11.0, changelog date, tag, push, uploads.
+- **Open user calls parked in-line**: Home-from-hub kiosk renav
+  (testers may answer); gauge editor container-menu conversion (EMI
+  drag); App Store categories (roadmap, less urgent since the
+  Arcade); survival tablet cloning (Parked section).
+
 ## Status (2026-08-09 — 1.11.0-beta.5: Paint promoted to its own app; beta.4 = paint on walls, registrar "23", release held)
 
 - **beta.5 (same day, user decision after playing beta.4)**: Paint
@@ -808,6 +829,16 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
    that decision first.
 
 ## Parked (don't propose unless the user re-raises)
+
+- **Survival tablet cloning** — parked 2026-08-09 ("backburner",
+  scoped in-session): creative pick-block already full-clones
+  (everything incl. paint rides the item). Survival options if it
+  comes back: (1) crafting-grid clone, the written-book pattern —
+  configured tablet + blank → both configured, ~half session, no
+  wire changes, could ride any release; (2) deployer "flashing
+  station" on the assembly line — Create-flavored, heavier. Open
+  scope Qs recorded: clone everything vs config-only (painting?),
+  does a clone copy the anvil name.
 
 - **Orbital Cannon launch-control app** — parked 2026-07-29 mid-
   brainstorm ("I have an idea for this for later", before any design
