@@ -1,7 +1,9 @@
 package com.modpack.linktablet.network;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.PaintCanvas;
 import com.modpack.linktablet.block.TabletBlockEntity;
+import com.modpack.linktablet.block.TabletScreenMath;
 import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.item.TabletItem;
@@ -24,13 +26,16 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -664,6 +669,52 @@ public class ModNetworking {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Paint on walls (1.11.0): strokes travel as sparse cell lists in
+    // CONTINUOUS surface-space index (block targets) or local canvas
+    // index (item targets) — see PaintCanvas for the index math.
+    // ------------------------------------------------------------------
+
+    /** One painted cell: index (continuous for block targets, local for
+     * item targets) + palette color (0 = blank, 1..MAX_COLOR = paint). */
+    public record PaintCell(int index, byte color) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintCell> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.VAR_INT, PaintCell::index,
+                        ByteBufCodecs.BYTE, PaintCell::color,
+                        PaintCell::new);
+    }
+
+    /** A stroke's sparse cell list (cap 64 — a drag gesture's worth of
+     * cells per packet, not the whole canvas). */
+    public record PaintStrokePayload(SignalTarget target, List<PaintCell> cells)
+            implements CustomPacketPayload {
+        public static final Type<PaintStrokePayload> TYPE = new Type<>(id("paint_stroke"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintStrokePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, PaintStrokePayload::target,
+                        PaintCell.STREAM_CODEC.apply(ByteBufCodecs.list(64)), PaintStrokePayload::cells,
+                        PaintStrokePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Blanks the whole canvas (item: the whole component; block: every
+     * touched member's canvas). */
+    public record PaintClearPayload(SignalTarget target) implements CustomPacketPayload {
+        public static final Type<PaintClearPayload> TYPE = new Type<>(id("paint_clear"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintClearPayload> STREAM_CODEC =
+                SignalTarget.STREAM_CODEC.map(PaintClearPayload::new, PaintClearPayload::target);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void handleSetProgram(SetProgramPayload payload, IPayloadContext context) {
         Player player = context.player();
         if (payload.target().pos().isEmpty()) return;
@@ -721,7 +772,9 @@ public class ModNetworking {
         // add-probe container menu; still inside the 1.11.0 break).
         // "22": 1.11.0 Twitch Chat — SetTwitchChannelPayload added (still
         // inside the 1.11.0 break).
-        PayloadRegistrar registrar = event.registrar("22");
+        // "23": 1.11.0 paint on walls — PaintStrokePayload/PaintClearPayload
+        // added (still inside the 1.11.0 break).
+        PayloadRegistrar registrar = event.registrar("23");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -749,6 +802,10 @@ public class ModNetworking {
                 ModNetworking::handleMonitorSnapshot);
         registrar.playToServer(SetTwitchChannelPayload.TYPE, SetTwitchChannelPayload.STREAM_CODEC,
                 ModNetworking::handleSetTwitchChannel);
+        registrar.playToServer(PaintStrokePayload.TYPE, PaintStrokePayload.STREAM_CODEC,
+                ModNetworking::handlePaintStroke);
+        registrar.playToServer(PaintClearPayload.TYPE, PaintClearPayload.STREAM_CODEC,
+                ModNetworking::handlePaintClear);
     }
 
     /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
@@ -827,6 +884,122 @@ public class ModNetworking {
             } else {
                 stack.set(ModDataComponents.TWITCH_CHANNEL.get(), channel);
             }
+        }
+    }
+
+    /**
+     * The member BE at (dx, dy) SURFACE offset from a controller, or
+     * null when unloaded/absent — (0,0) is the controller itself. Mirrors
+     * the offset math {@code TabletBlockEntity.updateLit()}'s controller
+     * loop and {@code surfaceIntact()} use: {@code screenRight}/
+     * {@code screenDown} give the world axes for surface dx/dy under the
+     * controller's FACING, so this is NOT plain world-axis arithmetic.
+     */
+    @Nullable
+    private static TabletBlockEntity memberAt(Level level, TabletBlockEntity controller, int dx, int dy) {
+        if (dx == 0 && dy == 0) return controller;
+        BlockState state = controller.getBlockState();
+        BlockPos pos = controller.getBlockPos()
+                .relative(TabletScreenMath.screenRight(state), dx)
+                .relative(TabletScreenMath.screenDown(state), dy);
+        if (!level.isLoaded(pos)) return null;
+        return level.getBlockEntity(pos) instanceof TabletBlockEntity member ? member : null;
+    }
+
+    /** Resolves a stroke's block target down to its controller + surface
+     * span, the SetProbePayload/handleSetProbe resolution shape. */
+    @Nullable
+    private static TabletBlockEntity resolvePaintController(Player player, BlockPos pos) {
+        if (!player.level().isLoaded(pos)) return null;
+        if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return null;
+        if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
+        return clicked.resolveController();
+    }
+
+    private static void handlePaintStroke(PaintStrokePayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
+            if (controller == null) return;
+            int surfaceW = controller.getSurfaceW();
+            int surfaceH = controller.getSurfaceH();
+            int contW = surfaceW * PaintCanvas.COLS;
+            int contH = surfaceH * PaintCanvas.ROWS;
+            // Group cells by owning member first — one setPaintCanvas
+            // (one sync packet) per touched member per stroke, not per cell.
+            Map<Long, Map<Integer, Byte>> byMember = new LinkedHashMap<>();
+            for (PaintCell cell : payload.cells()) {
+                if (cell.color() < 0 || cell.color() > PaintCanvas.MAX_COLOR) continue;
+                int index = cell.index();
+                if (index < 0 || index >= contW * contH) continue;
+                int contX = index % contW;
+                int contY = index / contW;
+                int dx = PaintCanvas.memberDx(contX);
+                int dy = PaintCanvas.memberDy(contY);
+                int local = PaintCanvas.localIndex(contX, contY);
+                long key = (((long) dx) << 32) | (dy & 0xFFFFFFFFL);
+                byMember.computeIfAbsent(key, k -> new LinkedHashMap<>()).put(local, cell.color());
+            }
+            Level level = player.level();
+            for (Map.Entry<Long, Map<Integer, Byte>> entry : byMember.entrySet()) {
+                int dx = (int) (entry.getKey() >> 32);
+                int dy = (int) (long) entry.getKey();
+                TabletBlockEntity member = memberAt(level, controller, dx, dy);
+                if (member == null) continue;
+                // Clone before mutating — setPaintCanvas stores by
+                // reference, and the array we hand it must never be
+                // touched again after the call (T1 aliasing rule).
+                byte[] updated = member.getPaintCanvas().clone();
+                boolean changed = false;
+                for (Map.Entry<Integer, Byte> localCell : entry.getValue().entrySet()) {
+                    int local = localCell.getKey();
+                    byte color = localCell.getValue();
+                    if (updated[local] == color) continue;
+                    updated[local] = color;
+                    changed = true;
+                }
+                if (changed) member.setPaintCanvas(updated);
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (stack.isEmpty()) return;
+        byte[] canvas = stack.getOrDefault(ModDataComponents.PAINT_CANVAS.get(), PaintCanvas.blank()).clone();
+        boolean changed = false;
+        for (PaintCell cell : payload.cells()) {
+            int index = cell.index();
+            byte color = cell.color();
+            if (index < 0 || index >= PaintCanvas.CELLS) continue;
+            if (color < 0 || color > PaintCanvas.MAX_COLOR) continue;
+            if (canvas[index] == color) continue;
+            canvas[index] = color;
+            changed = true;
+        }
+        if (!changed) return;
+        if (PaintCanvas.isBlank(canvas)) {
+            stack.remove(ModDataComponents.PAINT_CANVAS.get());
+        } else {
+            stack.set(ModDataComponents.PAINT_CANVAS.get(), canvas);
+        }
+    }
+
+    private static void handlePaintClear(PaintClearPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
+            if (controller == null) return;
+            Level level = player.level();
+            for (int dx = 0; dx < controller.getSurfaceW(); dx++) {
+                for (int dy = 0; dy < controller.getSurfaceH(); dy++) {
+                    TabletBlockEntity member = memberAt(level, controller, dx, dy);
+                    if (member != null) member.setPaintCanvas(PaintCanvas.blank());
+                }
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            stack.remove(ModDataComponents.PAINT_CANVAS.get());
         }
     }
 
