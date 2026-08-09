@@ -45,7 +45,12 @@ import java.util.regex.Pattern;
 @EventBusSubscriber(modid = LinkTabletMod.MOD_ID, value = Dist.CLIENT)
 public final class TwitchChatService {
 
-    public record ChatMessage(String user, int color, String text) {}
+    /** One native emote occurrence: INCLUSIVE Unicode CODE-POINT range
+     * into the message text (Twitch counts code points, not chars —
+     * astral emoji before an emote shift char indices, not these). */
+    public record EmoteSpan(int from, int to, String id) {}
+
+    public record ChatMessage(String user, int color, String text, List<EmoteSpan> emotes) {}
 
     public enum Status { IDLE, CONNECTING, LIVE, OFFLINE }
 
@@ -66,6 +71,11 @@ public final class TwitchChatService {
 
     /** Client thread writes (mirrored every tick); worker thread only reads. */
     private static final Set<String> WANTED_SHARED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** channel → numeric Twitch room id, learned from message tags.
+     * Worker thread writes; client thread (TwitchEmotes) reads. */
+    private static final Map<String, String> ROOM_IDS =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     // ---- reader-thread handoff ----
     private record Incoming(String channel, ChatMessage message) {}
@@ -118,6 +128,11 @@ public final class TwitchChatService {
         String c = normalize(channel);
         if (c == null || !wanted().contains(c)) return Status.IDLE;
         return status;
+    }
+
+    public static String roomId(String channel) {
+        String c = normalize(channel);
+        return c == null ? "" : ROOM_IDS.getOrDefault(c, "");
     }
 
     private static String normalize(String channel) {
@@ -191,6 +206,7 @@ public final class TwitchChatService {
         BUFFERS.clear();
         JOINED.clear();
         WANTED_SHARED.clear();
+        ROOM_IDS.clear();
         Worker w = worker;
         if (w != null) {
             w.shutdown();
@@ -331,7 +347,10 @@ public final class TwitchChatService {
             int color = colorTag.startsWith("#")
                     ? 0xFF000000 | Integer.parseInt(colorTag.substring(1), 16)
                     : defaultColor(user);
-            QUEUE.add(new Incoming(channel, new ChatMessage(user, color, text)));
+            String roomId = tagValue(tags, "room-id");
+            if (!roomId.isEmpty()) ROOM_IDS.putIfAbsent(channel, roomId);
+            QUEUE.add(new Incoming(channel,
+                    new ChatMessage(user, color, text, parseEmotes(tagValue(tags, "emotes")))));
         }
 
         private static String tagValue(String tags, String key) {
@@ -339,6 +358,29 @@ public final class TwitchChatService {
                 if (tag.startsWith(key + "=")) return tag.substring(key.length() + 1);
             }
             return "";
+        }
+
+        /** "25:0-4,12-16/1902:6-10" → sorted spans; malformed pieces dropped. */
+        private static List<EmoteSpan> parseEmotes(String tag) {
+            if (tag.isEmpty()) return List.of();
+            List<EmoteSpan> spans = new ArrayList<>();
+            for (String group : tag.split("/")) {
+                int colon = group.indexOf(':');
+                if (colon <= 0) continue;
+                String id = group.substring(0, colon);
+                for (String range : group.substring(colon + 1).split(",")) {
+                    int dash = range.indexOf('-');
+                    if (dash <= 0) continue;
+                    try {
+                        int from = Integer.parseInt(range.substring(0, dash));
+                        int to = Integer.parseInt(range.substring(dash + 1));
+                        if (from >= 0 && to >= from) spans.add(new EmoteSpan(from, to, id));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+            spans.sort(java.util.Comparator.comparingInt(EmoteSpan::from));
+            return spans;
         }
 
         /** Stable per-name fallback when the chatter never set a color. */
