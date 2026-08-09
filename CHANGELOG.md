@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New app: **Twitch Chat** — a read-only viewer of a chosen Twitch
+  channel's live chat, no account or login required (anonymous guest
+  access, nothing ever sent). Works on all three surfaces: held tablet
+  (channel box + scrolling colored chat), the overlay pin (compact HUD
+  chat while you play), and placed tablets (a wall-mounted chat board —
+  set once from the block's GUI, every viewer sees it with their own
+  connection). Your personal channel is remembered per-player; a placed
+  tablet remembers its own. The tablet only talks to Twitch while chat
+  is actually on screen — close every Twitch surface and the connection
+  drops, open one and it reconnects.
 - New app: **Frequency Monitor** — see who's actually transmitting or
   listening on a Redstone Link channel. Every frequency your signals
   and gauges use gets a live member list: Create link blocks, placed
@@ -30,8 +40,9 @@
 - **Fixed**: the gauge editor's name field never accepted typing
   (since 1.10.0) — clicking it now focuses it, and it starts focused
   when the editor opens.
-- New payloads for the Monitor push the wire registrar **"18" →
-  "20" — a pairing break**: update client and server together.
+- New payloads for the Monitor and Twitch Chat push the wire registrar
+  **"18" → "22" — a pairing break**: update client and server
+  together.
 
 ## 1.10.2 — 2026-08-03
 

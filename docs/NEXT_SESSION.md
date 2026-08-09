@@ -3,7 +3,55 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-08 evening — 1.11.0 feedback round 2 IN CODE + user-verified, registrar "21", release held)
+## Status (2026-08-08 night — 1.11.0-beta.2, Twitch Chat IN CODE + committed, registrar "22", release held)
+
+- **Twitch Chat** (`Program.TWITCH`, id 27, key `"twitch"`) — all 7
+  plan tasks done and committed on `tablet-overlay`: Program + lang
+  (T1); `client/TwitchChatService` — one anonymous TLS link to
+  Twitch's chat relay (`justinfan` guest nick, tags for username
+  colors), ref-counted per-channel joins, 2s→60s reconnect backoff,
+  prompt socket close on shutdown (T2); `twitch_channel` component +
+  BE NBT (never written empty) + `SetTwitchChannelPayload` — registrar
+  **"21"→"22"** (T3); `TwitchScreen` — channel box with click-to-focus
+  + Enter/focus-loss commit, colored wrapped chat, autoscroll-unless-
+  scrolled-up (T4); `TwitchOverlayContent` HUD pane (T5); kiosk
+  `renderTwitchFace` chat wall, three-pass, touchFace-first presence
+  (T6); this docs pass (T7). Socket runs ONLY while a surface displays
+  chat — screens/overlay acquire-release, faces heartbeat via
+  `touchFace` with a 100-tick expiry; logout clears every ref (and
+  `NoteWindows` now defocuses windows before clearing, a general fix
+  that fell out of that work). `mod_version` bumped to
+  `1.11.0-beta.2` this pass — tester distribution, final release name
+  still plain `1.11.0`.
+- **Known notes carried into the next session**: (a) the face and
+  screen visuals have NOT yet been seen in a running client — an F2
+  pass is owed before calling Twitch Chat done; (b) the CONNECTING/
+  LIVE/OFFLINE status lang-key switch is triplicated across screen/
+  overlay/face — a cleanup candidate, not urgent; (c) chat is
+  unfiltered live internet content and channel choice on a placed
+  tablet is open to anyone who can open its GUI — same trust model as
+  signal editing, noted for family-server awareness, not a bug.
+- **Commits state**: all 7 Twitch tasks plus this docs commit are on
+  `tablet-overlay`, not pushed (per this session's instructions — no
+  push this pass). Full `./gradlew build` gate covered below.
+
+**Test matrix (beta.2 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-08-twitch-chat-design.md`:
+
+- Set a live channel on a held tablet → chat flows; pin the overlay →
+  chat on HUD while playing.
+- Wall tablet: set channel from its GUI → face shows chat; second
+  account sees the same wall (its own connection).
+- Connection hygiene: close every Twitch surface → socket closes
+  (netstat or log line); reopen → rejoins.
+- Kill the network mid-chat → OFFLINE status, auto-reconnect when it
+  returns.
+- Misspelled/empty channel → "no messages yet" / hint, no errors.
+- Break + re-place a channel-set tablet → channel survives.
+- Regression: registrar "22" pairing break, old-world load, the
+  1.11.0 matrix still green.
+
+## Previous status (2026-08-08 evening — 1.11.0 feedback round 2 IN CODE + user-verified, registrar "21", release held)
 
 - **Round 2 (same day, from the redo sessions)**: (a) standalone
   EditBox click-to-focus fix — the store search box ate clicks
@@ -618,6 +666,16 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
    was DROPPED by user decision 2026-07-21 ("let the testers find
    bugs") — do NOT re-propose it; those areas are simply where to look
    first if a report comes in.
+7. **App Store categories** (user-requested 2026-08-08, mid-beta.2) —
+   the shelf is now 26 programs deep (utilities, games, media with
+   Twitch joining); group it with category headers, filter chips, or
+   per-category tabs instead of one flat scrolling list. Client UI
+   only, no wire/persistence change — pairs-safe, no registrar bump.
+   Design open: headers (cheapest, `StoreScreen` already scrolls),
+   filter chips (needs a selected-category client state), or tabs
+   (biggest rework, competes with the existing scroll). Needs a
+   category assignment per `Program`/addon entry either way — scope
+   that decision first.
 
 ## Parked (don't propose unless the user re-raises)
 

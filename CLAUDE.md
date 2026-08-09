@@ -272,6 +272,24 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   plain-screen drag targets work on JEI-only installs (JEI's
   addGuiScreenHandler shows the panel); under EMI they're inert.
 
+- Twitch Chat (1.11.0): `client/TwitchChatService` is CLIENT-ONLY and
+  READ-ONLY — anonymous `justinfan` guest link to Twitch's chat relay,
+  never grow a PRIVMSG writer or any auth flow; the product is "no
+  accounts, no tokens, nothing stored." The socket exists ONLY while
+  something displays chat (screens/overlay acquire-release the channel
+  ref-count; kiosk faces don't have a lifecycle to hook, so they
+  heartbeat via `touchFace` every render, with a 100-tick expiry
+  standing in for release) — no consumer means the socket closes, full
+  stop. Channel names are validated to `[a-z0-9_]{1,25}` in TWO places
+  that must stay in sync: `TwitchChatService` (client input) and
+  `ModNetworking` (server-side, since the client class never loads on
+  a dedicated server — copy the pattern, don't share the class).
+  Logout clears every ref and drops the connection; `NoteWindows` now
+  defocuses windows before clearing as part of that fix (a general fix,
+  not Twitch-specific). Chat is unfiltered live internet content —
+  channel choice on a placed tablet carries the same trust model as
+  editing its signals (whoever can open the GUI controls the wall).
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in
