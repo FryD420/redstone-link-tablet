@@ -96,6 +96,18 @@ public class ModDataComponents {
                     .networkSynchronized(ByteBufCodecs.STRING_UTF8)
                     .build());
 
+    /** Paint canvas (1.11.0); absent = blank (never written all-blank —
+     * the theme idiom); 280 palette indices, disk form frozen. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<byte[]>> PAINT_CANVAS =
+            DATA_COMPONENTS.register("paint_canvas", () -> DataComponentType.<byte[]>builder()
+                    .persistent(Codec.BYTE_BUFFER.xmap(buf -> {
+                        byte[] array = new byte[buf.remaining()];
+                        buf.get(array);
+                        return array;
+                    }, java.nio.ByteBuffer::wrap))
+                    .networkSynchronized(ByteBufCodecs.byteArray(com.modpack.linktablet.PaintCanvas.CELLS))
+                    .build());
+
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCREEN_ROTATION =
             DATA_COMPONENTS.register("screen_rotation", () -> DataComponentType.<Integer>builder()

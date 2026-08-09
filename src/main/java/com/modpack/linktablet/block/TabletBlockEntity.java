@@ -109,6 +109,12 @@ public class TabletBlockEntity extends BlockEntity {
     /** Twitch Chat channel (1.11.0); "" = unset. */
     private String twitchChannel = "";
 
+    /** Paint canvas (1.11.0 "paint on walls"), this member's own
+     * COLS×ROWS slice — merged walls stitch member slices at edit/
+     * render time (see {@link com.modpack.linktablet.PaintCanvas});
+     * all-zero = blank. */
+    private byte[] paintCanvas = com.modpack.linktablet.PaintCanvas.blank();
+
     /**
      * Frequency Monitor summary (1.11.0, block half): index-aligned with
      * {@code MonitorChannels.channelsOf(signals, gauges, monitorProbe)},
@@ -544,6 +550,34 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    // ---- Paint canvas (1.11.0) -----------------------------------------
+
+    /** This member's own COLS×ROWS slice; renderer-read-only, callers
+     * must not mutate the returned array. */
+    public byte[] getPaintCanvas() {
+        return paintCanvas;
+    }
+
+    public void setPaintCanvas(byte[] newCanvas) {
+        if (java.util.Arrays.equals(paintCanvas, newCanvas)) return;
+        this.paintCanvas = newCanvas;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /** Paints one local cell (bounds-checked, no-op on out-of-range or
+     * unchanged) — mutates a copy and delegates to {@link
+     * #setPaintCanvas} so the sync path stays one road. */
+    public void setPaintCell(int localIndex, byte color) {
+        if (localIndex < 0 || localIndex >= com.modpack.linktablet.PaintCanvas.CELLS) return;
+        if (paintCanvas[localIndex] == color) return;
+        byte[] copy = paintCanvas.clone();
+        copy[localIndex] = color;
+        setPaintCanvas(copy);
+    }
+
     /** Counts, index-aligned with {@code MonitorChannels.channelsOf}:
      * members transmitting (strength &gt; 0) and in range. */
     public int[] monitorCounts() {
@@ -582,6 +616,9 @@ public class TabletBlockEntity extends BlockEntity {
         setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
         setMonitorProbes(stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of()));
         setTwitchChannel(stack.getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), ""));
+        byte[] canvas = stack.get(ModDataComponents.PAINT_CANVAS.get());
+        setPaintCanvas(canvas != null && canvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                ? canvas : com.modpack.linktablet.PaintCanvas.blank());
         setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
     }
 
@@ -618,6 +655,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (!twitchChannel.isEmpty()) {
             stack.set(ModDataComponents.TWITCH_CHANNEL.get(), twitchChannel);
+        }
+        if (!com.modpack.linktablet.PaintCanvas.isBlank(paintCanvas)) {
+            stack.set(ModDataComponents.PAINT_CANVAS.get(), paintCanvas);
         }
         return stack;
     }
@@ -948,6 +988,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (!twitchChannel.isEmpty()) {
             tag.putString("twitch_channel", twitchChannel);
         }
+        if (!com.modpack.linktablet.PaintCanvas.isBlank(paintCanvas)) {
+            tag.putByteArray("paint_canvas", paintCanvas);
+        }
         if (caseColor != null) {
             tag.putString("case_color", caseColor.getName());
         }
@@ -1014,6 +1057,10 @@ public class TabletBlockEntity extends BlockEntity {
                         : Frequency.CODEC.parse(NbtOps.INSTANCE, monitorProbeTag)
                                 .result().map(List::of).orElse(List.of());
         this.twitchChannel = tag.getString("twitch_channel");
+        byte[] loadedCanvas = tag.contains("paint_canvas", Tag.TAG_BYTE_ARRAY)
+                ? tag.getByteArray("paint_canvas") : new byte[0];
+        this.paintCanvas = loadedCanvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                ? loadedCanvas : com.modpack.linktablet.PaintCanvas.blank();
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");
