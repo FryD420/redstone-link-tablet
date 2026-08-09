@@ -13,9 +13,17 @@ public final class SecretGames {
      * dispatch, but ESC goes Home — the tile is the door, unlike
      * secret-pip launches which return to the signals grid. */
     public static Screen createApp(String id, SignalView view) {
+        return createApp(id, view, com.modpack.linktablet.Program.LAUNCHER);
+    }
+
+    /** Arcade-hub launch (1.11.0): same dispatch, ESC returns to the
+     * given program — the hub passes ARCADE so the shelf feels like
+     * home base. */
+    public static Screen createApp(String id, SignalView view,
+                                   com.modpack.linktablet.Program returnTo) {
         Screen screen = create(id, view, true);
         if (screen instanceof ArcadeScreen arcade) {
-            arcade.setReturnProgram(com.modpack.linktablet.Program.LAUNCHER);
+            arcade.setReturnProgram(returnTo);
         }
         return screen;
     }

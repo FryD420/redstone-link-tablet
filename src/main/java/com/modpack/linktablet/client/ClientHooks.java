@@ -117,6 +117,7 @@ public class ClientHooks {
                 case STORE -> new com.modpack.linktablet.client.screen.StoreScreen(view);
                 case MONITOR -> new com.modpack.linktablet.client.screen.MonitorScreen(view);
                 case TWITCH -> new com.modpack.linktablet.client.screen.TwitchScreen(view);
+                case ARCADE -> new com.modpack.linktablet.client.screen.ArcadeHubScreen(view);
                 default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
             };
         }
