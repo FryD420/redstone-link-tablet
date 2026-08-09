@@ -51,6 +51,10 @@ public final class TwitchEmotes {
     private static final Set<String> FETCHED = new HashSet<>();
     private static final Set<String> JOINED = new HashSet<>();
 
+    /** Bumped on logout; in-flight fetch results from an older epoch are
+     * dropped in apply(). */
+    private static int epoch = 0;
+
     public static Emote resolve(String word, String channel) {
         Map<String, Emote> set = SETS.get(channel);
         Emote e = set == null ? null : set.get(word);
@@ -96,6 +100,7 @@ public final class TwitchEmotes {
 
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        epoch++;
         SETS.clear();
         GENERATION.clear();
         FETCHED.clear();
@@ -107,28 +112,30 @@ public final class TwitchEmotes {
     // ------------------------------------------------------------------
 
     private static void fetchGlobals() {
+        int fetchEpoch = epoch;
         get("https://7tv.io/v3/emote-sets/global", "7TV global", json ->
-                apply("", parse7tv(json.getAsJsonObject().getAsJsonArray("emotes"))));
+                apply(fetchEpoch, "", parse7tv(json.getAsJsonObject().getAsJsonArray("emotes"))));
         get("https://api.betterttv.net/3/cached/emotes/global", "BTTV global", json ->
-                apply("", parseBttv(json.getAsJsonArray())));
+                apply(fetchEpoch, "", parseBttv(json.getAsJsonArray())));
         get("https://api.frankerfacez.com/v1/set/global", "FFZ global", json ->
-                apply("", parseFfz(json.getAsJsonObject().getAsJsonObject("sets"))));
+                apply(fetchEpoch, "", parseFfz(json.getAsJsonObject().getAsJsonObject("sets"))));
     }
 
     private static void fetchChannel(String channel, String roomId) {
+        int fetchEpoch = epoch;
         get("https://7tv.io/v3/users/twitch/" + roomId, "7TV/" + channel, json -> {
             JsonObject set = json.getAsJsonObject().getAsJsonObject("emote_set");
-            if (set != null) apply(channel, parse7tv(set.getAsJsonArray("emotes")));
+            if (set != null) apply(fetchEpoch, channel, parse7tv(set.getAsJsonArray("emotes")));
         });
         get("https://api.betterttv.net/3/cached/users/twitch/" + roomId, "BTTV/" + channel,
                 json -> {
                     JsonObject o = json.getAsJsonObject();
                     Map<String, Emote> m = parseBttv(o.getAsJsonArray("channelEmotes"));
                     m.putAll(parseBttv(o.getAsJsonArray("sharedEmotes")));
-                    apply(channel, m);
+                    apply(fetchEpoch, channel, m);
                 });
         get("https://api.frankerfacez.com/v1/room/id/" + roomId, "FFZ/" + channel, json ->
-                apply(channel, parseFfz(json.getAsJsonObject().getAsJsonObject("sets"))));
+                apply(fetchEpoch, channel, parseFfz(json.getAsJsonObject().getAsJsonObject("sets"))));
     }
 
     private static void get(String url, String label, Consumer<JsonElement> onJson) {
@@ -153,7 +160,8 @@ public final class TwitchEmotes {
                 });
     }
 
-    private static void apply(String channel, Map<String, Emote> emotes) {
+    private static void apply(int fetchEpoch, String channel, Map<String, Emote> emotes) {
+        if (fetchEpoch != epoch) return; // logged out (and possibly back in) since dispatch
         if (emotes.isEmpty()) return;
         if (!channel.isEmpty() && !JOINED.contains(channel)) return; // parted while in flight
         SETS.computeIfAbsent(channel, c -> new HashMap<>()).putAll(emotes);
