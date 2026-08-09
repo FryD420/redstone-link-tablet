@@ -3,7 +3,28 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-09 — 1.11.0-beta.4 = beta.3 + paint on walls, registrar "22"→"23", release held)
+## Status (2026-08-09 — 1.11.0-beta.5: Paint promoted to its own app; beta.4 = paint on walls, registrar "23", release held)
+
+- **beta.5 (same day, user decision after playing beta.4)**: Paint
+  left the Arcade — `PAINT(25)` dropped its `game` flag, which
+  automatically: removes it from the Arcade shelf (18 games remain),
+  adds its store row (desc refreshed to mention walls), and stops
+  `fromKeys` migrating "paint" roster tiles to ARCADE (tiles folded
+  by beta.3/4 need a one-time re-Get from the store — changelogged).
+  `ClientHooks.screenFor` gained `case PAINT ->` riding the same
+  key-based SecretGames dispatch (pip easter egg untouched; wall
+  exits stay silent so murals park). KEY "paint" frozen as ever. No
+  wire change — registrar stays "23"; beta.5 PAIRS with beta.4.
+  Beta.5 test adds: store shows Paint row + Arcade (no Paint inside
+  the hub); paint tile on Home opens Paint, ESC → Home; pip still
+  works; a beta.4 roster's Arcade tile still opens the 18-game hub.
+- **Also beta.5 (same session, user screenshot report)**:
+  `renderTwitchFace` chat lines were riding the signals list's
+  chunky row bands (`LIST_ROWS * surfaceH`) — a merged wall spread
+  five messages across the glass with huge gaps. Now compact
+  bottom-stacked lines (`LIST_TEXT_H * 1.35` leading, count =
+  glassH/lineH): same text size everywhere, bigger walls fit MORE
+  lines. Verify on solo + merged Twitch walls.
 
 - **Paint on walls** (idea: Tommy) — the Paint app graduates from
   session-only doodles to a persisted per-tablet canvas. `PaintCanvas`

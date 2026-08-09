@@ -58,7 +58,12 @@ public enum Program implements com.modpack.linktablet.api.TabletProgram {
     G2048(22, "2048", 0xFFFED83D, "minecraft:gold_block", true),
     CRATES(23, "crates", 0xFF835432, "minecraft:barrel", true),
     LIFE(24, "life", 0xFF5E7C16, "minecraft:moss_block", true),
-    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting", true),
+    /** Paint (game=false since 1.11.0 beta.5, user decision after the
+     * wall-canvas feature): a real app with a store row, no longer an
+     * Arcade resident. The KEY stays "paint" forever — it still drives
+     * the SecretGames dispatch (the pip easter egg is key-based) and
+     * kiosk screen_program values in the wild. */
+    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting"),
     /** Frequency Monitor (1.11.0): read-only view of Create's link
      * network — who transmits on each channel the tablet uses. */
     MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass"),

@@ -130,6 +130,11 @@ public class ClientHooks {
                 case MONITOR -> new com.modpack.linktablet.client.screen.MonitorScreen(view);
                 case TWITCH -> new com.modpack.linktablet.client.screen.TwitchScreen(view);
                 case ARCADE -> new com.modpack.linktablet.client.screen.ArcadeHubScreen(view);
+                // Paint left the Arcade (beta.5): its own app, but the
+                // screen still rides the SecretGames dispatch (key-based,
+                // shared with the pip easter egg); ESC goes Home like
+                // every app, silently on walls so murals stay parked
+                case PAINT -> com.modpack.linktablet.client.screen.SecretGames.createApp("paint", view);
                 default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
             };
         }

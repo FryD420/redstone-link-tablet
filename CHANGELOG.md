@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Paint is its own app now** — with paintings persisting and showing
+  on walls, Paint outgrew the Arcade: it has its own App Store row
+  (pink chip, painting icon). The Arcade keeps the other 18 games. If
+  an earlier beta folded your Paint tile into the Arcade tile, just
+  Get Paint from the store again.
+- **Twitch chat walls read like chat now** — messages on placed
+  tablets stack as compact lines from the bottom of the screen
+  instead of spreading across the glass with big gaps; bigger merged
+  walls fit more lines at the same text size.
+
 - New app: **Twitch Chat** — a read-only viewer of a chosen Twitch
   channel's live chat, no account or login required (anonymous guest
   access, nothing ever sent). Works on all three surfaces: held tablet

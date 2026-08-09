@@ -975,20 +975,25 @@ public final class TabletScreenRenderer {
             return;
         }
 
-        int maxRows = TabletScreenMath.LIST_ROWS * surfaceH;
+        // Compact chat lines with a small leading, stacked from the
+        // BOTTOM of the glass — not the signals list's chunky row bands
+        // (which spread a few messages across a merged wall with huge
+        // gaps; tester report, beta.5). Text keeps one physical size
+        // everywhere; bigger walls simply fit MORE lines.
+        float lineH = LIST_TEXT_H * 1.35f;
+        int maxRows = Math.max(1, (int) (base.glassH() / lineH));
         int shown = Math.min(messages.size(), maxRows);
-        float rowH = tileSize(base.glassH(), maxRows);
         float u0 = TabletScreenMath.GLASS_U0 + SPACE;
         float u1 = base.u1() - SPACE;
         float scale = LIST_TEXT_H / 16f / FONT_LINE;
         int maxPx = (int) ((u1 - u0) * FONT_LINE / LIST_TEXT_H);
 
-        // Bottom-anchored: the newest message (last in the oldest→newest
-        // list) lands in row (maxRows - 1); older messages fill upward.
+        // Newest message (last in the oldest→newest list) sits on the
+        // bottom line; older messages fill upward.
         for (int i = 0; i < shown; i++) {
             TwitchChatService.ChatMessage message = messages.get(messages.size() - shown + i);
-            int row = maxRows - shown + i;
-            float top = listV0(row, rowH) + (rowH - LIST_TEXT_H) / 2f;
+            float top = TabletScreenMath.GLASS_V0 + base.glassH()
+                    - (shown - i) * lineH + (lineH - LIST_TEXT_H) / 2f;
             String prefix = message.user() + ": ";
             int prefixWidth = font.width(prefix);
             if (prefixWidth >= maxPx) {
