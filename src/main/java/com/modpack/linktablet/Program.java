@@ -61,7 +61,10 @@ public enum Program implements com.modpack.linktablet.api.TabletProgram {
     PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting", true),
     /** Frequency Monitor (1.11.0): read-only view of Create's link
      * network — who transmits on each channel the tablet uses. */
-    MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass");
+    MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass"),
+    /** Twitch Chat (1.11.0): read-only live chat of a selected channel
+     * — anonymous, client-side only, no accounts. */
+    TWITCH(27, "twitch", 0xFF9146FF, "minecraft:amethyst_shard");
 
     private final byte id;
     private final String key;
