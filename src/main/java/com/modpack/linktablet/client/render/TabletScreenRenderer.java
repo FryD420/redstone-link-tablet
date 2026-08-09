@@ -901,64 +901,31 @@ public final class TabletScreenRenderer {
         PoseStack.Pose pose = base.pose();
         int bgLight = base.bgLight();
 
-        // Physical (pre-rotation) glass span — the same ternary beginScreen
-        // used to derive physW/physH before its pose swaps them into the
-        // "logical" glassW()/glassH() the base already returned. The
-        // canvas raster is authored in this physical orientation (cols
-        // wide × rows tall at rot 0), so cell size is fixed here...
-        int members = surfaceW * surfaceH;
-        float physW = members == 1 ? TabletScreenMath.GLASS_U1 - TabletScreenMath.GLASS_U0
-                : TabletScreenMath.surfaceGlassW(surfaceW);
-        float physH = members == 1 ? TabletScreenMath.GLASS_V1 - TabletScreenMath.GLASS_V0
-                : TabletScreenMath.surfaceGlassH(surfaceH);
-        float cellW0 = physW / cols;
-        float cellH0 = physH / rows;
-
-        for (int r = 0; r < rows; r++) {
-            int rowBase = r * cols;
-            for (int c = 0; c < cols; c++) {
-                int color = argb[rowBase + c];
+        // beginScreen's pose already turns the content — the face only
+        // needs to PRE-TRANSPOSE its logical layout for odd rotations, the
+        // same shape as TabletScreenMath.gridLayout(count, rot): draw a
+        // dispCols×dispRows grid into the LOGICAL glass dims (already
+        // swapped by beginScreen at this rot), reading the canonical
+        // cols×rows raster by straight transpose. No mirroring math — the
+        // pose's own turn supplies the direction, exactly like the
+        // signals grid relies on gridLayout's plain rows/cols swap.
+        boolean odd = (rot & 1) != 0;
+        int dispCols = odd ? rows : cols;
+        int dispRows = odd ? cols : rows;
+        float cellW = base.glassW() / dispCols;
+        float cellH = base.glassH() / dispRows;
+        for (int dy = 0; dy < dispRows; dy++) {
+            float v0 = TabletScreenMath.GLASS_V0 + dy * cellH;
+            for (int dx = 0; dx < dispCols; dx++) {
+                int cx = odd ? dy : dx;
+                int cy = odd ? dx : dy;
+                int color = argb[cy * cols + cx];
                 if (color == 0) continue;
-                // ...and each cell's two opposite physical corners are run
-                // through the SAME inverse content-rotation swizzle
-                // TabletScreenMath.hitPipDetailed uses to undo a tap (one
-                // inverse CW quarter-turn per step) — the beginScreen pose
-                // applies the forward rotation, so a quad drawn at these
-                // logical corners lands back exactly on the given physical
-                // ones, rotating the whole picture (like the signal grid's
-                // tiles) without stretching any cell's aspect.
-                float[] p0 = physicalToLogical(c * cellW0, r * cellH0, physW, physH, rot);
-                float[] p1 = physicalToLogical((c + 1) * cellW0, (r + 1) * cellH0, physW, physH, rot);
-                float u0 = TabletScreenMath.GLASS_U0 + Math.min(p0[0], p1[0]);
-                float u1 = TabletScreenMath.GLASS_U0 + Math.max(p0[0], p1[0]);
-                float v0 = TabletScreenMath.GLASS_V0 + Math.min(p0[1], p1[1]);
-                float v1 = TabletScreenMath.GLASS_V0 + Math.max(p0[1], p1[1]);
-                fillRect(pose, vc, u0, v0, u1, v1, LAYER, color, bgLight);
+                float u0 = TabletScreenMath.GLASS_U0 + dx * cellW;
+                fillRect(pose, vc, u0, v0, u0 + cellW, v0 + cellH, LAYER, color, bgLight);
             }
         }
         poseStack.popPose();
-    }
-
-    /**
-     * Physical→logical corner swizzle for a quarter-turn count (0–3 CW):
-     * an exact mirror of {@code TabletScreenMath.hitPipDetailed}'s "undo
-     * the content rotation" loop — one inverse CW quarter-turn per step,
-     * tracking the (possibly swapped) span dimensions. That loop maps a
-     * physical tap into the logical space the renderer draws in; run
-     * forward here so a raster cell authored at a PHYSICAL position can be
-     * drawn at the LOGICAL position the pose will rotate back onto it.
-     */
-    private static float[] physicalToLogical(float pu, float pv, float gw, float gh, int rot) {
-        for (int i = 0; i < (rot & 3); i++) {
-            float nu = pv;
-            float nv = gw - pu;
-            pu = nu;
-            pv = nv;
-            float t = gw;
-            gw = gh;
-            gh = t;
-        }
-        return new float[]{pu, pv};
     }
 
     /** Status hint for the Twitch face, mirroring {@code
