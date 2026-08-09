@@ -43,6 +43,13 @@
 - New payloads for the Monitor and Twitch Chat push the wire registrar
   **"18" → "22" — a pairing break**: update client and server
   together.
+- **Arcade** — the 19 individual game apps are now one **Arcade** app:
+  a shelf with each game's best score, tap to play, ESC back to the
+  shelf. Existing tiles on your Home screen for a game (Snake, 2048,
+  etc.) become a single Arcade tile automatically, and the App Store
+  (and the launcher's add flow) shrinks to match — no more scrolling
+  past 19 games to find Clock or Gauges. Client-only change, no
+  pairing impact.
 
 ## 1.10.2 — 2026-08-03
 

@@ -3,7 +3,58 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-08-08 night — 1.11.0-beta.2, Twitch Chat IN CODE + committed, registrar "22", release held)
+## Status (2026-08-08 night — 1.11.0-beta.3 = beta.2 + Arcade consolidation, registrar still "22", release held)
+
+- **Arcade** (`Program.ARCADE`, id 28, key `"arcade"`) — the 19
+  individual game apps collapse into one Arcade app: T1 `Program.
+  ARCADE(28, "arcade")` + lang, `Programs.catalog()` hides `game=true`
+  entries (App Store and the launcher's add flow shrink 27→9 rows
+  incl. Arcade), `Programs.fromKeys` migrates any game key in a
+  roster to a single deduped Arcade tile (a roster of Snake + 2048 +
+  Signals loads as Arcade + Signals; a game-only roster becomes
+  `[ARCADE]`, not the default). T2 `ArcadeHubScreen` — the
+  StoreScreen shelf pattern, rows per game with best score
+  (`"Best: %s"`, hidden at 0), whole-row tap launches via the new
+  3-arg `SecretGames.createApp` with ESC returning to the hub. Kiosk
+  faces left on a game key keep their existing dispatch (tap opens
+  that game, Home exits) untouched, and the secret-pip trigger still
+  launches into the signals-grid return path unchanged. **Pure
+  client/catalog work — no wire, registrar, or component changes**;
+  registrar stays "22" from beta.2. `mod_version` bumped to
+  `1.11.0-beta.3` this pass.
+- **Deliberate reversal, noted on purpose**: the 1.10.0 dev cycle
+  built this exact hub (`Program.ARCADE(6)`, `ArcadeHubScreen`) and
+  the user then chose per-game apps before committing — the hub was
+  deleted UNCOMMITTED and id 6 retired. This spec re-reverses that
+  with the user's explicit confirmation (2026-08-08): the store had
+  since grown to 27 rows and the user independently asked for store
+  categories, so consolidation now serves the same pain. Id 6 stays
+  retired; the new program takes id 28.
+- **Commits state**: T1/T2 (`Program.ARCADE` + catalog/migration, then
+  `ArcadeHubScreen`) are committed on `tablet-overlay`; this docs +
+  version-bump commit lands right after. Not pushed this pass.
+- **Known notes carried into the next session**: the hub screen has
+  NOT yet been seen in a running client — an F2 pass (scroll, launch
+  a few games, ESC-return, best-score display/update) is owed before
+  calling Arcade done, per the test matrix below.
+
+**Test matrix (beta.3 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-08-arcade-consolidation-design.md`:
+
+- Store shows Arcade, shows NO individual games; launcher add flow
+  likewise.
+- Hub: scroll, launch each of a few games, ESC returns to shelf,
+  best scores display (and update after beating one).
+- Roster migration: a beta.2 tablet with several game tiles loads as
+  ONE Arcade tile + its other apps; re-saving the roster writes the
+  migrated form.
+- Secret pip trigger still launches its game and ESC returns to the
+  SIGNALS grid (easter egg intact).
+- Kiosk left showing a game (set pre-beta.3): face renders, tap
+  opens the game, Home exits.
+- Regression: store search, Twitch, Monitor, signals all untouched.
+
+## Previous status (2026-08-08 night — 1.11.0-beta.2, Twitch Chat IN CODE + committed, registrar "22", release held)
 
 - **Twitch Chat** (`Program.TWITCH`, id 27, key `"twitch"`) — all 7
   plan tasks done and committed on `tablet-overlay`: Program + lang
