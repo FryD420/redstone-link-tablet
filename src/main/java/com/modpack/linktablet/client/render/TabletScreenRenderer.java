@@ -901,27 +901,18 @@ public final class TabletScreenRenderer {
         PoseStack.Pose pose = base.pose();
         int bgLight = base.bgLight();
 
-        // beginScreen's pose already turns the content — the face only
-        // needs to PRE-TRANSPOSE its logical layout for odd rotations, the
-        // same shape as TabletScreenMath.gridLayout(count, rot): draw a
-        // dispCols×dispRows grid into the LOGICAL glass dims (already
-        // swapped by beginScreen at this rot), reading the canonical
-        // cols×rows raster by straight transpose. No mirroring math — the
-        // pose's own turn supplies the direction, exactly like the
-        // signals grid relies on gridLayout's plain rows/cols swap.
-        boolean odd = (rot & 1) != 0;
-        int dispCols = odd ? rows : cols;
-        int dispRows = odd ? cols : rows;
-        float cellW = base.glassW() / dispCols;
-        float cellH = base.glassH() / dispRows;
-        for (int dy = 0; dy < dispRows; dy++) {
-            float v0 = TabletScreenMath.GLASS_V0 + dy * cellH;
-            for (int dx = 0; dx < dispCols; dx++) {
-                int cx = odd ? dy : dx;
-                int cy = odd ? dx : dy;
+        // No index remap at any rotation: beginScreen's swapped glass dims
+        // + the pose's turn ARE the rotation; the per-axis rescale at
+        // quarter turns is the exact-fill requirement on non-square glass,
+        // not a bug (derived + corner-traced in review, 2026-08-09).
+        float cellW = base.glassW() / cols;
+        float cellH = base.glassH() / rows;
+        for (int cy = 0; cy < rows; cy++) {
+            float v0 = TabletScreenMath.GLASS_V0 + cy * cellH;
+            for (int cx = 0; cx < cols; cx++) {
                 int color = argb[cy * cols + cx];
                 if (color == 0) continue;
-                float u0 = TabletScreenMath.GLASS_U0 + dx * cellW;
+                float u0 = TabletScreenMath.GLASS_U0 + cx * cellW;
                 fillRect(pose, vc, u0, v0, u0 + cellW, v0 + cellH, LAYER, color, bgLight);
             }
         }
