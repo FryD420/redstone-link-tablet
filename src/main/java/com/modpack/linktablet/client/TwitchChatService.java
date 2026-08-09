@@ -35,7 +35,11 @@ import java.util.regex.Pattern;
  * the socket exists ONLY while at least one channel is watched. The
  * reader thread never touches game state: it enqueues, the client
  * tick drains (the renderer-thread rule). Read-only forever: this
- * class must never grow a PRIVMSG writer.
+ * class must never grow a PRIVMSG writer. Channel membership crosses
+ * threads through {@code WANTED_SHARED}: the client thread mirrors its
+ * wanted set into it every tick, and the worker reads only that
+ * concurrent set on (re)connect — it never touches the client-thread-only
+ * {@code JOINED} bookkeeping.
  */
 @EventBusSubscriber(modid = LinkTabletMod.MOD_ID, value = Dist.CLIENT)
 public final class TwitchChatService {
@@ -58,6 +62,9 @@ public final class TwitchChatService {
     private static final Set<String> JOINED = new HashSet<>();
     private static long clientTicks = 0;
     private static volatile Status status = Status.IDLE;
+
+    /** Client thread writes (mirrored every tick); worker thread only reads. */
+    private static final Set<String> WANTED_SHARED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     // ---- reader-thread handoff ----
     private record Incoming(String channel, ChatMessage message) {}
@@ -132,6 +139,8 @@ public final class TwitchChatService {
 
         // Reconcile the socket with what's wanted
         Set<String> wanted = wanted();
+        WANTED_SHARED.retainAll(wanted);
+        WANTED_SHARED.addAll(wanted);
         Worker w = worker;
         if (wanted.isEmpty()) {
             if (w != null) {
@@ -166,6 +175,7 @@ public final class TwitchChatService {
         private volatile boolean stop = false;
         private final ConcurrentLinkedQueue<String> outbox = new ConcurrentLinkedQueue<>();
         private volatile BufferedWriter out;
+        private volatile SSLSocket socket;
         private long backoff = BACKOFF_MIN_MS;
 
         Worker() {
@@ -176,6 +186,13 @@ public final class TwitchChatService {
         void shutdown() {
             stop = true;
             interrupt();
+            SSLSocket sock = socket;
+            if (sock != null) {
+                try {
+                    sock.close();
+                } catch (IOException ignored) {
+                }
+            }
         }
 
         void send(String line) {
@@ -186,18 +203,21 @@ public final class TwitchChatService {
         public void run() {
             while (!stop) {
                 status = Status.CONNECTING;
-                try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
+                try (SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault()
                         .createSocket("irc.chat.twitch.tv", 6697)) {
-                    socket.setSoTimeout(360_000); // Twitch pings ~5min; 6min = dead link
+                    this.socket = s;
+                    s.setSoTimeout(360_000); // Twitch pings ~5min; 6min = dead link
                     BufferedReader in = new BufferedReader(new InputStreamReader(
-                            socket.getInputStream(), StandardCharsets.UTF_8));
+                            s.getInputStream(), StandardCharsets.UTF_8));
                     out = new BufferedWriter(new OutputStreamWriter(
-                            socket.getOutputStream(), StandardCharsets.UTF_8));
+                            s.getOutputStream(), StandardCharsets.UTF_8));
                     write("CAP REQ :twitch.tv/tags");
                     write("NICK justinfan" + (10_000 + new java.util.Random().nextInt(80_000)));
-                    // Re-JOIN everything the client thread thinks is joined
-                    // (reconnects) — JOINED is only read here, never written
-                    for (String c : Set.copyOf(JOINED)) write("JOIN #" + c);
+                    // Re-JOIN everything the client thread currently wants
+                    // (reconnects) — WANTED_SHARED is a concurrent set safe
+                    // to iterate cross-thread; JOINED stays client-thread-only.
+                    outbox.clear();
+                    for (String c : WANTED_SHARED) write("JOIN #" + c);
                     LOG.info("Connected to Twitch chat (anonymous, read-only)");
                     status = Status.LIVE;
                     backoff = BACKOFF_MIN_MS;
@@ -210,6 +230,7 @@ public final class TwitchChatService {
                     if (!stop) LOG.info("Twitch chat link lost ({}); retrying", e.getMessage());
                 }
                 out = null;
+                this.socket = null;
                 if (stop) break;
                 status = Status.OFFLINE;
                 try {
@@ -254,7 +275,7 @@ public final class TwitchChatService {
             int chanStart = privmsg + " PRIVMSG #".length();
             int colon = rest.indexOf(" :", chanStart);
             if (colon < 0) return;
-            String channel = rest.substring(chanStart, colon).trim();
+            String channel = rest.substring(chanStart, colon).trim().toLowerCase(java.util.Locale.ROOT);
             String text = rest.substring(colon + 2);
             String user = tagValue(tags, "display-name");
             if (user.isEmpty()) {
