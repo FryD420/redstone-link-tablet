@@ -45,6 +45,18 @@ public class ClientHooks {
         showProgram(program, view);
     }
 
+    /** Game exits: the kiosk face stays where it was — a wall left on
+     * Paint keeps its mural (spec acceptance); only explicit navigation
+     * (launching an app, Home from a non-game screen) repoints the
+     * face. Mirrors {@link #showProgram} minus the Block-branch
+     * {@code SetProgramPayload} send. */
+    public static void returnToProgramSilently(com.modpack.linktablet.api.TabletProgram program, SignalView view) {
+        if (!(view instanceof SignalView.Block)) {
+            ClientPrefs.setLastProgram(program.key());
+        }
+        Minecraft.getInstance().setScreen(screenFor(program, view));
+    }
+
     public static void openHome(SignalView view) {
         openProgram(Program.LAUNCHER, view);
     }

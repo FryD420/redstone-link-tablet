@@ -567,17 +567,6 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
-    /** Paints one local cell (bounds-checked, no-op on out-of-range or
-     * unchanged) — mutates a copy and delegates to {@link
-     * #setPaintCanvas} so the sync path stays one road. */
-    public void setPaintCell(int localIndex, byte color) {
-        if (localIndex < 0 || localIndex >= com.modpack.linktablet.PaintCanvas.CELLS) return;
-        if (paintCanvas[localIndex] == color) return;
-        byte[] copy = paintCanvas.clone();
-        copy[localIndex] = color;
-        setPaintCanvas(copy);
-    }
-
     /** Counts, index-aligned with {@code MonitorChannels.channelsOf}:
      * members transmitting (strength &gt; 0) and in range. */
     public int[] monitorCounts() {

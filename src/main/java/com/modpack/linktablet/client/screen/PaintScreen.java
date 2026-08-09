@@ -185,6 +185,9 @@ public class PaintScreen extends ArcadeScreen {
     // ------------------------------------------------------------------
 
     private boolean apply(double mouseX, double mouseY, int button) {
+        // canvas is first populated by layout() (called from render()); a
+        // mouse event arriving before the first frame must not NPE.
+        if (canvas == null) return false;
         int cx = (int) Math.floor((mouseX - boardX()) / cell);
         int cy = (int) Math.floor((mouseY - boardY()) / cell);
         if (cx < 0 || cx >= cols || cy < 0 || cy >= rows) return false;

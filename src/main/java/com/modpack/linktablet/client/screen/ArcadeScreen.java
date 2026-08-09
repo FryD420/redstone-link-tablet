@@ -121,13 +121,15 @@ abstract class ArcadeScreen extends Screen {
 
     /** Same return-trip idiom as SignalEditScreen for the GUI path: back
      * to the signal grid the secret pip lives on (or the Arcade hub for
-     * hub launches), never the launcher. */
+     * hub launches), never the launcher. Silent variant: returning from
+     * a game never renavigates a block kiosk — the wall keeps showing
+     * whatever it showed (spec: a wall left on Paint keeps its mural). */
     @Override
     public void onClose() {
         if (returnProgram != null) {
-            com.modpack.linktablet.client.ClientHooks.returnToProgram(returnProgram, view);
+            com.modpack.linktablet.client.ClientHooks.returnToProgramSilently(returnProgram, view);
         } else if (returnToTablet) {
-            com.modpack.linktablet.client.ClientHooks.returnToProgram(
+            com.modpack.linktablet.client.ClientHooks.returnToProgramSilently(
                     com.modpack.linktablet.Program.SIGNALS, view);
         } else {
             minecraft.setScreen(null);

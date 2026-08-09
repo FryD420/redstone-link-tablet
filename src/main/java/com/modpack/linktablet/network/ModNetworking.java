@@ -965,6 +965,8 @@ public class ModNetworking {
         ItemStack stack = resolveStack(player, payload.target());
         if (stack.isEmpty()) return;
         byte[] canvas = stack.getOrDefault(ModDataComponents.PAINT_CANVAS.get(), PaintCanvas.blank()).clone();
+        // Crafted/corrupt components must not throw in a payload handler.
+        if (canvas.length != PaintCanvas.CELLS) canvas = PaintCanvas.blank();
         boolean changed = false;
         for (PaintCell cell : payload.cells()) {
             int index = cell.index();
