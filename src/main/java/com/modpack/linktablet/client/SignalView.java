@@ -71,6 +71,16 @@ public sealed interface SignalView {
         return com.modpack.linktablet.PaintCanvas.blank();
     }
 
+    /** Surface span in blocks (1.11.0 paint on walls): 1×1 for held/slot
+     * tablets; a placed tablet's (possibly merged) surface for Block. */
+    default int surfaceW() {
+        return 1;
+    }
+
+    default int surfaceH() {
+        return 1;
+    }
+
     /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
     @org.jetbrains.annotations.Nullable
     default net.minecraft.network.chat.Component customName() {
@@ -295,6 +305,18 @@ public sealed interface SignalView {
         public byte[] paintCanvas() {
             TabletBlockEntity be = resolved();
             return be != null ? be.getPaintCanvas() : com.modpack.linktablet.PaintCanvas.blank();
+        }
+
+        @Override
+        public int surfaceW() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getSurfaceW() : 1;
+        }
+
+        @Override
+        public int surfaceH() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getSurfaceH() : 1;
         }
 
         /** The BE that owns this position's data (controller when merged). */
