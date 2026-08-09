@@ -88,6 +88,14 @@ public class ModDataComponents {
                             .apply(ByteBufCodecs.list()))
                     .build());
 
+    /** Twitch Chat channel name (1.11.0); absent = unset, never written
+     * empty — the theme idiom. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> TWITCH_CHANNEL =
+            DATA_COMPONENTS.register("twitch_channel", () -> DataComponentType.<String>builder()
+                    .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8)
+                    .build());
+
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCREEN_ROTATION =
             DATA_COMPONENTS.register("screen_rotation", () -> DataComponentType.<Integer>builder()

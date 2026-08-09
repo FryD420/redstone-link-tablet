@@ -635,6 +635,22 @@ public class ModNetworking {
         }
     }
 
+    /** Twitch Chat channel (1.11.0), the SetProbePayload both-target shape. */
+    public record SetTwitchChannelPayload(SignalTarget target, String channel)
+            implements CustomPacketPayload {
+        public static final Type<SetTwitchChannelPayload> TYPE = new Type<>(id("set_twitch_channel"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetTwitchChannelPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetTwitchChannelPayload::target,
+                        ByteBufCodecs.stringUtf8(25), SetTwitchChannelPayload::channel,
+                        SetTwitchChannelPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record MonitorSnapshotPayload(List<MonitorChannel> channels)
             implements CustomPacketPayload {
         public static final Type<MonitorSnapshotPayload> TYPE = new Type<>(id("monitor_snapshot"));
@@ -703,7 +719,9 @@ public class ModNetworking {
         // wire growth gets its own fence).
         // "21": 1.11.0 probe editor — OpenProbeMenuPayload added (the
         // add-probe container menu; still inside the 1.11.0 break).
-        PayloadRegistrar registrar = event.registrar("21");
+        // "22": 1.11.0 Twitch Chat — SetTwitchChannelPayload added (still
+        // inside the 1.11.0 break).
+        PayloadRegistrar registrar = event.registrar("22");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -729,6 +747,8 @@ public class ModNetworking {
                 ModNetworking::handleOpenProbeMenu);
         registrar.playToClient(MonitorSnapshotPayload.TYPE, MonitorSnapshotPayload.STREAM_CODEC,
                 ModNetworking::handleMonitorSnapshot);
+        registrar.playToServer(SetTwitchChannelPayload.TYPE, SetTwitchChannelPayload.STREAM_CODEC,
+                ModNetworking::handleSetTwitchChannel);
     }
 
     /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
@@ -779,6 +799,35 @@ public class ModNetworking {
 
     private static void handleMonitorSnapshot(MonitorSnapshotPayload payload, IPayloadContext context) {
         com.modpack.linktablet.client.ClientMonitorSnapshot.accept(payload.channels());
+    }
+
+    /** Twitch channel charset — TwitchChatService.validChannel's rule,
+     * copied (that class is client-only). */
+    private static final java.util.regex.Pattern TWITCH_CHANNEL =
+            java.util.regex.Pattern.compile("[a-z0-9_]{1,25}");
+
+    private static void handleSetTwitchChannel(SetTwitchChannelPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        String channel = payload.channel().toLowerCase(java.util.Locale.ROOT);
+        if (!channel.isEmpty() && !TWITCH_CHANNEL.matcher(channel).matches()) return;
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) controller.setTwitchChannel(channel);
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            if (channel.isEmpty()) {
+                stack.remove(ModDataComponents.TWITCH_CHANNEL.get());
+            } else {
+                stack.set(ModDataComponents.TWITCH_CHANNEL.get(), channel);
+            }
+        }
     }
 
     private static void handleUpsertGauge(UpsertGaugePayload payload, IPayloadContext context) {

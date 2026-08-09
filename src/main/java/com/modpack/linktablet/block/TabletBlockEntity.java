@@ -106,6 +106,9 @@ public class TabletBlockEntity extends BlockEntity {
      * when unset. */
     private List<Frequency> monitorProbes = List.of();
 
+    /** Twitch Chat channel (1.11.0); "" = unset. */
+    private String twitchChannel = "";
+
     /**
      * Frequency Monitor summary (1.11.0, block half): index-aligned with
      * {@code MonitorChannels.channelsOf(signals, gauges, monitorProbe)},
@@ -526,6 +529,21 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    // ---- Twitch Chat channel (1.11.0) ----------------------------------
+
+    public String getTwitchChannel() {
+        return twitchChannel;
+    }
+
+    public void setTwitchChannel(String newChannel) {
+        if (twitchChannel.equals(newChannel)) return;
+        this.twitchChannel = newChannel;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** Counts, index-aligned with {@code MonitorChannels.channelsOf}:
      * members transmitting (strength &gt; 0) and in range. */
     public int[] monitorCounts() {
@@ -563,6 +581,7 @@ public class TabletBlockEntity extends BlockEntity {
                 stack.get(ModDataComponents.HOME_APPS.get()));
         setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
         setMonitorProbes(stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of()));
+        setTwitchChannel(stack.getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), ""));
         setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
     }
 
@@ -596,6 +615,9 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (!monitorProbes.isEmpty()) {
             stack.set(ModDataComponents.MONITOR_PROBE.get(), monitorProbes);
+        }
+        if (!twitchChannel.isEmpty()) {
+            stack.set(ModDataComponents.TWITCH_CHANNEL.get(), twitchChannel);
         }
         return stack;
     }
@@ -923,6 +945,9 @@ public class TabletBlockEntity extends BlockEntity {
             Frequency.CODEC.listOf().encodeStart(NbtOps.INSTANCE, monitorProbes)
                     .result().ifPresent(t -> tag.put("monitor_probe", t));
         }
+        if (!twitchChannel.isEmpty()) {
+            tag.putString("twitch_channel", twitchChannel);
+        }
         if (caseColor != null) {
             tag.putString("case_color", caseColor.getName());
         }
@@ -988,6 +1013,7 @@ public class TabletBlockEntity extends BlockEntity {
                                 .result().orElse(List.of())
                         : Frequency.CODEC.parse(NbtOps.INSTANCE, monitorProbeTag)
                                 .result().map(List::of).orElse(List.of());
+        this.twitchChannel = tag.getString("twitch_channel");
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");

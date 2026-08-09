@@ -60,6 +60,11 @@ public sealed interface SignalView {
         return List.of();
     }
 
+    /** Twitch Chat channel (1.11.0); absent data reads "" (unset). */
+    default String twitchChannel() {
+        return "";
+    }
+
     /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
     @org.jetbrains.annotations.Nullable
     default net.minecraft.network.chat.Component customName() {
@@ -125,6 +130,14 @@ public sealed interface SignalView {
             return mc.player.getItemInHand(hand)
                     .getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
         }
+
+        @Override
+        public String twitchChannel() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return "";
+            return mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), "");
+        }
     }
 
     /**
@@ -169,6 +182,11 @@ public sealed interface SignalView {
         @Override
         public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
             return stack().getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
+        }
+
+        @Override
+        public String twitchChannel() {
+            return stack().getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), "");
         }
 
         public ItemStack stack() {
@@ -238,6 +256,12 @@ public sealed interface SignalView {
         public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
             TabletBlockEntity be = resolved();
             return be != null ? be.getMonitorProbes() : List.of();
+        }
+
+        @Override
+        public String twitchChannel() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getTwitchChannel() : "";
         }
 
         /** The BE that owns this position's data (controller when merged). */
