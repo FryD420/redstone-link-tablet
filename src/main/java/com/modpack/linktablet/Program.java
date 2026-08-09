@@ -64,7 +64,11 @@ public enum Program implements com.modpack.linktablet.api.TabletProgram {
     MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass"),
     /** Twitch Chat (1.11.0): read-only live chat of a selected channel
      * — anonymous, client-side only, no accounts. */
-    TWITCH(27, "twitch", 0xFF9146FF, "minecraft:amethyst_shard");
+    TWITCH(27, "twitch", 0xFF9146FF, "minecraft:amethyst_shard"),
+    /** Arcade (1.11.0): the 19 games consolidated under one door —
+     * reverses the 1.10.0 per-game-app decision by user request
+     * (2026-08-08); id 6 (the July hub) stays retired. */
+    ARCADE(28, "arcade", 0xFF169C9C, "create:linked_controller");
 
     private final byte id;
     private final String key;
