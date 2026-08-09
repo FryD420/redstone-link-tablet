@@ -184,12 +184,16 @@ public final class TwitchChatService {
         }
         // JOIN/PART deltas (queued to the worker; it flushes when live)
         for (String c : wanted) {
-            if (JOINED.add(c)) worker.send("JOIN #" + c);
+            if (JOINED.add(c)) {
+                worker.send("JOIN #" + c);
+                TwitchEmotes.onChannelJoined(c);
+            }
         }
         JOINED.removeIf(c -> {
             if (!wanted.contains(c)) {
                 worker.send("PART #" + c);
                 BUFFERS.remove(c);
+                TwitchEmotes.onChannelParted(c);
                 return true;
             }
             return false;
