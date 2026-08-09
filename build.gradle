@@ -105,6 +105,20 @@ tasks.register('chromeTool', JavaExec) {
     mainClass = 'com.modpack.linktablet.tools.ChromeTool'
 }
 
+// Dev-only Twitch/7TV/BTTV/FFZ emote-format spike, same rules as nbtTool.
+// Optional numeric Twitch room id arg (default = xqc): ./gradlew emoteTool --args="71092938"
+// Explicit javaLauncher: this machine's JAVA_HOME can point at a JDK 17,
+// but sourceSets.main.runtimeClasspath is compiled by the project's JDK 21
+// toolchain (class file version 65) — without this the JavaExec forks on
+// whatever JDK the daemon started with and throws UnsupportedClassVersionError.
+tasks.register('emoteTool', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.modpack.linktablet.tools.EmoteProbe'
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 tasks.named('jar', Jar) {
     exclude('com/modpack/linktablet/tools/**')
     // Dev-only example addon for the program API (see ExampleAddon):
