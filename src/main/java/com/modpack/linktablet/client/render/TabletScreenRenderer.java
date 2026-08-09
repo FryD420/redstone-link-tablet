@@ -981,7 +981,12 @@ public final class TabletScreenRenderer {
         // gaps; tester report, beta.5). Text keeps one physical size
         // everywhere; bigger walls simply fit MORE lines.
         float lineH = LIST_TEXT_H * 1.35f;
-        int maxRows = Math.max(1, (int) (base.glassH() / lineH));
+        // Stay clear of the ~0.5-texel glass bleed under the bezel ring:
+        // the background quad hides there, but TEXT floats above the
+        // bezel lip, so a line placed in the bleed paints ON the bezel
+        // (user screenshot, beta.5). Inset = bleed + the SPACE margin.
+        float inset = 0.5f + SPACE;
+        int maxRows = Math.max(1, (int) ((base.glassH() - 2 * inset) / lineH));
         int shown = Math.min(messages.size(), maxRows);
         float u0 = TabletScreenMath.GLASS_U0 + SPACE;
         float u1 = base.u1() - SPACE;
@@ -992,7 +997,7 @@ public final class TabletScreenRenderer {
         // bottom line; older messages fill upward.
         for (int i = 0; i < shown; i++) {
             TwitchChatService.ChatMessage message = messages.get(messages.size() - shown + i);
-            float top = TabletScreenMath.GLASS_V0 + base.glassH()
+            float top = TabletScreenMath.GLASS_V0 + base.glassH() - inset
                     - (shown - i) * lineH + (lineH - LIST_TEXT_H) / 2f;
             String prefix = message.user() + ": ";
             int prefixWidth = font.width(prefix);
