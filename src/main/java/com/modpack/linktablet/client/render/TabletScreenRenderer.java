@@ -988,8 +988,10 @@ public final class TabletScreenRenderer {
         float inset = 0.5f + SPACE;
         int maxRows = Math.max(1, (int) ((base.glassH() - 2 * inset) / lineH));
         int shown = Math.min(messages.size(), maxRows);
-        float u0 = TabletScreenMath.GLASS_U0 + SPACE;
-        float u1 = base.u1() - SPACE;
+        // Same bleed inset on the horizontal edges — usernames were
+        // starting on the left bezel ring (user screenshot, beta.5)
+        float u0 = TabletScreenMath.GLASS_U0 + inset;
+        float u1 = base.u1() - inset;
         float scale = LIST_TEXT_H / 16f / FONT_LINE;
         int maxPx = (int) ((u1 - u0) * FONT_LINE / LIST_TEXT_H);
 
