@@ -3,6 +3,7 @@ package com.modpack.linktablet.client.render;
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
 import com.modpack.linktablet.client.TextFit;
+import com.modpack.linktablet.client.TwitchChatService;
 import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -852,6 +853,94 @@ public final class TabletScreenRenderer {
             drawLabel(poseStack, buffers, font, powerText, barU0 - 0.3f - powW,
                     v0 + (rowH - powH) / 2f, powH / 16f / FONT_LINE, false, false,
                     power[i] > 0 ? theme.textPrimary : theme.textMuted, bgLight);
+        }
+        poseStack.popPose();
+    }
+
+    /** Status hint for the Twitch face, mirroring {@code
+     * TwitchOverlayContent#statusMessage}/{@code TwitchScreen#statusMessage}:
+     * null means "show the chat wall" (LIVE with a non-empty buffer). */
+    private static Component twitchStatus(String channel, List<TwitchChatService.ChatMessage> messages) {
+        if (channel.isEmpty()) return Component.translatable("gui.linktablet.twitch.no_channel");
+        TwitchChatService.Status status = TwitchChatService.status(channel);
+        return switch (status) {
+            case CONNECTING -> Component.translatable("gui.linktablet.twitch.connecting");
+            case OFFLINE -> Component.translatable("gui.linktablet.twitch.offline");
+            case LIVE -> messages.isEmpty()
+                    ? Component.translatable("gui.linktablet.twitch.no_messages") : null;
+            case IDLE -> Component.translatable("gui.linktablet.twitch.no_channel");
+        };
+    }
+
+    /**
+     * Kiosk Twitch Chat face (1.11.0-beta.2): the shared screen base plus
+     * a chat wall — the newest message anchored to the LAST row, older
+     * ones stacking upward, so a sparse buffer clings to the bottom the
+     * way a real chat window does rather than floating at the top. Each
+     * line is "user: text" in the chatter's own color, ellipsized (no
+     * wrapping — a placed face is a glance, not a reader) to the glass
+     * width. Empty channel or a non-LIVE/empty-buffer status shows the
+     * matching centered hint instead ({@link #twitchStatus}, the same
+     * mapping {@code TwitchOverlayContent} and {@code TwitchScreen} use).
+     * Touches the service's per-frame presence heartbeat FIRST, before
+     * any layout math — the face's presence keeps the channel joined;
+     * once chunk culling stops the touches, the service parts it on its
+     * own. Text-only content beyond the shared background, so the strict
+     * pass order holds trivially.
+     */
+    public static void renderTwitchFace(PoseStack poseStack, MultiBufferSource buffers,
+                                        String channel, int rot, ScreenTheme theme, boolean backlit,
+                                        int packedLight, int surfaceW, int surfaceH, int caseTint) {
+        if (!channel.isEmpty()) TwitchChatService.touchFace(channel);
+
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        Font font = Minecraft.getInstance().font;
+        int bgLight = base.bgLight();
+
+        List<TwitchChatService.ChatMessage> messages = TwitchChatService.messages(channel);
+        Component status = twitchStatus(channel, messages);
+        if (status != null) {
+            String text = status.getString();
+            float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+            float textH = Mth.clamp(
+                    (base.glassW() - 2f) * FONT_LINE / Math.max(1, font.width(text)),
+                    0.8f, base.glassH() * 0.2f);
+            float top = TabletScreenMath.GLASS_V0 + (base.glassH() - textH) / 2f;
+            drawLabel(poseStack, buffers, font, text, cu, top, textH / 16f / FONT_LINE,
+                    true, false, theme.textMuted, bgLight);
+            poseStack.popPose();
+            return;
+        }
+
+        int maxRows = TabletScreenMath.LIST_ROWS * surfaceH;
+        int shown = Math.min(messages.size(), maxRows);
+        float rowH = tileSize(base.glassH(), maxRows);
+        float u0 = TabletScreenMath.GLASS_U0 + SPACE;
+        float u1 = base.u1() - SPACE;
+        float scale = LIST_TEXT_H / 16f / FONT_LINE;
+        int maxPx = (int) ((u1 - u0) * FONT_LINE / LIST_TEXT_H);
+
+        // Bottom-anchored: the newest message (last in the oldest→newest
+        // list) lands in row (maxRows - 1); older messages fill upward.
+        for (int i = 0; i < shown; i++) {
+            TwitchChatService.ChatMessage message = messages.get(messages.size() - shown + i);
+            int row = maxRows - shown + i;
+            float top = listV0(row, rowH) + (rowH - LIST_TEXT_H) / 2f;
+            String prefix = message.user() + ": ";
+            int prefixWidth = font.width(prefix);
+            if (prefixWidth >= maxPx) {
+                String line = TextFit.ellipsize(font, prefix, maxPx);
+                drawLabel(poseStack, buffers, font, line, u0, top, scale,
+                        false, false, message.color(), bgLight);
+                continue;
+            }
+            drawLabel(poseStack, buffers, font, prefix, u0, top, scale,
+                    false, false, message.color(), bgLight);
+            float textU0 = u0 + prefixWidth * LIST_TEXT_H / FONT_LINE;
+            String text = TextFit.ellipsize(font, message.text(), maxPx - prefixWidth);
+            drawLabel(poseStack, buffers, font, text, textU0, top, scale,
+                    false, false, theme.textPrimary, bgLight);
         }
         poseStack.popPose();
     }

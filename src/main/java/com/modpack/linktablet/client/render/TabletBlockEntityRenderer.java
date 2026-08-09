@@ -127,6 +127,10 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                         be.monitorCounts(), be.monitorPower(),
                         be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
                         packedLight, surfaceW, surfaceH, caseTint);
+                case TWITCH -> TabletScreenRenderer.renderTwitchFace(poseStack, buffers,
+                        be.getTwitchChannel(),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
                 // Launcher faces honor list mode too (test pass 2) — plain
                 // rows, since roster rows are doors, not toggles
                 case LAUNCHER, SIGNALS -> TabletScreenRenderer.render(poseStack, buffers, signals,
