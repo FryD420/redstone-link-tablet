@@ -308,6 +308,10 @@ public final class NoteWindows {
 
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        // Defocus first — acquire/release-style contents (Twitch) must drop their refs; the clear alone orphans them.
+        for (FloatingWindow window : WINDOWS) {
+            window.defocus();
+        }
         WINDOWS.clear();
     }
 

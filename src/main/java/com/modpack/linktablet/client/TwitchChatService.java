@@ -4,6 +4,7 @@ import com.modpack.linktablet.LinkTabletMod;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,6 +169,24 @@ public final class TwitchChatService {
             }
             return false;
         });
+    }
+
+    /** Logout drops every consumer wholesale (overlay windows are
+     * cleared without defocus — the ClientMonitorSnapshot precedent):
+     * clear all state and shut the worker so no ref survives a relog. */
+    @SubscribeEvent
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        REFS.clear();
+        FACE_SEEN.clear();
+        BUFFERS.clear();
+        JOINED.clear();
+        WANTED_SHARED.clear();
+        Worker w = worker;
+        if (w != null) {
+            w.shutdown();
+            worker = null;
+        }
+        status = Status.IDLE;
     }
 
     /** The socket thread: connect, log in anonymously, pump lines. */
