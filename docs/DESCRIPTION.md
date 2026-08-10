@@ -20,9 +20,10 @@ The **Link Tablet** is a handheld device with a real touchscreen OS that drives
 [Create](https://modrinth.com/mod/create)'s Redstone Links remotely. Lights, doors,
 trains, farms, the entire factory — name them, give them an icon, and control them
 from one screen, anywhere in link range. It boots to a **Home screen of apps** —
-signals, gauges, a clock, a calculator, with more from the built-in **App Store** —
-mounts on walls where tablets merge into one **wall-sized display**, and pins a
-**mini-tablet to your HUD** so you can flip switches without ever opening a GUI.
+signals, gauges, a clock, a **live network monitor**, even **Twitch chat** and a
+**paint canvas**, with more from the built-in **App Store** — mounts on walls
+where tablets merge into one **wall-sized display**, and pins a **mini-tablet to
+your HUD** so you can flip switches without ever opening a GUI.
 
 ![The tablet GUI over a floating-island vista — a slider, a timer, and toggle signals in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
 
@@ -46,10 +47,16 @@ one-click Get/Remove; your Home screen is yours, per tablet. The apps:
   Link frequencies and show the received 0–15. Name each dial, pick its channel
   and color. Held tablets hear what you'd hear; placed tablets hear what a real
   link at that spot would — and merged walls make great **factory dashboards**.
+- **Monitor** — an **X-ray for your link network** (see below).
+- **Twitch Chat** — live stream chat on your tablet, your HUD, or a wall —
+  emotes included, no account needed (see below).
+- **Paint** — a pixel canvas that persists on the tablet and shows on walls
+  (see below).
 
 Placed tablets show whatever app they're on right on the glass — tap it to open
 the app, **tap the bezel ring to go Home** — and the wall screen follows your
-GUI navigation, so the kiosk and the menu always agree.
+GUI navigation, so the kiosk and the menu always agree. The App Store has a
+**search box** now, too — the shelf got big.
 
 <!-- 📸 SCREENSHOT (optional, 1.10.0): the Home screen GUI next to a placed wall-clock tablet and a gauges wall — "it's an OS" in one image -->
 
@@ -103,6 +110,21 @@ Controller can trigger, the tablet can too:
 > 📋 **Tip — quick-add:** right-click any Redstone Link (or anything with a link
 > frequency, like elevator contacts) while holding the tablet — the editor opens
 > with that frequency pre-filled and a name suggested. Just hit Save.
+
+---
+
+## 🔎 Who's on this frequency?
+
+The **Monitor** app is an X-ray for your link network. It lists every channel
+your tablet touches — and any channel you **probe** (drop in a frequency pair,
+up to 8) — with the live power on each one and **every member transmitting or
+listening**: real Redstone Links, placed tablets, and even *"a tablet in
+someone's inventory"* — so when a receiver is mysteriously pinned at 15, the
+Monitor tells you it's the spare tablet in your own pocket. Out-of-range
+members wear a badge, a wall tablet showing the Monitor is a live **status
+board**, and the overlay pin puts the readout on your HUD.
+
+<!-- 📸 SCREENSHOT (1.11.0): the Monitor GUI over a contraption — a few channels with member rows visible, ideally one "inventory tablet" member and one out-of-range badge -->
 
 ---
 
@@ -232,6 +254,46 @@ build a bank of separate dashboards side by side.
 
 ---
 
+## 💬 Your stream chat, in the game
+
+The **Twitch Chat** app shows any channel's live chat — **no account, no login,
+no tokens, nothing stored**: it's an anonymous, strictly read-only view of the
+public chat. Type a channel name and chat flows onto your held tablet, pins to
+your HUD while you play, or fills a placed tablet as a **chat wall** — set the
+channel once on the block and every viewer sees it. Build a merged wall and
+your chat gets the big-screen treatment next to the factory dashboards.
+
+And it's real chat: **emotes render as actual images** — Twitch's own plus
+**7TV, BetterTTV, and FrankerFaceZ**, animated ones animating — so the wall
+looks like chat, not a text log. (A toggle in the header switches back to plain
+text if you prefer.) Keep Twitch as your last-used app and **the tablet in your
+hand becomes a pocket chat screen**, live even in third person — moderate your
+chat from inside the mine.
+
+The connection only exists while chat is actually on a screen somewhere — close
+every Twitch surface and the tablet stops talking to Twitch entirely. Fair
+warning for shared servers: chat is live, unfiltered internet, and anyone who
+can open a placed tablet's GUI can change its channel — same trust rules as
+editing its signals.
+
+<!-- 📸 SCREENSHOT (1.11.0): a merged chat wall mid-stream — colored usernames, a few animated emotes visible, ideally beside a signals wall so it reads as "part of the factory" -->
+
+---
+
+## 🖌️ Paint on the walls
+
+The **Paint** app is a pixel canvas that lives on the tablet — doodle on the
+held tablet, and the picture **persists and shows right on the glass** when you
+place it. Every tablet carries its own canvas slice, so merged walls become
+**murals**: paint across the seams on the wall's GUI (viewers watch your
+strokes land live), split the wall and each tablet keeps its piece, merge them
+back and the mural reassembles. Break it, chest it, gift it — the art travels
+with the tablet.
+
+<!-- 📸 SCREENSHOT (1.11.0): a 3×2 merged wall with a finished mural, one member tablet pulled off and held in hand showing its slice -->
+
+---
+
 ## 🎨 Make it yours
 
 - **8 UI themes** — Dark, Light, AMOLED, Brass, Terminal, PurpleFox, Parchment,
@@ -299,6 +361,10 @@ Controller. Mounted tablets transmit from the block instead.
 - Frequency-card mods (component-based frequency items) work out of the box.
 - Optional **JEI and EMI** integration: drag ingredients straight into the
   frequency slots.
+- **Twitch Chat is fully client-side and optional** — it connects anonymously
+  to Twitch's public chat (and the public emote services) only while chat is
+  actually on a screen, sends nothing, and stores nothing. No account involved,
+  ever; it does nothing at all on the server side.
 - MIT licensed, free to use in any modpack.
 
 ---
@@ -336,8 +402,20 @@ docs link was GitHub); the API is announced to addon authors elsewhere.
   from the `main` branch — **push banner.png to main BEFORE re-pasting the
   listings** or the image 404s.
 
-### 1.10.0 additions — text is CURRENT through 1.10.0 (OS/store/links/follow
-### rewrite 2026-07-28); two OPTIONAL new slots joined the queue:
+### 1.11.0 additions — text is CURRENT through 1.11.0 (Monitor/Twitch+emotes/
+### Paint rewrite 2026-08-09; games/Arcade stay unmentioned per standing
+### policy). Three NEW slots joined the queue:
+
+- ⬜ **monitor** — the Monitor GUI over a contraption: member rows visible,
+  ideally an "inventory tablet" member and an out-of-range badge in frame.
+- ⬜ **chat wall** — a merged Twitch chat wall mid-stream with visible emotes,
+  beside a signals wall. STRONG social-preview candidate (streamers will get
+  it instantly).
+- ⬜ **mural** — a 3×2 painted mural wall, one member tablet held in hand
+  showing its slice.
+
+### 1.10.0 additions — (superseded header kept for history) two OPTIONAL
+### slots still queued:
 
 - ⬜ **pocket OS** (optional) — Home screen GUI beside a placed wall-clock
   tablet and a gauges wall; one image that says "it's an OS".
