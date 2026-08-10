@@ -3,7 +3,30 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-09 end of day)
+## ▶ START HERE next session (state as of 2026-08-09 late night)
+
+- **v1.11.0 IS LIVE EVERYWHERE** (same-day full cycle 2026-08-09):
+  tagged `v1.11.0` (4e0c23a), merged --no-ff to main (f9f6473),
+  uploaded to both platforms (user-confirmed), Discord announcement
+  drafted (user posts those themselves — standing rule), family
+  server + modpack updated and verified ("everything works").
+  Dedicated `runServer` boot gate PASSED before release (clean, no
+  dist-cleaner errors). Registrar "23" pairing break fully rolled
+  out. Listing text (tightened rewrite) pasted to both platforms.
+- **Late additions that made the release**: Twitch chat EMOTES
+  (beta.6, subagent-driven, spike-gated) and the HELD-tablet chat
+  face — resume-driven, first person + own F5 (beta.7/8; the
+  "chat not showing on the held tablet" report was a design gap,
+  not a regression — item renderer was signals-only since 1.2).
+- **Remaining post-release**: the screenshot shoot (three new
+  1.11.0 slots — monitor, chat wall/social-preview candidate,
+  mural — see DESCRIPTION.md's shooting checklist); reactive
+  hotfix posture for tester reports. No coding item queued.
+- **Idea seed from the emotes cycle**: extending the resume-driven
+  hand face beyond Twitch (any program in your hand) — noted, not
+  committed.
+
+## Previous START HERE (state as of 2026-08-09 end of day)
 
 - **1.11.0-beta.8 is the DISTRIBUTION build** (same content as
   beta.7; renumbered at distribution time, user call 2026-08-09 —
