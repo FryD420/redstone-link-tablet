@@ -81,7 +81,7 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         // Held items ignore the stored screen rotation — it's a mounting
         // concern; the hand always shows portrait.
         String twitchChannel = com.modpack.linktablet.client.ClientPrefs.twitchChannel();
-        if (firstPersonHand(context)
+        if (ownHand(context, stack)
                 && com.modpack.linktablet.Program.TWITCH.key()
                         .equals(com.modpack.linktablet.client.ClientPrefs.lastProgram())
                 && !twitchChannel.isEmpty()) {
@@ -89,9 +89,11 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
             // your OWN first-person tablet shows the chat wall when Twitch
             // was the last program you used — the item carries no program
             // state, so the PERSONAL resume pref + personal channel drive
-            // it. Other contexts (frames, ground, other players' hands)
-            // keep the signals face: the pref is viewer-local and must not
-            // paint tablets that aren't "yours". renderTwitchFace's
+            // it. Only YOUR hands (first person, or your own F5 third
+            // person via stack identity) — frames, ground, and other
+            // players' hands keep the signals face: the pref is
+            // viewer-local and must not paint tablets that aren't
+            // "yours". renderTwitchFace's
             // touchFace heartbeat handles the socket lifecycle exactly
             // like a kiosk face — put the tablet away and the channel
             // expires.
@@ -104,12 +106,24 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         poseStack.popPose();
     }
 
-    /** Your own hands only — the two contexts where "this tablet is
-     * mine" is guaranteed, so the viewer-local resume pref may drive
-     * the face. */
-    private static boolean firstPersonHand(ItemDisplayContext context) {
-        return context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
-                || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
+    /** Your own hands only — the contexts where "this tablet is mine"
+     * holds, so the viewer-local resume pref may drive the face.
+     * First person is yours by definition; third person (F5) is
+     * verified by stack REFERENCE identity against the local player's
+     * hands (the isScreenLit precedent) — other players' tablets render
+     * from their own entity's stack instances and fall through. */
+    private static boolean ownHand(ItemDisplayContext context, ItemStack stack) {
+        if (context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND) {
+            return true;
+        }
+        if (context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND) {
+            var player = Minecraft.getInstance().player;
+            return player != null
+                    && (stack == player.getMainHandItem() || stack == player.getOffhandItem());
+        }
+        return false;
     }
 
     /**
