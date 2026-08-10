@@ -3,7 +3,47 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-09 late night)
+## ▶ START HERE next session (state as of 2026-08-10 — storm save, mid-session)
+
+- **Screenshot shoot DONE + listings UPDATED (user-confirmed "listings
+  are up")**: five shots from the user's SMP live in `docs/images/`
+  (chat-wall, monitor, factory-hall, mural, mural-remix), embedded in
+  DESCRIPTION.md, pushed to main (da3f6eb), pasted to both platforms.
+  Recovery note: shots were rescued from the instance's F2 screenshots
+  folder. NEVER embed chat close-ups without vetting the visible text
+  (one candidate had a slur-adjacent line — skipped, note in the
+  shooting checklist).
+- **1.11.1-candidate fixes IN CODE on `tablet-overlay`, pushed**
+  (both client-only, pair with 1.11.0; changelog under Unreleased):
+  (a) overlay Twitch chat WRAPS long messages (f8d61cc) — 10-line
+  bottom-anchored budget, TwitchScreen's row shape; VERIFIED live in
+  the dev client (automated: seeded prefs, quickPlay into TEST world,
+  screenshots — wrap + indent + emote-on-continuation + oldest-drop
+  all confirmed). (b) Paint fast-drag interpolation (c437bf7) —
+  Bresenham `PaintCanvas.line` bridges cursor jumps; build green,
+  USER FEEL-CHECK still owed (checklist delivered in-session).
+- **Paint v2 tools SPEC approved + committed** (bc6a3cc,
+  `docs/superpowers/specs/2026-08-10-paint-tools-design.md`): fill/
+  line/rect/eyedropper/undo as client-side gestures over the existing
+  stroke wire — pairs-safe. NEXT STEP: user spec review, then the
+  writing-plans skill (implementation plan) — brainstorm was complete,
+  session interrupted at the spec-review gate by a storm save.
+- **Task list (session task tracker)**: #1 overlay wrap DONE; #2 paint
+  interpolation in code, feel-check owed; #3 paint tools = the spec
+  above; #4 locked one-big-button screen (tester Fluid Valve, Discord)
+  — NOW ALSO CARRIES the wall-painting lock (user decision during the
+  paint brainstorm: one lock mechanism, one shared registrar bump,
+  designed together; that's why Paint v2 stays pairs-safe). #4 is
+  un-brainstormed.
+- Dev-client automation notes that worked (reusable): seed
+  `run/config/linktablet-client.properties` (overlayPin=slot:0@twitch,
+  channel, lastProgram) + `pauseOnLostFocus:false` + TEMP
+  `--quickPlaySingleplayer TEST` programArguments in build.gradle
+  (REVERTED after — keep it that way), screenshot via PowerShell
+  CopyFromScreen + WM_CLOSE to quit gracefully. Dev prefs were
+  restored to pre-session values.
+
+## Previous START HERE (state as of 2026-08-09 late night)
 
 - **v1.11.0 IS LIVE EVERYWHERE** (same-day full cycle 2026-08-09):
   tagged `v1.11.0` (4e0c23a), merged --no-ff to main (f9f6473),
