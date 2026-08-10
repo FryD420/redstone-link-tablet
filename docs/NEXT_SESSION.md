@@ -3,7 +3,39 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-10 — storm save, mid-session)
+## ▶ START HERE next session (state as of 2026-08-10 evening — 1.11.1 tagged)
+
+- **v1.11.1 TAGGED + PUSHED** (d251886, tag v1.11.1, merged --no-ff
+  to main 89c9a7f, same-day cycle): overlay chat wrap (10-line
+  bottom-anchored budget), paint fast-stroke interpolation, and the
+  full PAINT TOOLBOX — fill/line/rect/eyedropper + conflict-aware
+  32-step undo (widened for the dedicated-server flush-echo window),
+  header tool bar with material-art glyphs (3 user-driven rounds,
+  held-color readout on brush/pour/drop). ALL client-only — PAIRS
+  with 1.11.0, no coordination needed. Jar:
+  build/libs/linktablet-1.11.1.jar. Built via subagent-driven SDD
+  (7 tasks + final fable review, ledger in .superpowers/sdd/).
+  REMAINING: user uploads to both platforms + posts the Discord
+  announcement (drafted in-session); tester checklist went out with
+  the jar. Two server-only test rows ride the testers: fill+instant-Z
+  revert, two-account conflict undo.
+- **Screen lock + big button (Fluid Valve) is SPEC'D and PARKED**
+  for the next pairing-break release (registrar "23"→"24"):
+  docs/superpowers/specs/2026-08-10-screen-lock-design.md — use-only
+  lock, wrench-as-key, automatic full-glass button on lock+lone-
+  signal, ONE server-side wrench-in-hand rule for config payloads
+  (mural protection free). Next step when revived: writing-plans.
+  Credit Fluid Valve when it ships. The user's wall-painting lock is
+  INSIDE this design (decision from the Paint v2 brainstorm).
+- Earlier same day: screenshot shoot recovered from F2 folder +
+  listings updated on both platforms (chat-wall/monitor/factory-hall/
+  mural/mural-remix in docs/images/, embeds live). NEVER embed chat
+  close-ups without vetting the visible text.
+- DESCRIPTION.md nit for next listing pass: the Paint section
+  doesn't mention the new tools yet (fill/shapes/eyedropper/undo) —
+  fold into the next refresh, no urgency.
+
+## Previous START HERE (state as of 2026-08-10 — storm save, mid-session)
 
 - **Screenshot shoot DONE + listings UPDATED (user-confirmed "listings
   are up")**: five shots from the user's SMP live in `docs/images/`
