@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.11.1 — 2026-08-10
 
 - **Paint grew a toolbox** — bucket fill (floods across merged-wall
   seams), line and rectangle tools with a live preview, an eyedropper,
