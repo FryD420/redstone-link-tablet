@@ -338,7 +338,24 @@ public class PaintScreen extends ArcadeScreen {
             }
             return true;
         }
-        if (apply(mouseX, mouseY, button)) {
+        if (tool == Tool.FILL && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                byte color = (byte) (button == 1 ? 0 : selected + 1);
+                int start = cy * cols + cx;
+                if (canvas[start] != paletteArgb(color)) { // same-color fill is a no-op
+                    for (int idx : PaintCanvas.floodRegion(canvas, cols, rows, start)) {
+                        paintCell(idx, color);
+                    }
+                    endGesture();
+                    flush();
+                    UISounds.tick(button == 1 ? 0.9F : 1.1F);
+                }
+                return true;
+            }
+        }
+        if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             UISounds.tick(button == 1 ? 0.9F : 1.1F);
             return true;
@@ -348,7 +365,7 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (apply(mouseX, mouseY, button)) {
+        if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             return true;
         }
