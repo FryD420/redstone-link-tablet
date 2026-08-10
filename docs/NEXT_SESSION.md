@@ -5,7 +5,20 @@ at the repo root (auto-loaded every Claude session).
 
 ## ▶ START HERE next session (state as of 2026-08-09 end of day)
 
-- **1.11.0-beta.6 just built this session** (Twitch chat emotes —
+- **1.11.0-beta.7 supersedes beta.6 same-session** (beta.6 was never
+  distributed; new number per the beta.3 overwritten-jar lesson):
+  the user's first emotes dev pass ("booted fine", emotes rendering
+  in GUI + wall confirmed by screenshot) surfaced that the HELD
+  first-person tablet always draws the signals face — a design gap
+  since 1.2, not a regression (`screen_program` never on the item).
+  Fix (user decision, option A "resume"): `TabletItemRenderer` now
+  renders `renderTwitchFace` on your OWN first-person tablet iff
+  `ClientPrefs.lastProgram == "twitch"` AND the personal channel is
+  set — FIRST_PERSON_*_HAND contexts ONLY (frames/ground/other
+  players keep pips; the resume pref is viewer-local). touchFace
+  rides for free (kiosk lifecycle). Twitch-only for now — extending
+  the resume face to other programs is an open idea, not committed.
+- **1.11.0-beta.6 built earlier this session** (Twitch chat emotes —
   native + 7TV/BTTV/FFZ, animated, on all three surfaces, toggle
   glyph in the Twitch header; 100% client-only, registrar untouched
   at "23" — beta.6 pairs with beta.4/beta.5). NOT yet sent to

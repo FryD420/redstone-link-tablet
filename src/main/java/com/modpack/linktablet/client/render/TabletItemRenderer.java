@@ -80,9 +80,36 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         ScreenTheme theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         // Held items ignore the stored screen rotation — it's a mounting
         // concern; the hand always shows portrait.
-        TabletScreenRenderer.render(poseStack, buffers, signals, listLayout, 0, theme, lit,
-                packedLight, heldPips(stack));
+        String twitchChannel = com.modpack.linktablet.client.ClientPrefs.twitchChannel();
+        if (firstPersonHand(context)
+                && com.modpack.linktablet.Program.TWITCH.key()
+                        .equals(com.modpack.linktablet.client.ClientPrefs.lastProgram())
+                && !twitchChannel.isEmpty()) {
+            // Resume-aware hand face (user decision 2026-08-09, option A):
+            // your OWN first-person tablet shows the chat wall when Twitch
+            // was the last program you used — the item carries no program
+            // state, so the PERSONAL resume pref + personal channel drive
+            // it. Other contexts (frames, ground, other players' hands)
+            // keep the signals face: the pref is viewer-local and must not
+            // paint tablets that aren't "yours". renderTwitchFace's
+            // touchFace heartbeat handles the socket lifecycle exactly
+            // like a kiosk face — put the tablet away and the channel
+            // expires.
+            TabletScreenRenderer.renderTwitchFace(poseStack, buffers, twitchChannel, 0, theme,
+                    lit, packedLight, 1, 1, 0);
+        } else {
+            TabletScreenRenderer.render(poseStack, buffers, signals, listLayout, 0, theme, lit,
+                    packedLight, heldPips(stack));
+        }
         poseStack.popPose();
+    }
+
+    /** Your own hands only — the two contexts where "this tablet is
+     * mine" is guaranteed, so the viewer-local resume pref may drive
+     * the face. */
+    private static boolean firstPersonHand(ItemDisplayContext context) {
+        return context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
     }
 
     /**

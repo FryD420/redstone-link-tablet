@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The tablet in your hand shows chat** — when Twitch Chat is the
+  last app you used and you have a channel set, your own first-person
+  tablet renders the live chat wall right on its screen (emotes and
+  all) instead of the signals grid. Put it away or switch apps and the
+  signals face returns. Other people's tablets, item frames, and
+  dropped tablets are unaffected. Client-only — beta.7 still pairs
+  with beta.4/5/6.
 - **Twitch chat gets emotes** — native Twitch emotes plus 7TV, BTTV,
   and FFZ show as images inline in chat, animated ones included, on
   every surface: the held app, the overlay pin, and placed/merged
