@@ -94,26 +94,34 @@ public final class Programs {
     }
 
     /** Everything the App Store shelves — every program except the
-     * launcher itself (the desk the tiles sit on) and the store (it
-     * doesn't sell itself). */
+     * launcher itself (the desk the tiles sit on), the store (it
+     * doesn't sell itself), and the games (they live inside the
+     * Arcade since 1.11.0 — the enum constants stay for frozen keys,
+     * kiosks, and the secret pips, but the catalog hides them). */
     public static List<TabletProgram> catalog() {
         List<TabletProgram> catalog = new ArrayList<>();
         for (TabletProgram program : TABLE.values()) {
-            if (program != Program.LAUNCHER && program != Program.STORE) {
-                catalog.add(program);
-            }
+            if (program == Program.LAUNCHER || program == Program.STORE) continue;
+            if (program instanceof Program builtin && builtin.gameId() != null) continue;
+            catalog.add(program);
         }
         return catalog;
     }
 
     /** Stored key list → programs; unknown/launcher/store keys drop
-     * silently (the downgrade story), an empty result falls back to the
-     * default roster. */
+     * silently (the downgrade story), an empty result falls back to
+     * the default roster. Game keys resolve to the ARCADE tile
+     * (1.11.0 consolidation) — a roster of Snake + 2048 + Signals
+     * loads as Arcade + Signals, deduped; the next roster edit
+     * writes the migrated form. */
     public static List<TabletProgram> fromKeys(List<String> keys) {
         if (keys == null) return DEFAULT_HOME;
         List<TabletProgram> home = new ArrayList<>();
         for (String key : keys) {
             TabletProgram program = TABLE.get(key);
+            if (program instanceof Program builtin && builtin.gameId() != null) {
+                program = Program.ARCADE;
+            }
             if (program != null && program != Program.LAUNCHER && program != Program.STORE
                     && !home.contains(program)) {
                 home.add(program);

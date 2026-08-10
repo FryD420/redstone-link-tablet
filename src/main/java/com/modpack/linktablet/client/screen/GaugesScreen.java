@@ -68,6 +68,39 @@ public class GaugesScreen extends Screen {
         this.view = view;
     }
 
+    // ------------------------------------------------------------------
+    // JEI/EMI ghost-drag targets (compat/jei, compat/emi) — same staging
+    // path as the picker, nothing consumed. Zero-area when the editor
+    // modal is closed, so the handlers naturally have nowhere to drop.
+    // ------------------------------------------------------------------
+
+    /** Absolute 18×18 rect of editor frequency slot 0/1 — empty while
+     * the editor modal is closed. */
+    public net.minecraft.client.renderer.Rect2i frequencySlotArea(int slot) {
+        if (!editorOpen) return new net.minecraft.client.renderer.Rect2i(0, 0, 0, 0);
+        return new net.minecraft.client.renderer.Rect2i(
+                slot == 0 ? edSlot1X() : edSlot2X(), edSlotY(), 18, 18);
+    }
+
+    /** The chrome panel's outer rect — JEI/EMI use it to position their
+     * ingredient panels around this plain (non-container) screen, which
+     * is what makes the drag SOURCE visible at all. */
+    public net.minecraft.client.renderer.Rect2i panelBounds() {
+        return new net.minecraft.client.renderer.Rect2i(
+                panelLeft() - 6, bodyTop() - 2, PANEL_W + 12, bodyHeight() + 4);
+    }
+
+    /** Stages a viewer-dragged ingredient into an editor slot (count 1). */
+    public void stageFrequencyItem(int slot, ItemStack stack) {
+        if (!editorOpen || stack.isEmpty()) return;
+        if ((slot & 1) == 0) {
+            editStack1 = stack.copyWithCount(1);
+        } else {
+            editStack2 = stack.copyWithCount(1);
+        }
+        UISounds.tick(1.3F);
+    }
+
     private ScreenTheme theme() {
         return view.theme();
     }
@@ -197,6 +230,11 @@ public class GaugesScreen extends Screen {
         nameBox.setMaxLength(Gauge.MAX_NAME_LENGTH);
         nameBox.setHint(Component.translatable("gui.linktablet.gauge.name"));
         nameBox.setValue(gauge != null ? gauge.name() : "");
+        // Standalone EditBox: nothing else ever focuses it (vanilla's
+        // mouseClicked never sets focus — that's the widget traversal's
+        // job, and this box isn't registered), so focus it here like
+        // PickerOverlay's search box or the name can never be typed.
+        nameBox.setFocused(true);
         UISounds.page();
     }
 
@@ -368,7 +406,12 @@ public class GaugesScreen extends Screen {
         if (picker.mouseClicked(mouseX, mouseY, button)) return true;
 
         if (editorOpen) {
-            if (nameBox.mouseClicked(mouseX, mouseY, button)) return true;
+            // Click-to-focus for the standalone box (see openEditor note)
+            if (nameBox.mouseClicked(mouseX, mouseY, button)) {
+                nameBox.setFocused(true);
+                return true;
+            }
+            nameBox.setFocused(false);
             if (over(mouseX, mouseY, edSlot1X(), edSlotY(), 18, 18)) {
                 UISounds.tick(1.3F);
                 picker.open(width, height, stack -> editStack1 = stack, true);

@@ -64,6 +64,13 @@ public class SignalEditMenu extends GhostItemMenu<SignalEditMenu.EditContext> {
         return new SignalEditMenu(ModMenus.SIGNAL_EDIT.get(), id, inv, buf);
     }
 
+    /** Same menu under the PROBE_EDIT type (1.11.0): the Monitor's
+     * add-probe editor reuses the ghost-slot core wholesale — the menu
+     * type only decides which screen the client binds. */
+    public static SignalEditMenu createProbe(int id, Inventory inv, RegistryFriendlyByteBuf buf) {
+        return new SignalEditMenu(ModMenus.PROBE_EDIT.get(), id, inv, buf);
+    }
+
     @Override
     protected EditContext createOnClient(RegistryFriendlyByteBuf buf) {
         return EditContext.STREAM_CODEC.decode(buf);

@@ -2,12 +2,16 @@ package com.modpack.linktablet.client.render;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
+import com.modpack.linktablet.client.EmoteText;
+import com.modpack.linktablet.client.EmoteTextures;
 import com.modpack.linktablet.client.TextFit;
+import com.modpack.linktablet.client.TwitchChatService;
 import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.LightTexture;
@@ -21,6 +25,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -744,6 +750,377 @@ public final class TabletScreenRenderer {
         vertex(pose, vc, u1 / 16f, layer, v1 / 16f, argb, light);
         vertex(pose, vc, u2 / 16f, layer, v2 / 16f, argb, light);
         vertex(pose, vc, u3 / 16f, layer, v3 / 16f, argb, light);
+    }
+
+    /**
+     * Kiosk Frequency Monitor face (1.11.0): one summary row per channel
+     * — both frequency item icons, a count "chip" (members transmitting
+     * and in range), and a power bar (the max strength among them) —
+     * the world-face digest of {@code MonitorScreen}'s channel header,
+     * without the member breakdown (a glance, not the full monitor).
+     * Counts/power arrive pre-reduced from the BE's synced summary
+     * ({@code MonitorScanner}'s block half scans the network on a
+     * server tick, never here); this face just draws what it's given.
+     * List-mode row rhythm, rows capped to what the glass fits — no
+     * scrolling on a placed face. Strict pass order: row/chip/bar quads,
+     * then both frequency icons, then the count and power numerals.
+     */
+    public static void renderMonitorFace(PoseStack poseStack, MultiBufferSource buffers,
+                                         List<com.modpack.linktablet.frequency.Frequency> channels,
+                                         int[] counts, int[] power, int rot, ScreenTheme theme,
+                                         boolean backlit, int packedLight, int surfaceW,
+                                         int surfaceH, int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        int total = Math.min(channels.size(), Math.min(counts.length, power.length));
+        int count = TabletScreenMath.visibleSignals(total, true, surfaceW, surfaceH);
+        if (count == 0) {
+            poseStack.popPose();
+            return;
+        }
+        VertexConsumer vc = base.vc();
+        PoseStack.Pose pose = base.pose();
+        int bgLight = base.bgLight();
+        float rowH = tileSize(base.glassH(), TabletScreenMath.LIST_ROWS * surfaceH);
+        float u0Row = TabletScreenMath.GLASS_U0 + SPACE;
+        float u1Row = base.u1() - SPACE;
+        // Two icons share the row's icon zone, so each gets half the
+        // single-icon list row's budget (Math.min, no forced floor —
+        // dense merged rows can shrink below the grid's ICON_MIN).
+        float iconSize = Math.min(LIST_ICON, rowH * 0.5f);
+        float barW = Mth.clamp((u1Row - u0Row) * 0.28f, 1.5f, 4f);
+        float chipInsetPx = rowH / 6f;
+        float chipSize = rowH - 2f * chipInsetPx;
+        Font font = Minecraft.getInstance().font;
+
+        // Pass 1 (quads): row plaque, count chip, power bar per channel
+        for (int i = 0; i < count; i++) {
+            float v0 = listV0(i, rowH);
+            float v1 = v0 + rowH;
+            boolean active = counts[i] > 0;
+            int lineLight = active ? LightTexture.FULL_BRIGHT : packedLight;
+
+            fillRect(pose, vc, u0Row, v0, u1Row, v1, LAYER, theme.screenTrack, packedLight);
+            raisedBevel(pose, vc, u0Row, v0, u1Row, v1, LAYER * 1.5f, theme.screenTrack, packedLight);
+
+            float chipU0 = u1Row - SPACE - chipSize;
+            fillRect(pose, vc, chipU0, v0 + chipInsetPx, chipU0 + chipSize, v1 - chipInsetPx,
+                    LAYER * 2, active ? theme.accentDim : theme.switchOff, lineLight);
+
+            float barU1 = chipU0 - SPACE * 2f;
+            float barU0 = barU1 - barW;
+            float barV0 = v0 + (rowH - rowH * 0.3f) / 2f;
+            float barV1 = barV0 + rowH * 0.3f;
+            fillRect(pose, vc, barU0, barV0, barU1, barV1, LAYER * 2, theme.switchOff, packedLight);
+            if (power[i] > 0) {
+                float frac = Mth.clamp(power[i] / (float) com.modpack.linktablet.frequency.Gauge.MAX_VALUE, 0f, 1f);
+                fillRect(pose, vc, barU0, barV0, barU0 + (barU1 - barU0) * frac, barV1,
+                        LAYER * 2.5f, theme.accentDim, LightTexture.FULL_BRIGHT);
+            }
+            insetGroove(pose, vc, barU0, barV0, barU1, barV1, LAYER * 2.75f, theme.switchOff, packedLight);
+        }
+
+        // Pass 2 (items): both frequency icons, left of the row
+        for (int i = 0; i < count; i++) {
+            com.modpack.linktablet.frequency.Frequency freq = channels.get(i);
+            float v0 = listV0(i, rowH);
+            float cv = v0 + rowH / 2f;
+            boolean active = counts[i] > 0;
+            int light = active ? LightTexture.FULL_BRIGHT : packedLight;
+            float cu1 = u0Row + SPACE + iconSize / 2f;
+            float cu2 = cu1 + iconSize + 0.2f;
+            renderIcon(poseStack, buffers, freq.icon1(), cu1, cv, iconSize, light);
+            renderIcon(poseStack, buffers, freq.icon2(), cu2, cv, iconSize, light);
+        }
+
+        // Pass 3 (text): count numeral over its chip, power numeral by its bar
+        for (int i = 0; i < count; i++) {
+            float v0 = listV0(i, rowH);
+            boolean active = counts[i] > 0;
+            float chipU0 = u1Row - SPACE - chipSize;
+            String countText = String.valueOf(counts[i]);
+            float numH = Mth.clamp(chipSize * 0.55f, 0.7f, 1.6f);
+            float countW = font.width(countText) * numH / FONT_LINE;
+            drawLabel(poseStack, buffers, font, countText,
+                    chipU0 + (chipSize - countW) / 2f, v0 + (rowH - numH) / 2f,
+                    numH / 16f / FONT_LINE, false, false,
+                    active ? 0xFFFFFFFF : theme.textMuted, bgLight);
+
+            float barU1 = chipU0 - SPACE * 2f;
+            float barU0 = barU1 - barW;
+            // Left of the bar, vertically centered — the row is one line
+            // tall, so stacking the numeral above/below the bar (the
+            // GUI's two-line layout) would either crowd the row top or
+            // spill past its bottom.
+            String powerText = String.valueOf(power[i]);
+            float powH = Mth.clamp(rowH * 0.5f, 0.7f, 1.4f);
+            float powW = font.width(powerText) * powH / FONT_LINE;
+            drawLabel(poseStack, buffers, font, powerText, barU0 - 0.3f - powW,
+                    v0 + (rowH - powH) / 2f, powH / 16f / FONT_LINE, false, false,
+                    power[i] > 0 ? theme.textPrimary : theme.textMuted, bgLight);
+        }
+        poseStack.popPose();
+    }
+
+    /**
+     * Kiosk Paint face (1.11.0 "paint on walls"): the shared screen base
+     * plus the wall's own stitched picture — {@code PaintScreen#stitchArgb}
+     * is the ONE stitch (GUI and this face read the same helper so they
+     * never drift), palette-mapped ARGB per continuous cell, dimensions
+     * {@code surfaceW*PaintCanvas.COLS × surfaceH*PaintCanvas.ROWS}
+     * row-major. Blank cells (0) are skipped so the themed background
+     * shows through underneath; an entirely blank canvas shows the faint
+     * centered "Paint" door label instead — {@link #renderLabelFace}'s
+     * look, inlined here since the base is already open (can't call that
+     * method directly without opening a second, duplicate base). Fills
+     * only, no items, and the blank-canvas label is the only text, so the
+     * strict pass order (fills, then text) holds trivially.
+     */
+    public static void renderPaintFace(PoseStack poseStack, MultiBufferSource buffers,
+                                       com.modpack.linktablet.block.TabletBlockEntity controller,
+                                       int rot, ScreenTheme theme, boolean backlit,
+                                       int packedLight, int surfaceW, int surfaceH, int caseTint) {
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        int[] argb = com.modpack.linktablet.client.screen.PaintScreen.stitchArgb(controller);
+        boolean blank = true;
+        for (int c : argb) {
+            if (c != 0) { blank = false; break; }
+        }
+        if (blank) {
+            Font font = Minecraft.getInstance().font;
+            String label = com.modpack.linktablet.Program.PAINT.displayName().getString();
+            float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+            float textH = Mth.clamp(
+                    (base.glassW() - 2f) * FONT_LINE / Math.max(1, font.width(label)),
+                    0.8f, base.glassH() * 0.2f);
+            float top = TabletScreenMath.GLASS_V0 + (base.glassH() - textH) / 2f;
+            drawLabel(poseStack, buffers, font, label, cu, top, textH / 16f / FONT_LINE,
+                    true, false, theme.textMuted, base.bgLight());
+            poseStack.popPose();
+            return;
+        }
+        int cols = surfaceW * com.modpack.linktablet.PaintCanvas.COLS;
+        int rows = surfaceH * com.modpack.linktablet.PaintCanvas.ROWS;
+        VertexConsumer vc = base.vc();
+        PoseStack.Pose pose = base.pose();
+        int bgLight = base.bgLight();
+
+        // No index remap at any rotation: beginScreen's swapped glass dims
+        // + the pose's turn ARE the rotation; the per-axis rescale at
+        // quarter turns is the exact-fill requirement on non-square glass,
+        // not a bug (derived + corner-traced in review, 2026-08-09).
+        float cellW = base.glassW() / cols;
+        float cellH = base.glassH() / rows;
+        for (int cy = 0; cy < rows; cy++) {
+            float v0 = TabletScreenMath.GLASS_V0 + cy * cellH;
+            for (int cx = 0; cx < cols; cx++) {
+                int color = argb[cy * cols + cx];
+                if (color == 0) continue;
+                float u0 = TabletScreenMath.GLASS_U0 + cx * cellW;
+                fillRect(pose, vc, u0, v0, u0 + cellW, v0 + cellH, LAYER, color, bgLight);
+            }
+        }
+        poseStack.popPose();
+    }
+
+    /** Status hint for the Twitch face, mirroring {@code
+     * TwitchOverlayContent#statusMessage}/{@code TwitchScreen#statusMessage}:
+     * null means "show the chat wall" (LIVE with a non-empty buffer). */
+    private static Component twitchStatus(String channel, List<TwitchChatService.ChatMessage> messages) {
+        if (channel.isEmpty()) return Component.translatable("gui.linktablet.twitch.no_channel");
+        TwitchChatService.Status status = TwitchChatService.status(channel);
+        return switch (status) {
+            case CONNECTING -> Component.translatable("gui.linktablet.twitch.connecting");
+            case OFFLINE -> Component.translatable("gui.linktablet.twitch.offline");
+            case LIVE -> messages.isEmpty()
+                    ? Component.translatable("gui.linktablet.twitch.no_messages") : null;
+            case IDLE -> Component.translatable("gui.linktablet.twitch.no_channel");
+        };
+    }
+
+    /**
+     * Kiosk Twitch Chat face (1.11.0-beta.2): the shared screen base plus
+     * a chat wall — the newest message anchored to the LAST row, older
+     * ones stacking upward, so a sparse buffer clings to the bottom the
+     * way a real chat window does rather than floating at the top. Each
+     * line is "user: text" in the chatter's own color, ellipsized (no
+     * wrapping — a placed face is a glance, not a reader) to the glass
+     * width. Empty channel or a non-LIVE/empty-buffer status shows the
+     * matching centered hint instead ({@link #twitchStatus}, the same
+     * mapping {@code TwitchOverlayContent} and {@code TwitchScreen} use).
+     * Touches the service's per-frame presence heartbeat FIRST, before
+     * any layout math — the face's presence keeps the channel joined;
+     * once chunk culling stops the touches, the service parts it on its
+     * own. Emotes (1.11.0) are the only non-text content: the line walk
+     * queues them as {@link EmoteQuad}s and flushes them AFTER every
+     * label, so the pass order stays base quads → text → emote images
+     * and no cached VertexConsumer is ever interleaved.
+     */
+    public static void renderTwitchFace(PoseStack poseStack, MultiBufferSource buffers,
+                                        String channel, int rot, ScreenTheme theme, boolean backlit,
+                                        int packedLight, int surfaceW, int surfaceH, int caseTint) {
+        if (!channel.isEmpty()) TwitchChatService.touchFace(channel);
+
+        ScreenBase base = beginScreen(poseStack, buffers, rot, theme, backlit,
+                packedLight, surfaceW, surfaceH, caseTint);
+        Font font = Minecraft.getInstance().font;
+        int bgLight = base.bgLight();
+
+        List<TwitchChatService.ChatMessage> messages = TwitchChatService.messages(channel);
+        Component status = twitchStatus(channel, messages);
+        if (status != null) {
+            String text = status.getString();
+            float cu = TabletScreenMath.GLASS_U0 + base.glassW() / 2f;
+            float textH = Mth.clamp(
+                    (base.glassW() - 2f) * FONT_LINE / Math.max(1, font.width(text)),
+                    0.8f, base.glassH() * 0.2f);
+            float top = TabletScreenMath.GLASS_V0 + (base.glassH() - textH) / 2f;
+            drawLabel(poseStack, buffers, font, text, cu, top, textH / 16f / FONT_LINE,
+                    true, false, theme.textMuted, bgLight);
+            poseStack.popPose();
+            return;
+        }
+
+        // Compact chat lines with a small leading, stacked from the
+        // BOTTOM of the glass — not the signals list's chunky row bands
+        // (which spread a few messages across a merged wall with huge
+        // gaps; tester report, beta.5). Text keeps one physical size
+        // everywhere; bigger walls simply fit MORE lines.
+        float lineH = LIST_TEXT_H * 1.35f;
+        // Stay clear of the ~0.5-texel glass bleed under the bezel ring:
+        // the background quad hides there, but TEXT floats above the
+        // bezel lip, so a line placed in the bleed paints ON the bezel
+        // (user screenshot, beta.5). Inset = bleed + the SPACE margin.
+        float inset = 0.5f + SPACE;
+        int maxRows = Math.max(1, (int) ((base.glassH() - 2 * inset) / lineH));
+        int shown = Math.min(messages.size(), maxRows);
+        // Same bleed inset on the horizontal edges — usernames were
+        // starting on the left bezel ring (user screenshot, beta.5)
+        float u0 = TabletScreenMath.GLASS_U0 + inset;
+        float u1 = base.u1() - inset;
+        float scale = LIST_TEXT_H / 16f / FONT_LINE;
+        int maxPx = (int) ((u1 - u0) * FONT_LINE / LIST_TEXT_H);
+        // Emote images carry their own textures, so they can't ride the
+        // font batches: queue them here and flush once, after every
+        // label (see flushEmoteQuads).
+        List<EmoteQuad> emoteQuads = new ArrayList<>();
+
+        // Newest message (last in the oldest→newest list) sits on the
+        // bottom line; older messages fill upward.
+        for (int i = 0; i < shown; i++) {
+            TwitchChatService.ChatMessage message = messages.get(messages.size() - shown + i);
+            float top = TabletScreenMath.GLASS_V0 + base.glassH() - inset
+                    - (shown - i) * lineH + (lineH - LIST_TEXT_H) / 2f;
+            String prefix = message.user() + ": ";
+            int prefixWidth = font.width(prefix);
+            if (prefixWidth >= maxPx) {
+                String line = TextFit.ellipsize(font, prefix, maxPx);
+                drawLabel(poseStack, buffers, font, line, u0, top, scale,
+                        false, false, message.color(), bgLight);
+                continue;
+            }
+            drawLabel(poseStack, buffers, font, prefix, u0, top, scale,
+                    false, false, message.color(), bgLight);
+
+            // Segment walk (1.11.0 emotes): text draws immediately, emote
+            // images queue for the flush below. One shared cursor in glass
+            // texels (advanceU) and one shared budget in FONT PIXELS
+            // (budgetPx) — the same u0/maxPx budget the plain-text line
+            // used, so the beta.5 bleed insets apply unchanged.
+            float advanceU = u0 + prefixWidth * LIST_TEXT_H / FONT_LINE;
+            int budgetPx = maxPx - prefixWidth;
+            for (EmoteText.Segment seg : EmoteText.segments(message, channel)) {
+                if (budgetPx <= 0) break;
+                if (seg instanceof EmoteText.EmoteSeg es) {
+                    EmoteTextures.Sprite sprite = EmoteTextures.get(es.emote());
+                    if (sprite == null) {
+                        // Not loaded yet (or failed): the emote's text name,
+                        // the same fallback EmoteText.drawGui takes.
+                        String name = TextFit.ellipsize(font, es.emote().name(), budgetPx);
+                        drawLabel(poseStack, buffers, font, name, advanceU, top, scale,
+                                false, false, theme.textPrimary, bgLight);
+                        int drawn = font.width(name);
+                        advanceU += drawn * LIST_TEXT_H / FONT_LINE;
+                        budgetPx = name.equals(es.emote().name()) ? budgetPx - drawn : 0;
+                        continue;
+                    }
+                    // Width comes from the tokenizer's one sizing rule.
+                    // It re-runs EmoteTextures.get on this loaded path (a
+                    // second LRU map hit, negligible) — the get above is
+                    // for the null/text fallback, not to save a lookup.
+                    int wPx = EmoteText.emoteWidth(es.emote(), font, (int) FONT_LINE);
+                    if (wPx > budgetPx) break; // no partial emotes on a wall line
+                    emoteQuads.add(new EmoteQuad(sprite, advanceU, top,
+                            wPx * LIST_TEXT_H / FONT_LINE, LIST_TEXT_H));
+                    advanceU += wPx * LIST_TEXT_H / FONT_LINE;
+                    budgetPx -= wPx;
+                } else if (seg instanceof EmoteText.TextSeg ts) {
+                    String draw = TextFit.ellipsize(font, ts.text(), budgetPx);
+                    drawLabel(poseStack, buffers, font, draw, advanceU, top, scale,
+                            false, false, theme.textPrimary, bgLight);
+                    int drawn = font.width(draw);
+                    advanceU += drawn * LIST_TEXT_H / FONT_LINE;
+                    budgetPx = draw.equals(ts.text()) ? budgetPx - drawn : 0;
+                }
+            }
+        }
+        flushEmoteQuads(buffers, base.pose(), emoteQuads, bgLight);
+        poseStack.popPose();
+    }
+
+    /**
+     * One queued emote image, in the face's own glass-texel space:
+     * {@code (u, v)} is the top-left corner (the label cursor and the
+     * line top), {@code w}/{@code h} the drawn size in texels.
+     */
+    private record EmoteQuad(EmoteTextures.Sprite sprite, float u, float v, float w, float h) {
+    }
+
+    /**
+     * Emote images, drawn AFTER every label of the chat wall (never
+     * interleaved with a cached VertexConsumer — the 1.2.1/1.3.0 pass
+     * rule). Geometry sits in the class's screen-local mapping: texel
+     * {@code (u, v)} → local {@code (u/16, y, v/16)}, screen normal +Y,
+     * wound TL→BL→BR→TR, exactly like {@link #fillRect} and like
+     * vanilla's own glyph quads once {@link #drawLabel}'s +90° X spin
+     * has laid font space flat. Height is the icon hairline
+     * ({@code LAYER * 3.5}): emotes are image content, and being flat
+     * quads they need none of {@link #renderIcon}'s depth lift — they
+     * stay a hair under the text layer they never overlap. The buffer
+     * is {@link RenderType#text}, the font's OWN family (translucent,
+     * lightmapped, POSITION_COLOR_TEX_LIGHTMAP — position, color, uv,
+     * light and nothing else), so this is still the text pass with a
+     * different texture bound. Sorted by texture so repeats of one
+     * emote share a batch. Sheets stack frames vertically, so a frame
+     * is the full width and one {@code 1/frameCount} v-slice.
+     */
+    private static void flushEmoteQuads(MultiBufferSource buffers, PoseStack.Pose pose,
+                                        List<EmoteQuad> quads, int light) {
+        if (quads.isEmpty()) return;
+        quads.sort(Comparator.comparing(q -> q.sprite().texture()));
+        long now = Util.getMillis();
+        ResourceLocation bound = null;
+        VertexConsumer vc = null;
+        for (EmoteQuad q : quads) {
+            if (!q.sprite().texture().equals(bound)) {
+                bound = q.sprite().texture();
+                // RenderType.text is an unbounded Util.memoize cache keyed by
+                // texture — tiny objects, bounded by distinct emotes seen in a
+                // session; deliberate, not a leak worth a custom cache.
+                vc = buffers.getBuffer(RenderType.text(bound));
+            }
+            int frame = EmoteTextures.frameAt(q.sprite(), now);
+            float t0 = frame / (float) q.sprite().frameCount();
+            float t1 = (frame + 1) / (float) q.sprite().frameCount();
+            float x0 = q.u() / 16f, z0 = q.v() / 16f;
+            float x1 = (q.u() + q.w()) / 16f, z1 = (q.v() + q.h()) / 16f;
+            float y = LAYER * 3.5f;
+            vc.addVertex(pose, x0, y, z0).setColor(-1).setUv(0f, t0).setLight(light);
+            vc.addVertex(pose, x0, y, z1).setColor(-1).setUv(0f, t1).setLight(light);
+            vc.addVertex(pose, x1, y, z1).setColor(-1).setUv(1f, t1).setLight(light);
+            vc.addVertex(pose, x1, y, z0).setColor(-1).setUv(1f, t0).setLight(light);
+        }
     }
 
     /**

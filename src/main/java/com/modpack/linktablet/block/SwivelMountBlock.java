@@ -105,7 +105,8 @@ public class SwivelMountBlock extends FaceAttachedHorizontalDirectionalBlock imp
                 if (!player.getAbilities().instabuild) {
                     stack.shrink(1);
                 }
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE,
+                level.playSound(null, com.modpack.linktablet.compat.SableCompat
+                                .worldBlockPos(level, pos), SoundEvents.AMETHYST_BLOCK_PLACE,
                         SoundSource.BLOCKS, 0.8F, 1.3F);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
@@ -122,9 +123,11 @@ public class SwivelMountBlock extends FaceAttachedHorizontalDirectionalBlock imp
                 level.removeBlock(pos, false);
                 ItemStack mount = new ItemStack(ModItems.SWIVEL_MOUNT.get());
                 if (!player.addItem(mount)) {
-                    popResource(level, pos, mount);
+                    popResource(level, com.modpack.linktablet.compat.SableCompat
+                            .worldBlockPos(level, pos), mount);
                 }
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK,
+                level.playSound(null, com.modpack.linktablet.compat.SableCompat
+                                .worldBlockPos(level, pos), SoundEvents.AMETHYST_BLOCK_BREAK,
                         SoundSource.BLOCKS, 0.8F, 1.1F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);

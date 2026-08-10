@@ -58,7 +58,22 @@ public enum Program implements com.modpack.linktablet.api.TabletProgram {
     G2048(22, "2048", 0xFFFED83D, "minecraft:gold_block", true),
     CRATES(23, "crates", 0xFF835432, "minecraft:barrel", true),
     LIFE(24, "life", 0xFF5E7C16, "minecraft:moss_block", true),
-    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting", true);
+    /** Paint (game=false since 1.11.0 beta.5, user decision after the
+     * wall-canvas feature): a real app with a store row, no longer an
+     * Arcade resident. The KEY stays "paint" forever — it still drives
+     * the SecretGames dispatch (the pip easter egg is key-based) and
+     * kiosk screen_program values in the wild. */
+    PAINT(25, "paint", 0xFFF38BAA, "minecraft:painting"),
+    /** Frequency Monitor (1.11.0): read-only view of Create's link
+     * network — who transmits on each channel the tablet uses. */
+    MONITOR(26, "monitor", 0xFF16A0A0, "minecraft:spyglass"),
+    /** Twitch Chat (1.11.0): read-only live chat of a selected channel
+     * — anonymous, client-side only, no accounts. */
+    TWITCH(27, "twitch", 0xFF9146FF, "minecraft:amethyst_shard"),
+    /** Arcade (1.11.0): the 19 games consolidated under one door —
+     * reverses the 1.10.0 per-game-app decision by user request
+     * (2026-08-08); id 6 (the July hub) stays retired. */
+    ARCADE(28, "arcade", 0xFF169C9C, "create:linked_controller");
 
     private final byte id;
     private final String key;

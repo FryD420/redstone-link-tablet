@@ -102,6 +102,31 @@ public class TabletBlockEntity extends BlockEntity {
      */
     private List<com.modpack.linktablet.frequency.Gauge> gauges = List.of();
 
+    /** Frequency Monitor probe channels (1.11.0, multi-probe); empty
+     * when unset. */
+    private List<Frequency> monitorProbes = List.of();
+
+    /** Twitch Chat channel (1.11.0); "" = unset. */
+    private String twitchChannel = "";
+
+    /** Paint canvas (1.11.0 "paint on walls"), this member's own
+     * COLS×ROWS slice — merged walls stitch member slices at edit/
+     * render time (see {@link com.modpack.linktablet.PaintCanvas});
+     * all-zero = blank. */
+    private byte[] paintCanvas = com.modpack.linktablet.PaintCanvas.blank();
+
+    /**
+     * Frequency Monitor summary (1.11.0, block half): index-aligned with
+     * {@code MonitorChannels.channelsOf(signals, gauges, monitorProbe)},
+     * written by {@link com.modpack.linktablet.compat.MonitorScanner}'s
+     * level-tick scan. Transient like {@link #gaugeValues}/{@link
+     * #heldPips}: synced via the update tag only, never written to disk —
+     * a fresh load re-registers (if still on Monitor) and the next scan
+     * refills it.
+     */
+    private int[] monitorCounts = new int[0];
+    private int[] monitorPower = new int[0];
+
     /** Server-side receivers keyed by listened frequency (1.10.0). */
     private final Map<Frequency, com.modpack.linktablet.compat.VirtualReceiver> receivers = new HashMap<>();
 
@@ -192,10 +217,20 @@ public class TabletBlockEntity extends BlockEntity {
      * use-packet), so routing always derives from agreed state. */
     public void setCurrentProgram(com.modpack.linktablet.api.TabletProgram program) {
         if (screenProgram == program) return;
+        boolean wasMonitor = screenProgram == com.modpack.linktablet.Program.MONITOR;
         screenProgram = program;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+        // Frequency Monitor block registry (1.11.0): only a controller's
+        // program change ever needs to register — a part's screenProgram
+        // is dormant (the field exists on every BE, but only the
+        // controller's copy is ever shown/synced).
+        if (program == com.modpack.linktablet.Program.MONITOR) {
+            if (!isSurfacePart()) com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+        } else if (wasMonitor) {
+            com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         }
     }
 
@@ -270,15 +305,29 @@ public class TabletBlockEntity extends BlockEntity {
         }
     }
 
+    /** Beyond this eye→pivot distance the aim is refused (guard, 1.10.1):
+     * reach is ~5 blocks and follow range 8 — anything past this is a
+     * coordinate-frame mismatch (Sable sub-level without working compat)
+     * and clamping it would overwrite the stored aim with garbage. */
+    private static final double AIM_GUARD_DIST_SQ = 32 * 32;
+
     /** The one aim derivation (wrench AND follow): eye point → clamped
-     * {pitch, yaw}, or null when the eye sits on the pivot. */
+     * {pitch, yaw}, or null when the eye sits on the pivot — or (1.10.1)
+     * when it's implausibly far after Sable localization (see guard). */
     @Nullable
     private float[] computeAim(net.minecraft.world.phys.Vec3 eye) {
         net.minecraft.core.Direction attach = mountAttachNormal();
         net.minecraft.world.phys.Vec3 pivot =
                 TabletScreenMath.MountBasis.pivot(worldPosition, attach);
+        // Sable sub-level (1.10.1): the block may live in the plot frame
+        // while the player is in world space — bring the eye over first
+        if (level != null) {
+            eye = com.modpack.linktablet.compat.SableCompat.localizeNear(
+                    level, worldPosition, eye);
+        }
         net.minecraft.world.phys.Vec3 toEye = eye.subtract(pivot);
-        if (toEye.lengthSqr() < 1.0E-6) return null;
+        if (toEye.lengthSqr() < 1.0E-6
+                || toEye.lengthSqr() > AIM_GUARD_DIST_SQ) return null;
         net.minecraft.world.phys.Vec3 normal = toEye.normalize();
 
         // Clamp the tilt toward the attach face's normal
@@ -332,8 +381,14 @@ public class TabletBlockEntity extends BlockEntity {
         if ((level.getGameTime() % FOLLOW_INTERVAL_TICKS) != 0) return;
         net.minecraft.world.phys.Vec3 pivot =
                 TabletScreenMath.MountBasis.pivot(worldPosition, mountAttachNormal());
+        // Sable sub-level (1.10.1): players live in world space — search
+        // where the block APPEARS, not its plot position (computeAim
+        // brings the found eye back into the plot frame)
+        net.minecraft.world.phys.Vec3 searchAt =
+                com.modpack.linktablet.compat.SableCompat.toWorldPoint(
+                        level, worldPosition, pivot);
         net.minecraft.world.entity.player.Player nearest = level.getNearestPlayer(
-                pivot.x, pivot.y, pivot.z, FOLLOW_RANGE, false);
+                searchAt.x, searchAt.y, searchAt.z, FOLLOW_RANGE, false);
         if (nearest == null || nearest.isSpectator()) return;
         float[] angles = computeAim(nearest.getEyePosition());
         if (angles == null) return;
@@ -440,8 +495,11 @@ public class TabletBlockEntity extends BlockEntity {
                     power -> onGaugeReading(freq, power));
             Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(serverLevel, receiver);
             receivers.put(freq, receiver);
-            // addToNetwork re-evaluates the channel, so the initial
-            // value arrives through the change hook right away
+            // Create's add-time evaluation never reaches a non-
+            // LinkBehaviour member (1.10.2 fix) — read the channel once
+            // ourselves so a gauge placed on a static signal shows it
+            // immediately instead of freezing at 0 until the next change
+            receiver.readInitial();
             gaugeValues.put(freq, receiver.getReceivedStrength());
         }
     }
@@ -462,6 +520,79 @@ public class TabletBlockEntity extends BlockEntity {
         gaugeValues.clear();
     }
 
+    // ---- Frequency Monitor probe (1.11.0) -----------------------------
+
+    public List<Frequency> getMonitorProbes() {
+        return monitorProbes;
+    }
+
+    public void setMonitorProbes(List<Frequency> newProbes) {
+        if (monitorProbes.equals(newProbes)) return;
+        this.monitorProbes = List.copyOf(newProbes);
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    // ---- Twitch Chat channel (1.11.0) ----------------------------------
+
+    public String getTwitchChannel() {
+        return twitchChannel;
+    }
+
+    public void setTwitchChannel(String newChannel) {
+        if (twitchChannel.equals(newChannel)) return;
+        this.twitchChannel = newChannel;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    // ---- Paint canvas (1.11.0) -----------------------------------------
+
+    /** This member's own COLS×ROWS slice; renderer-read-only, callers
+     * must not mutate the returned array. */
+    public byte[] getPaintCanvas() {
+        return paintCanvas;
+    }
+
+    public void setPaintCanvas(byte[] newCanvas) {
+        if (java.util.Arrays.equals(paintCanvas, newCanvas)) return;
+        this.paintCanvas = newCanvas;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /** Counts, index-aligned with {@code MonitorChannels.channelsOf}:
+     * members transmitting (strength &gt; 0) and in range. */
+    public int[] monitorCounts() {
+        return monitorCounts;
+    }
+
+    /** Effective power per channel — the max strength among the members
+     * {@link #monitorCounts()} counted. */
+    public int[] monitorPower() {
+        return monitorPower;
+    }
+
+    /** Change hook from {@code MonitorScanner}'s block scan: store + sync
+     * (the {@code onGaugeReading} shape) — no disk write, the summary is
+     * transient and re-derives from the next scan after any load. */
+    public void setMonitorSummary(int[] counts, int[] power) {
+        if (java.util.Arrays.equals(monitorCounts, counts) && java.util.Arrays.equals(monitorPower, power)) {
+            return;
+        }
+        this.monitorCounts = counts;
+        this.monitorPower = power;
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** Copies signals, case color, screen layout, theme, and rotation from the placed item. */
     public void loadFromItem(ItemStack stack) {
         this.caseColor = stack.get(ModDataComponents.CASE_COLOR.get());
@@ -472,6 +603,11 @@ public class TabletBlockEntity extends BlockEntity {
         this.homeApps = com.modpack.linktablet.Programs.fromKeys(
                 stack.get(ModDataComponents.HOME_APPS.get()));
         setGauges(stack.getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of()));
+        setMonitorProbes(stack.getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of()));
+        setTwitchChannel(stack.getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), ""));
+        byte[] canvas = stack.get(ModDataComponents.PAINT_CANVAS.get());
+        setPaintCanvas(canvas != null && canvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                ? canvas : com.modpack.linktablet.PaintCanvas.blank());
         setSignals(stack.getOrDefault(ModDataComponents.TABLET_SIGNALS.get(), List.of()));
     }
 
@@ -502,6 +638,15 @@ public class TabletBlockEntity extends BlockEntity {
         }
         if (!gauges.isEmpty()) {
             stack.set(ModDataComponents.TABLET_GAUGES.get(), gauges);
+        }
+        if (!monitorProbes.isEmpty()) {
+            stack.set(ModDataComponents.MONITOR_PROBE.get(), monitorProbes);
+        }
+        if (!twitchChannel.isEmpty()) {
+            stack.set(ModDataComponents.TWITCH_CHANNEL.get(), twitchChannel);
+        }
+        if (!com.modpack.linktablet.PaintCanvas.isBlank(paintCanvas)) {
+            stack.set(ModDataComponents.PAINT_CANVAS.get(), paintCanvas);
         }
         return stack;
     }
@@ -637,10 +782,26 @@ public class TabletBlockEntity extends BlockEntity {
         if (isSurfacePart()) {
             clearTransmitters();
             clearReceivers();
+            // Demoted into a part: screenProgram goes dormant even if it
+            // still reads MONITOR, so the block registry must drop it —
+            // the (new) controller registers itself independently.
+            com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         } else {
             refreshTransmitters();
             refreshReceivers();
             updateLit();
+            // Promoted (back) into a controller/standalone: the dormant
+            // screenProgram may already read MONITOR from before it was
+            // demoted — re-register the same way onLoad does, or a
+            // surface split leaves the face showing Monitor with a
+            // registry entry that was dropped on demotion and never
+            // recreated (setCurrentProgram only fires on an actual
+            // program change, which a role change isn't).
+            if (level instanceof ServerLevel
+                    && screenProgram == com.modpack.linktablet.Program.MONITOR
+                    && !isSurfacePart()) {
+                com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+            }
         }
     }
 
@@ -740,6 +901,13 @@ public class TabletBlockEntity extends BlockEntity {
         // Follow mode (1.10.0): the powered flag is transient — re-read
         // the neighborhood on load (neighborChanged keeps it live after)
         this.followPowered = serverLevel.hasNeighborSignal(worldPosition);
+        // Frequency Monitor block registry (1.11.0): a controller loading
+        // back in already showing Monitor re-registers — setCurrentProgram
+        // only fires on an actual change, so a chunk reload needs its own
+        // hook (registerBlock no-ops harmlessly if already present).
+        if (screenProgram == com.modpack.linktablet.Program.MONITOR && !isSurfacePart()) {
+            com.modpack.linktablet.compat.MonitorScanner.registerBlock(this);
+        }
         boolean stale =
                 (isSurfacePart()
                         && serverLevel.isLoaded(getControllerPos())
@@ -773,6 +941,7 @@ public class TabletBlockEntity extends BlockEntity {
     public void setRemoved() {
         clearTransmitters();
         clearReceivers();
+        com.modpack.linktablet.compat.MonitorScanner.unregisterBlock(this);
         super.setRemoved();
     }
 
@@ -800,6 +969,16 @@ public class TabletBlockEntity extends BlockEntity {
             com.modpack.linktablet.frequency.Gauge.CODEC.listOf()
                     .encodeStart(NbtOps.INSTANCE, gauges)
                     .result().ifPresent(t -> tag.put("gauges", t));
+        }
+        if (!monitorProbes.isEmpty()) {
+            Frequency.CODEC.listOf().encodeStart(NbtOps.INSTANCE, monitorProbes)
+                    .result().ifPresent(t -> tag.put("monitor_probe", t));
+        }
+        if (!twitchChannel.isEmpty()) {
+            tag.putString("twitch_channel", twitchChannel);
+        }
+        if (!com.modpack.linktablet.PaintCanvas.isBlank(paintCanvas)) {
+            tag.putByteArray("paint_canvas", paintCanvas);
         }
         if (caseColor != null) {
             tag.putString("case_color", caseColor.getName());
@@ -856,6 +1035,21 @@ public class TabletBlockEntity extends BlockEntity {
         this.gauges = gaugesTag == null ? List.of()
                 : com.modpack.linktablet.frequency.Gauge.CODEC.listOf()
                         .parse(NbtOps.INSTANCE, gaugesTag).result().orElse(List.of());
+        // Multi-probe list; the single-Frequency compound is the brief
+        // pre-multi dev format (never released) — decoded as a one-entry
+        // list so dev worlds carry over.
+        Tag monitorProbeTag = tag.get("monitor_probe");
+        this.monitorProbes = monitorProbeTag == null ? List.of()
+                : monitorProbeTag instanceof net.minecraft.nbt.ListTag
+                        ? Frequency.CODEC.listOf().parse(NbtOps.INSTANCE, monitorProbeTag)
+                                .result().orElse(List.of())
+                        : Frequency.CODEC.parse(NbtOps.INSTANCE, monitorProbeTag)
+                                .result().map(List::of).orElse(List.of());
+        this.twitchChannel = tag.getString("twitch_channel");
+        byte[] loadedCanvas = tag.contains("paint_canvas", Tag.TAG_BYTE_ARRAY)
+                ? tag.getByteArray("paint_canvas") : new byte[0];
+        this.paintCanvas = loadedCanvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                ? loadedCanvas : com.modpack.linktablet.PaintCanvas.blank();
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");
@@ -901,6 +1095,10 @@ public class TabletBlockEntity extends BlockEntity {
         for (int i = 0; i < readings.length && i < gauges.size(); i++) {
             gaugeValues.put(gauges.get(i).frequency(), readings[i]);
         }
+        // Monitor summary (1.11.0): sync tags only, like gauge_readings —
+        // an absent tag (disk load) naturally clears to empty arrays.
+        this.monitorCounts = tag.getIntArray("monitor_counts");
+        this.monitorPower = tag.getIntArray("monitor_power");
     }
 
     @Override
@@ -915,6 +1113,10 @@ public class TabletBlockEntity extends BlockEntity {
                 readings[i] = gaugeReading(i);
             }
             tag.putIntArray("gauge_readings", readings);
+        }
+        if (monitorCounts.length > 0) {
+            tag.putIntArray("monitor_counts", monitorCounts);
+            tag.putIntArray("monitor_power", monitorPower);
         }
         return tag;
     }

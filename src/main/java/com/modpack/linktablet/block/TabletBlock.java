@@ -263,7 +263,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     if (!player.getAbilities().instabuild) {
                         stack.shrink(1);
                     }
-                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_PLACE,
+                    level.playSound(null, audiblePos(level, pos), SoundEvents.AMETHYST_BLOCK_PLACE,
                             SoundSource.BLOCKS, 0.8F, 1.3F);
                 }
                 return ItemInteractionResult.sidedSuccess(level.isClientSide);
@@ -283,24 +283,27 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 ItemStack stack = be.toItemStack();
                 boolean mounted = state.getValue(MOUNTED);
-                boolean tabletOnly = mounted && mountedOnPanel(TabletScreenMath.mountedUV(
-                        be.mountBasis(), player.getEyePosition(),
-                        hitResult.getLocation().subtract(player.getEyePosition())));
+                boolean tabletOnly = false;
+                if (mounted) {
+                    Vec3[] ray = mountedRay(level, pos, player, hitResult.getLocation());
+                    tabletOnly = mountedOnPanel(
+                            TabletScreenMath.mountedUV(be.mountBasis(), ray[0], ray[1]));
+                }
                 if (tabletOnly) {
                     level.setBlock(pos, standState(state), 3);
                 } else {
                     level.removeBlock(pos, false);
                 }
                 if (!player.addItem(stack)) {
-                    popResource(level, pos, stack);
+                    popResource(level, audiblePos(level, pos), stack);
                 }
                 if (mounted && !tabletOnly) {
                     ItemStack mount = new ItemStack(ModItems.SWIVEL_MOUNT.get());
                     if (!player.addItem(mount)) {
-                        popResource(level, pos, mount);
+                        popResource(level, audiblePos(level, pos), mount);
                     }
                 }
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.BLOCKS, 0.8F, 1.1F);
+                level.playSound(null, audiblePos(level, pos), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.BLOCKS, 0.8F, 1.1F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -334,8 +337,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 // draws roster rows through the same list table
                 java.util.List<com.modpack.linktablet.api.TabletProgram> home = target.getHomeApps();
                 TabletScreenMath.PipHit tile = be.isMounted()
-                        ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
-                                hitResult.getLocation(), home.size(), target.isScreenList(),
+                        ? TabletScreenMath.mountedHitPip(be.mountBasis(),
+                                com.modpack.linktablet.compat.SableCompat.localizeNear(
+                                        level, pos, player.getEyePosition()),
+                                com.modpack.linktablet.compat.SableCompat.localizeNear(
+                                        level, pos, hitResult.getLocation()),
+                                home.size(), target.isScreenList(),
                                 target.effectiveRotation())
                         : TabletScreenMath.hitPipDetailed(state, pos, hitResult,
                                 home.size(), target.isScreenList(), target.effectiveRotation(),
@@ -389,8 +396,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             // actual angled glass plane instead (both sides derive the
             // basis from the same synced pitch/yaw).
             TabletScreenMath.PipHit pipHit = be.isMounted()
-                    ? TabletScreenMath.mountedHitPip(be.mountBasis(), player.getEyePosition(),
-                            hitResult.getLocation(), signals.size(), target.isScreenList(),
+                    ? TabletScreenMath.mountedHitPip(be.mountBasis(),
+                            com.modpack.linktablet.compat.SableCompat.localizeNear(
+                                    level, pos, player.getEyePosition()),
+                            com.modpack.linktablet.compat.SableCompat.localizeNear(
+                                    level, pos, hitResult.getLocation()),
+                            signals.size(), target.isScreenList(),
                             target.effectiveRotation())
                     : TabletScreenMath.hitPipDetailed(state, pos, hitResult,
                             signals.size(), target.isScreenList(), target.effectiveRotation(),
@@ -530,7 +541,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 } else {
                     be.aimAt(context.getPlayer().getEyePosition());
                 }
-                IWrenchable.playRotateSound(level, pos);
+                IWrenchable.playRotateSound(level, audiblePos(level, pos));
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -554,7 +565,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     } else {
                         target.rotateScreen();
                     }
-                    IWrenchable.playRotateSound(level, pos);
+                    IWrenchable.playRotateSound(level, audiblePos(level, pos));
                 }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -565,7 +576,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 : state.setValue(FACING, state.getValue(FACING).getClockWise());
         if (!level.isClientSide) {
             level.setBlock(pos, rotated, 3);
-            IWrenchable.playRotateSound(level, pos);
+            IWrenchable.playRotateSound(level, audiblePos(level, pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
@@ -589,7 +600,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             if (mountedOnGlass(uv)) {
                 if (!level.isClientSide) {
                     be.rotateScreen();
-                    IWrenchable.playRotateSound(level, pos);
+                    IWrenchable.playRotateSound(level, audiblePos(level, pos));
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
             }
@@ -598,7 +609,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     ItemStack tablet = be.toItemStack();
                     level.setBlock(pos, standState(state), 3);
                     context.getPlayer().getInventory().placeItemBackInInventory(tablet);
-                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_BREAK,
+                    level.playSound(null, audiblePos(level, pos), SoundEvents.AMETHYST_BLOCK_BREAK,
                             SoundSource.BLOCKS, 0.8F, 1.1F);
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
@@ -615,10 +626,34 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     }
 
     /** Eye-ray screen texels under a wrench click on a mounted tablet. */
+    /**
+     * Sounds and item drops for a plot block must land where the block
+     * APPEARS in the world, not at its Sable plot coordinates (20M
+     * blocks from any ear). Identity for normal tablets.
+     */
+    private static BlockPos audiblePos(Level level, BlockPos pos) {
+        return com.modpack.linktablet.compat.SableCompat.worldBlockPos(level, pos);
+    }
+
+    /**
+     * Sable sub-level (1.10.1): a physicalized tablet's blocks live in
+     * the plot frame while the player stays in world space — every
+     * mounted ray must localize its eye AND target point before the
+     * math. Returns {@code {eye, delta}} in the BLOCK's frame; identity
+     * (and free) for normal tablets.
+     */
+    private static Vec3[] mountedRay(Level level, BlockPos pos, Player player, Vec3 target) {
+        Vec3 eye = com.modpack.linktablet.compat.SableCompat
+                .localizeNear(level, pos, player.getEyePosition());
+        Vec3 hit = com.modpack.linktablet.compat.SableCompat
+                .localizeNear(level, pos, target);
+        return new Vec3[]{eye, hit.subtract(eye)};
+    }
+
     private static double[] mountedWrenchUV(TabletBlockEntity be, UseOnContext context) {
-        Vec3 eye = context.getPlayer().getEyePosition();
-        return TabletScreenMath.mountedUV(be.mountBasis(), eye,
-                context.getClickLocation().subtract(eye));
+        Vec3[] ray = mountedRay(context.getLevel(), context.getClickedPos(),
+                context.getPlayer(), context.getClickLocation());
+        return TabletScreenMath.mountedUV(be.mountBasis(), ray[0], ray[1]);
     }
 
     /** Panel is texels u 0..12, v 0..14. */
@@ -638,8 +673,9 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
      * uses for its landscape flip, so the two gestures agree on edges. */
     private static boolean mountedOnBezel(TabletBlockEntity be, Player player,
                                           BlockHitResult hitResult) {
-        double[] uv = TabletScreenMath.mountedUV(be.mountBasis(), player.getEyePosition(),
-                hitResult.getLocation().subtract(player.getEyePosition()));
+        Vec3[] ray = mountedRay(be.getLevel(), be.getBlockPos(), player,
+                hitResult.getLocation());
+        double[] uv = TabletScreenMath.mountedUV(be.mountBasis(), ray[0], ray[1]);
         return mountedOnPanel(uv) && !mountedOnGlass(uv);
     }
 

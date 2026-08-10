@@ -54,6 +54,33 @@ public sealed interface SignalView {
         return ClientGaugeReadings.strength(gauges.get(index).frequency());
     }
 
+    /** Frequency Monitor probe channels (1.11.0, multi-probe); absent
+     * data reads an empty list. */
+    default List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+        return List.of();
+    }
+
+    /** Twitch Chat channel (1.11.0); absent data reads "" (unset). */
+    default String twitchChannel() {
+        return "";
+    }
+
+    /** Paint canvas (1.11.0), this view's own COLS×ROWS slice; absent
+     * data reads blank. */
+    default byte[] paintCanvas() {
+        return com.modpack.linktablet.PaintCanvas.blank();
+    }
+
+    /** Surface span in blocks (1.11.0 paint on walls): 1×1 for held/slot
+     * tablets; a placed tablet's (possibly merged) surface for Block. */
+    default int surfaceW() {
+        return 1;
+    }
+
+    default int surfaceH() {
+        return 1;
+    }
+
     /** Custom (anvil) name of the tablet, or null when unnamed (1.8.0). */
     @org.jetbrains.annotations.Nullable
     default net.minecraft.network.chat.Component customName() {
@@ -111,6 +138,34 @@ public sealed interface SignalView {
             return mc.player.getItemInHand(hand)
                     .getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of());
         }
+
+        @Override
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return List.of();
+            return mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
+        }
+
+        @Override
+        public String twitchChannel() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return "";
+            return mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), "");
+        }
+
+        @Override
+        public byte[] paintCanvas() {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return com.modpack.linktablet.PaintCanvas.blank();
+            byte[] canvas = mc.player.getItemInHand(hand)
+                    .getOrDefault(ModDataComponents.PAINT_CANVAS.get(), new byte[0]);
+            // Clone: a caller-mutated array must never alias the stack's
+            // own component value.
+            return canvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                    ? canvas.clone() : com.modpack.linktablet.PaintCanvas.blank();
+        }
     }
 
     /**
@@ -150,6 +205,25 @@ public sealed interface SignalView {
         @Override
         public List<com.modpack.linktablet.frequency.Gauge> gauges() {
             return stack().getOrDefault(ModDataComponents.TABLET_GAUGES.get(), List.of());
+        }
+
+        @Override
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+            return stack().getOrDefault(ModDataComponents.MONITOR_PROBE.get(), List.of());
+        }
+
+        @Override
+        public String twitchChannel() {
+            return stack().getOrDefault(ModDataComponents.TWITCH_CHANNEL.get(), "");
+        }
+
+        @Override
+        public byte[] paintCanvas() {
+            byte[] canvas = stack().getOrDefault(ModDataComponents.PAINT_CANVAS.get(), new byte[0]);
+            // Clone: a caller-mutated array must never alias the stack's
+            // own component value.
+            return canvas.length == com.modpack.linktablet.PaintCanvas.CELLS
+                    ? canvas.clone() : com.modpack.linktablet.PaintCanvas.blank();
         }
 
         public ItemStack stack() {
@@ -213,6 +287,36 @@ public sealed interface SignalView {
         public int gaugeReading(int index) {
             TabletBlockEntity be = resolved();
             return be != null ? be.gaugeReading(index) : 0;
+        }
+
+        @Override
+        public List<com.modpack.linktablet.frequency.Frequency> monitorProbes() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getMonitorProbes() : List.of();
+        }
+
+        @Override
+        public String twitchChannel() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getTwitchChannel() : "";
+        }
+
+        @Override
+        public byte[] paintCanvas() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getPaintCanvas() : com.modpack.linktablet.PaintCanvas.blank();
+        }
+
+        @Override
+        public int surfaceW() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getSurfaceW() : 1;
+        }
+
+        @Override
+        public int surfaceH() {
+            TabletBlockEntity be = resolved();
+            return be != null ? be.getSurfaceH() : 1;
         }
 
         /** The BE that owns this position's data (controller when merged). */

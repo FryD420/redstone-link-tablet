@@ -45,6 +45,18 @@ public class ClientHooks {
         showProgram(program, view);
     }
 
+    /** Game exits: the kiosk face stays where it was — a wall left on
+     * Paint keeps its mural (spec acceptance); only explicit navigation
+     * (launching an app, Home from a non-game screen) repoints the
+     * face. Mirrors {@link #showProgram} minus the Block-branch
+     * {@code SetProgramPayload} send. */
+    public static void returnToProgramSilently(com.modpack.linktablet.api.TabletProgram program, SignalView view) {
+        if (!(view instanceof SignalView.Block)) {
+            ClientPrefs.setLastProgram(program.key());
+        }
+        Minecraft.getInstance().setScreen(screenFor(program, view));
+    }
+
     public static void openHome(SignalView view) {
         openProgram(Program.LAUNCHER, view);
     }
@@ -115,6 +127,14 @@ public class ClientHooks {
                 case CALCULATOR -> new com.modpack.linktablet.client.screen.CalculatorScreen(view);
                 case GAUGES -> new com.modpack.linktablet.client.screen.GaugesScreen(view);
                 case STORE -> new com.modpack.linktablet.client.screen.StoreScreen(view);
+                case MONITOR -> new com.modpack.linktablet.client.screen.MonitorScreen(view);
+                case TWITCH -> new com.modpack.linktablet.client.screen.TwitchScreen(view);
+                case ARCADE -> new com.modpack.linktablet.client.screen.ArcadeHubScreen(view);
+                // Paint left the Arcade (beta.5): its own app, but the
+                // screen still rides the SecretGames dispatch (key-based,
+                // shared with the pip easter egg); ESC goes Home like
+                // every app, silently on walls so murals stay parked
+                case PAINT -> com.modpack.linktablet.client.screen.SecretGames.createApp("paint", view);
                 default -> new com.modpack.linktablet.client.screen.LauncherScreen(view);
             };
         }

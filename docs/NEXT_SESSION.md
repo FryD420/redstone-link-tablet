@@ -3,7 +3,487 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## Status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
+## ▶ START HERE next session (state as of 2026-08-09 end of day)
+
+- **1.11.0-beta.8 is the DISTRIBUTION build** (same content as
+  beta.7; renumbered at distribution time, user call 2026-08-09 —
+  beta.6/7 jars were never sent and are deleted locally). The user
+  is testing beta.8 and preparing the RELEASE; the full consolidated
+  1.11.0 checklist went out with the jar.
+- **1.11.0-beta.7 superseded beta.6 same-session** (beta.6 was never
+  distributed; new number per the beta.3 overwritten-jar lesson):
+  the user's first emotes dev pass ("booted fine", emotes rendering
+  in GUI + wall confirmed by screenshot) surfaced that the HELD
+  first-person tablet always draws the signals face — a design gap
+  since 1.2, not a regression (`screen_program` never on the item).
+  Fix (user decision, option A "resume"): `TabletItemRenderer` now
+  renders `renderTwitchFace` on your OWN first-person tablet iff
+  `ClientPrefs.lastProgram == "twitch"` AND the personal channel is
+  set — your OWN hands only: FIRST_PERSON_*_HAND contexts, plus F5
+  third person via stack REFERENCE identity against the local
+  player's hands (frames/ground/other players keep pips; the resume
+  pref is viewer-local). touchFace rides for free (kiosk lifecycle). Twitch-only for now — extending
+  the resume face to other programs is an open idea, not committed.
+- **1.11.0-beta.6 built earlier this session** (Twitch chat emotes —
+  native + 7TV/BTTV/FFZ, animated, on all three surfaces, toggle
+  glyph in the Twitch header; 100% client-only, registrar untouched
+  at "23" — beta.6 pairs with beta.4/beta.5). NOT yet sent to
+  testers, and the feature has NOT been seen in a running client —
+  the F2 pass below is owed before any distribution.
+- **1.11.0-beta.5 is with the testers** (jar + checklist sent
+  2026-08-09; pairs with beta.4/beta.6, registrar "23"). The whole
+  1.11.0 train: Frequency Monitor + multi-probe container editor,
+  Twitch Chat, Arcade consolidation, Paint on walls (Paint its own
+  app), App Store search, focus fixes, now plus emotes. All pushed
+  through `1161234`, plus this session's emotes commit.
+- **Beta.5 additions user-verified in dev**: Paint store row, compact
+  Twitch chat walls, bezel-clean text on all four edges (three
+  screenshot-driven fix rounds, all confirmed "perfect").
+- **Beta.6 F2 pass owed** (never run in a client yet): live channel
+  with real emotes on GUI, overlay, and a wall — wall emote
+  legibility on small/1×1 faces, aliasing, and animated playback in
+  sync across surfaces; overlay overflow now hard-cuts with no
+  trailing ellipsis (confirm that reads clean, not broken); toggle
+  glyph on/off without a relog; the full test matrix below.
+- **Remaining before RELEASE** (all user-gated): the beta.6 F2 pass
+  above; tester verdicts across beta.2–6 matrices (below); the
+  dedicated-server `runServer` pass (Monitor classification + Twitch
+  on a server — never run); listing refresh (DESCRIPTION.md still
+  describes 1.10.x — none of 1.11.0 is in the listing text) + the
+  long-queued screenshot shoot; then version → 1.11.0, changelog
+  date, tag, push, uploads.
+- **Open user calls parked in-line**: Home-from-hub kiosk renav
+  (testers may answer); gauge editor container-menu conversion (EMI
+  drag); App Store categories (roadmap, less urgent since the
+  Arcade); survival tablet cloning (Parked section); Display Link
+  target app (Parked section, shelved mid-brainstorm).
+
+## Status (2026-08-09 — 1.11.0-beta.6: Twitch chat emotes, registrar unchanged "23", release held)
+
+- **Twitch chat emotes** (idea from the perf/toggle discussion) —
+  inline images in Twitch chat on all three surfaces, the wall as the
+  point. Native Twitch emotes decode free from the IRC `emotes=` tag
+  (code-point-aware span math so astral-plane characters don't shift
+  later spans); third-party sets (7TV, BTTV, FFZ) fetch anonymously
+  per-channel once `room-id` is known from the first message, with
+  each provider failing soft to plain text on its own (never a crash,
+  at most one INFO per provider per channel). New client-only classes:
+  `TwitchEmotes` (set/matching state, epoch-guarded so a stale fetch
+  can't clobber a newer channel), `EmoteTextures` (async GIF/PNG
+  fetch + composite into one vertical sprite-sheet `DynamicTexture`
+  per emote, capped 1x resolution / 40 frames / ~256 KB download / LRU
+  128 with evicted textures closed), and `EmoteText` (the ONE
+  tokenizer — segments, word-wrap, and GUI draw all go through it, per
+  message memoized and invalidated per-channel when a third-party set
+  arrives). A dev-only spike, `tools/EmoteProbe`
+  (`./gradlew emoteTool`), gated the whole feature first and confirmed
+  7TV/BTTV serve GIF/PNG at 1x (the WebP-migration risk didn't bite).
+  Rendering: `TwitchScreen` and the overlay pane word-wrap mixed
+  text/emote runs (an emote is an unbreakable token); wall faces stay
+  single-line bottom-stacked and ellipsized at segment granularity,
+  with emote quads drawn via `RenderType.text(sheet)` — inside the
+  existing text pass, no new custom RenderType, same bleed-inset rules
+  as text. A smiley toggle glyph next to the channel pin in
+  `TwitchScreen`'s header flips `ClientPrefs` boolean `twitch.emotes`
+  (default on); off gives text-only chat everywhere — the wall path is
+  exactly beta.5's, while GUI and overlay are functionally equivalent
+  text-only rendering (they still lay out through `EmoteText`, so wrap
+  boundaries differ slightly from `font.split` and the overlay hard-cuts
+  without a trailing ellipsis) — the potato-GPU valve. No
+  wire, component, NBT, or registrar change of any kind — registrar
+  stays "23"; beta.6 pairs with beta.4/beta.5.
+- **Known notes carried into the next session**: emotes have NOT yet
+  been seen in a running client — the F2 pass owed is wall emote
+  legibility on small/1×1 faces, aliasing, and animated playback
+  (does the shared animation clock actually keep GUI/overlay/wall in
+  sync), plus confirming the overlay's new hard-cut overflow (no
+  trailing ellipsis) reads clean rather than broken. `mod_version`
+  bumped to `1.11.0-beta.6` this pass — tester distribution, final
+  release name still plain `1.11.0`.
+- **Commits state**: T1–T8 (spike, native spans, third-party sets,
+  texture pipeline, tokenizer, GUI/overlay/wall rendering) are
+  committed on `tablet-overlay`; this docs + version-bump commit lands
+  right after. Not pushed this pass.
+
+**Test matrix (beta.6 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-09-twitch-emotes-design.md` "Test
+matrix (beta.6 additions)":
+
+- Native emote mid-message renders on GUI, overlay, and wall; a
+  message with an astral emoji BEFORE an emote keeps the span
+  aligned.
+- Heavy 7TV channel: emotes pop in as sets/textures load (text →
+  image self-heal), animated ones animate in sync across GUI +
+  wall simultaneously.
+- Cap check: a 60+-frame 7TV monster animates with its frame cap,
+  no hitch on first appearance (decode is off-thread).
+- Toggle OFF → pure beta.5 text everywhere; ON again → emotes
+  return without a relog.
+- Kill the network after emotes are cached → chat goes OFFLINE as
+  today; cached emotes still animate; new-emote fetches fail soft
+  to text.
+- Merged wall + rotated wall: emote quads respect the bezel bleed
+  insets on all four edges (the beta.5 screenshot rule).
+- Unknown/failed emote (dead CDN id) renders as text, one INFO max.
+- Channel part → re-join: sets re-fetch, no stale cross-channel
+  emote matches (channel A's 7TV names must not fire in channel B).
+- Regression: username colors, wrapping indent, autoscroll,
+  status lines, socket-lifecycle (close every surface → socket
+  drops) all unchanged; registrar untouched — beta.6 client joins a
+  beta.4/5 server.
+
+## Previous status (2026-08-09 — 1.11.0-beta.5: Paint promoted to its own app; beta.4 = paint on walls, registrar "23", release held)
+
+- **beta.5 (same day, user decision after playing beta.4)**: Paint
+  left the Arcade — `PAINT(25)` dropped its `game` flag, which
+  automatically: removes it from the Arcade shelf (18 games remain),
+  adds its store row (desc refreshed to mention walls), and stops
+  `fromKeys` migrating "paint" roster tiles to ARCADE (tiles folded
+  by beta.3/4 need a one-time re-Get from the store — changelogged).
+  `ClientHooks.screenFor` gained `case PAINT ->` riding the same
+  key-based SecretGames dispatch (pip easter egg untouched; wall
+  exits stay silent so murals park). KEY "paint" frozen as ever. No
+  wire change — registrar stays "23"; beta.5 PAIRS with beta.4.
+  Beta.5 test adds: store shows Paint row + Arcade (no Paint inside
+  the hub); paint tile on Home opens Paint, ESC → Home; pip still
+  works; a beta.4 roster's Arcade tile still opens the 18-game hub.
+- **Also beta.5 (same session, user screenshot report)**:
+  `renderTwitchFace` chat lines were riding the signals list's
+  chunky row bands (`LIST_ROWS * surfaceH`) — a merged wall spread
+  five messages across the glass with huge gaps. Now compact
+  bottom-stacked lines (`LIST_TEXT_H * 1.35` leading, count =
+  glassH/lineH): same text size everywhere, bigger walls fit MORE
+  lines. Verify on solo + merged Twitch walls.
+
+- **Paint on walls** (idea: Tommy) — the Paint app graduates from
+  session-only doodles to a persisted per-tablet canvas. `PaintCanvas`
+  (root package `com.modpack.linktablet` — the ONE geometry/mapping
+  home for GUI, stroke handler, and renderer; never fork it) owns the
+  20×14/280-cell layout and index math. **Slice rule**: there is no
+  merged-canvas object — every tablet always owns its own 20×14 slice
+  (`paint_canvas` component + BE NBT byte array, 0 = blank, never
+  written all-blank); a merged wall's picture is derived by stitching
+  member slices at edit/render time, so merge, split, pickup, and
+  break all Just Work with zero crop/discard/orphan risk. T1 landed
+  the canvas + persistence + item↔block round-trip; T2 the wire
+  (`PaintStrokePayload`/`PaintClearPayload`, registrar **"22"→"23"**,
+  continuous-space stroke indices for block targets, mapped to member
+  BEs via `TabletScreenMath.screenRight/screenDown`); T3 the
+  `PaintScreen` rework (adaptive cell size down to 2px on big walls,
+  stroke batching cap 64/packet, block screens re-read synced state
+  with a pending-stroke overlay); T4 `renderPaintFace` (fills-only,
+  faint "Paint" label when blank) plus a kiosk-nav regression fix
+  (hub game launches from block-bound GUIs now resend
+  `SetProgramPayload`, restoring the ability to SET a wall to Paint —
+  the Arcade consolidation had silently dropped that path).
+- **The rotation-review saga, one-liner**: quarter-turned paintings on
+  a merged wall rescale PER-AXIS by design (not remapped index-for-
+  index) — that's the exact-fill requirement on non-square glass, and
+  it took a 3-round review to settle. `renderPaintFace` doing no index
+  remap at any rotation is correct; don't "fix" it again.
+- **Known notes carried into the next session**: paint walls have NOT
+  yet been seen in a running client (F2 pass owed — hold a stroke,
+  merge/split/rotate a wall, confirm the mural). `mod_version` bumped
+  to `1.11.0-beta.4` this pass — tester distribution, final release
+  name still plain `1.11.0`.
+- **Commits state**: T1-T4 are committed on `tablet-overlay`; this
+  docs + version-bump commit lands right after. Not pushed this pass.
+
+**Test matrix (beta.4 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-09-paint-walls-design.md` "Test
+matrix (beta.4 additions)":
+
+- Paint on a held tablet → close → reopen (persists) → place the
+  tablet → the wall shows the picture.
+- Wall GUI painting: strokes appear live on the wall for a second
+  viewer; clear wipes the whole wall.
+- Merge two painted 1×1s → both slices show in place; paint across
+  the seam → both tablets' slices update; split → each carries its
+  piece; re-merge same arrangement → mural reassembles.
+- Rotation: rotated merged wall shows the picture correctly.
+- Pickup: break a painted tablet → place elsewhere → picture intact;
+  the item survives a chest round-trip.
+- Secret-pip Paint edits the same canvas (no more session-scratch).
+- Kiosk nav: wall GUI → Arcade → Paint sets the wall face; ESC back
+  to hub; Home exits; the wall keeps showing Paint.
+- Old-world load: tablets without `paint_canvas` untouched; registrar
+  "23" pairing break vs beta.3 (everyone swaps together).
+- Regression: other game launches from a wall GUI nav the face again
+  (restored behavior); held launches unchanged.
+
+## Previous status (2026-08-08 night — 1.11.0-beta.3 = beta.2 + Arcade consolidation, registrar still "22", release held)
+
+- **Arcade** (`Program.ARCADE`, id 28, key `"arcade"`) — the 19
+  individual game apps collapse into one Arcade app: T1 `Program.
+  ARCADE(28, "arcade")` + lang, `Programs.catalog()` hides `game=true`
+  entries (App Store and the launcher's add flow shrink 27→9 rows
+  incl. Arcade), `Programs.fromKeys` migrates any game key in a
+  roster to a single deduped Arcade tile (a roster of Snake + 2048 +
+  Signals loads as Arcade + Signals; a game-only roster becomes
+  `[ARCADE]`, not the default). T2 `ArcadeHubScreen` — the
+  StoreScreen shelf pattern, rows per game with best score
+  (`"Best: %s"`, hidden at 0), whole-row tap launches via the new
+  3-arg `SecretGames.createApp` with ESC returning to the hub. Kiosk
+  faces left on a game key keep their existing dispatch (tap opens
+  that game, Home exits) untouched, and the secret-pip trigger still
+  launches into the signals-grid return path unchanged. **Pure
+  client/catalog work — no wire, registrar, or component changes**;
+  registrar stays "22" from beta.2. `mod_version` bumped to
+  `1.11.0-beta.3` this pass.
+- **Deliberate reversal, noted on purpose**: the 1.10.0 dev cycle
+  built this exact hub (`Program.ARCADE(6)`, `ArcadeHubScreen`) and
+  the user then chose per-game apps before committing — the hub was
+  deleted UNCOMMITTED and id 6 retired. This spec re-reverses that
+  with the user's explicit confirmation (2026-08-08): the store had
+  since grown to 27 rows and the user independently asked for store
+  categories, so consolidation now serves the same pain. Id 6 stays
+  retired; the new program takes id 28.
+- **Commits state**: T1/T2 (`Program.ARCADE` + catalog/migration, then
+  `ArcadeHubScreen`) are committed on `tablet-overlay`; this docs +
+  version-bump commit lands right after. Not pushed this pass.
+- **Known notes carried into the next session**: the hub screen has
+  NOT yet been seen in a running client — an F2 pass (scroll, launch
+  a few games, ESC-return, best-score display/update) is owed before
+  calling Arcade done, per the test matrix below.
+
+**Test matrix (beta.3 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-08-arcade-consolidation-design.md`:
+
+- Store shows Arcade, shows NO individual games; launcher add flow
+  likewise.
+- Hub: scroll, launch each of a few games, ESC returns to shelf,
+  best scores display (and update after beating one).
+- Roster migration: a beta.2 tablet with several game tiles loads as
+  ONE Arcade tile + its other apps; re-saving the roster writes the
+  migrated form.
+- Secret pip trigger still launches its game and ESC returns to the
+  SIGNALS grid (easter egg intact).
+- Kiosk left showing a game (set pre-beta.3): face renders, tap
+  opens the game, Home exits.
+- Regression: store search, Twitch, Monitor, signals all untouched.
+
+## Previous status (2026-08-08 night — 1.11.0-beta.2, Twitch Chat IN CODE + committed, registrar "22", release held)
+
+- **Twitch Chat** (`Program.TWITCH`, id 27, key `"twitch"`) — all 7
+  plan tasks done and committed on `tablet-overlay`: Program + lang
+  (T1); `client/TwitchChatService` — one anonymous TLS link to
+  Twitch's chat relay (`justinfan` guest nick, tags for username
+  colors), ref-counted per-channel joins, 2s→60s reconnect backoff,
+  prompt socket close on shutdown (T2); `twitch_channel` component +
+  BE NBT (never written empty) + `SetTwitchChannelPayload` — registrar
+  **"21"→"22"** (T3); `TwitchScreen` — channel box with click-to-focus
+  + Enter/focus-loss commit, colored wrapped chat, autoscroll-unless-
+  scrolled-up (T4); `TwitchOverlayContent` HUD pane (T5); kiosk
+  `renderTwitchFace` chat wall, three-pass, touchFace-first presence
+  (T6); this docs pass (T7). Socket runs ONLY while a surface displays
+  chat — screens/overlay acquire-release, faces heartbeat via
+  `touchFace` with a 100-tick expiry; logout clears every ref (and
+  `NoteWindows` now defocuses windows before clearing, a general fix
+  that fell out of that work). `mod_version` bumped to
+  `1.11.0-beta.2` this pass — tester distribution, final release name
+  still plain `1.11.0`.
+- **Known notes carried into the next session**: (a) the face and
+  screen visuals have NOT yet been seen in a running client — an F2
+  pass is owed before calling Twitch Chat done; (b) the CONNECTING/
+  LIVE/OFFLINE status lang-key switch is triplicated across screen/
+  overlay/face — a cleanup candidate, not urgent; (c) chat is
+  unfiltered live internet content and channel choice on a placed
+  tablet is open to anyone who can open its GUI — same trust model as
+  signal editing, noted for family-server awareness, not a bug.
+- **Commits state**: all 7 Twitch tasks plus this docs commit are on
+  `tablet-overlay`, not pushed (per this session's instructions — no
+  push this pass). Full `./gradlew build` gate covered below.
+
+**Test matrix (beta.2 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-08-twitch-chat-design.md`:
+
+- Set a live channel on a held tablet → chat flows; pin the overlay →
+  chat on HUD while playing.
+- Wall tablet: set channel from its GUI → face shows chat; second
+  account sees the same wall (its own connection).
+- Connection hygiene: close every Twitch surface → socket closes
+  (netstat or log line); reopen → rejoins.
+- Kill the network mid-chat → OFFLINE status, auto-reconnect when it
+  returns.
+- Misspelled/empty channel → "no messages yet" / hint, no errors.
+- Break + re-place a channel-set tablet → channel survives.
+- Regression: registrar "22" pairing break, old-world load, the
+  1.11.0 matrix still green.
+
+## Previous status (2026-08-08 evening — 1.11.0 feedback round 2 IN CODE + user-verified, registrar "21", release held)
+
+- **Round 2 (same day, from the redo sessions)**: (a) standalone
+  EditBox click-to-focus fix — the store search box ate clicks
+  without focusing (vanilla EditBox.mouseClicked never sets focus;
+  that's the widget traversal's job, and unregistered boxes must do
+  it on their own click path); audit found the GAUGE EDITOR'S NAME
+  FIELD had the same defect since 1.10.0 — it was NEVER typeable.
+  Both fixed (click-to-focus both, gauge modal focuses on open).
+  (b) **Add Probe container menu** — user report "JEI doesn't show on
+  the Monitor": BOTH viewers only attach to AbstractContainerScreen
+  (EMI 1.1.24 ScreenMixin gates on instanceof, bytecode-verified;
+  EMI also suppresses JEI's overlay when both installed), so the
+  plain-screen bounds APIs can never surface a panel — the earlier
+  addGuiScreenHandler/addScreenBoundsProvider attempt was a dead
+  end. Fix = the house pattern: `ProbeEditScreen` on `SignalEditMenu`
+  reused under the PROBE_EDIT menu type (ghost slots, all-items
+  search, inventory, Add), opened server-side via
+  OpenProbeMenuPayload (registrar **"20"→"21"**); MonitorScreen's +
+  opens it, inline staged slots removed. **USER-VERIFIED "works
+  well" 2026-08-08** (~3-min pass, log clean). Gauge editor stays a
+  plain screen: viewer drag there works JEI-only; converting it to a
+  container menu is the queued fix IF testers want EMI drag on it.
+
+- **Feedback round 1 (2026-08-08, from the user's first dev-client
+  session — 47 min, log clean)**: three user-requested changes, all
+  IN CODE + committed, build green, **awaiting the redone test
+  session**:
+  (a) **multi-probe** (user decision via AskUserQuestion: list of up
+  to 8, not single) — `monitor_probe` is now `List<Frequency>`
+  (component + BE NBT `monitor_probe` kept; the brief single-format
+  dev NBT decodes as a one-entry list), `SetProbePayload` carries the
+  whole list (registrar **"19"→"20"**, still inside the 1.11.0
+  pairing break), and `MonitorScreen` adopted the signal editor's
+  stage-then-Add picker flow (two staged slots + procedural "+" chip,
+  probe rows carry a remove cross; staged slots no longer auto-send).
+  (b) **JEI/EMI ghost drag everywhere applicable** — gauge editor
+  modal slots + Monitor probe staging slots joined the signal editor
+  as drop targets (`GaugesScreen.frequencySlotArea/stageFrequencyItem`,
+  `MonitorScreen.probeSlotArea/stageProbeItem`; zero-area rect =
+  closed modal). New item-slot surfaces should join this pattern.
+  (c) **App Store search** — ChromeEditBox row under the header
+  filters by name/description/key; panel height stays full-catalog
+  so it doesn't jump while typing; inventory key guarded while the
+  box is focused (the nameBox rule).
+  Redone-test additions to the matrix: probe add/remove flow (stage,
+  +, row cross, cap 8, dupe rejected with the deny tick), JEI drag
+  onto all three screens' slots (EMI too if present), store search
+  incl. "no matches" and ESC/inventory-key behavior.
+
+## Previous status (2026-08-05 — Frequency Monitor 1.11.0 IN CODE, registrar "19"→now "20", release held)
+
+- **Frequency Monitor** (`Program.MONITOR`, id 26, key `"monitor"`) —
+  all 9 plan tasks done: Program + lang (T1); `MonitorChannels.
+  channelsOf` the one channel-derivation table, probe→signal
+  freqs→gauge freqs deduped by Create identity (T2); wire types
+  `MonitorSubscribePayload`/`SetProbePayload`/`MonitorSnapshotPayload`
+  + client `ClientMonitorSnapshot` store, 40-tick heartbeat, registrar
+  **"18"→"19" — PAIRING BREAK** (T3); `monitor_probe` component + BE
+  NBT, never written empty (T4); `compat/MonitorScanner` — 4-tick
+  polls of Create's `networksIn`, member classification (link block /
+  placed tablet / inventory tablet via `ownerName` on both handlers /
+  other), range via Create's `withinRange` on RAW positions with
+  DISPLAYED coords Sable-localized, 100-tick viewer expiry, 64-member
+  wire cap (T5); `MonitorScreen` — probe ghost slots, channel+member
+  rows, pin, resize-guarded subscription (T6); kiosk face —
+  `monitor_counts`/`monitor_power` update-tag sync, three-pass
+  `renderMonitorFace`, re-registers on surface-split promotion (T7);
+  `MonitorOverlayContent` compact rows (T8); this docs pass (T9).
+  **All 9 tasks are COMMITTED on `tablet-overlay`** (11 commits ahead
+  of `origin/tablet-overlay`, not pushed — see `git log`); the T9
+  docs commit (this CHANGELOG/NEXT_SESSION/CLAUDE.md update) lands
+  right after. `mod_version` stays `1.10.2` in `gradle.properties` —
+  **release is user-gated**, no bump yet, so the built jar is still
+  named `linktablet-1.10.2.jar` even though it carries 1.11.0-dev
+  code.
+- **Known limitations** (from task reviews, carried forward — not
+  bugs, just v1 scope):
+  (a) the client snapshot store is single-target: opening
+  `MonitorScreen` on tablet A while an overlay pin watches tablet B
+  rebinds the store to A (last-wins), so the overlay shows A's data
+  under B's title. Candidate future fix: visually flag a retargeted
+  overlay. Reviewer's cheaper alternative: the overlay could render
+  skeleton rows whenever the snapshot store's bound target differs
+  from its own view target ("no live data" instead of "wrong data").
+  (b) the 64-member wire cap keeps the first-encountered members, not
+  the strongest, on a degenerate 65+-member channel.
+  (c) up to a 4-tick empty flash when a kiosk switches onto the
+  Monitor program (summary hasn't synced yet).
+  (d) the F2 visual pass on `renderMonitorFace` and the 8px overlay
+  icons has NOT been run in a client yet — first thing to check in
+  the in-world pass below.
+  (e) tablets using more than 64 distinct frequencies (9+ signals × 8
+  freqs; merged surfaces raise the signal cap) hit the same wire cap
+  on the CHANNEL list itself — the snapshot truncates to the first 64
+  channels (prefix of `MonitorChannels.channelsOf`'s order), not the
+  channels currently most active.
+- **`./gradlew build` green** (T9 gate) — jar at
+  `build/libs/linktablet-1.10.2.jar`.
+- **Remaining before release**: the user's in-world test pass (matrix
+  below), then version bump + CHANGELOG date + tag/push, then the
+  user uploads to both platforms — see `CLAUDE.md`'s Release process.
+
+**Test matrix (dev pass)** — copied verbatim from
+`docs/superpowers/specs/2026-08-05-frequency-monitor-design.md`:
+
+- One channel with: a gauge, a real Create Redstone Link, and a
+  creative phantom tablet copy in the inventory → three member rows,
+  correctly classified; phantom row disappears when the item is
+  dropped.
+- Probe an unrelated channel the tablet doesn't use.
+- Range gating: walk a transmitter out of range → out-of-range badge,
+  effective power drops.
+- Dedicated server pass (`runServer`) — payloads + classification.
+- Kiosk face summary on flat, merged, and mounted tablets; face tap
+  opens the GUI; pre-1.11 world's kiosks unaffected.
+- Overlay pin shows live summaries; pin survives relog (`@monitor`
+  descriptor).
+- Old-world load: tablets without `monitor_probe` untouched;
+  1.10.x ↔ 1.11.0 client/server mismatch cleanly refuses (registrar
+  break, expected).
+- Channel-count stress: 9+ signals × 8 distinct freqs (>64 channels)
+  — Monitor opens, first 64 shown, nobody kicked.
+- Probe edit while a kiosk face shows Monitor (≤4-tick row shift
+  settles).
+- Two players monitoring the same channel simultaneously (independent
+  snapshots/anchors).
+- Window resize with MonitorScreen open (subscription guard repro).
+- Sable: Monitor opened on a vehicle-mounted tablet — check the
+  displayed member coords read sensibly; decide if follow-up needed.
+- Surface merge→split while showing Monitor (face summary resumes on
+  the promoted controller).
+- Overlay pinned on tablet B, open+close MonitorScreen on tablet A
+  (documented limitation repro; B's heartbeat survives A closing).
+
+## Previous status (2026-08-03 — v1.10.2 tagged; upload 1.10.2 ONLY, skip 1.10.1)
+
+- **v1.10.2 (same-day hotfix stack on 1.10.1)**: (a) 1.10.1's Sable
+  shim NEVER BOUND on dedicated servers — `getMethod` enumeration hit
+  the client-only `getContainer(ClientLevel)` overload and NeoForge's
+  dist cleaner threw; repro'd + fixed with exact-signature
+  `findStatic`/`findVirtual` lookups, verified on dev `runServer` AND
+  the user's BisectHosting server symptom. (b) Placed-gauge frozen
+  dial: Create's `addToNetwork` never delivers the initial value to
+  non-LinkBehaviour members → `VirtualReceiver.readInitial()`.
+  Also diagnosed (NOT bugs): three "always 15" reports = a creative-
+  mode tablet ITEM copy in the inventory transmitting alongside the
+  placed block (stacked-transmitter design); CA/Sable handles Create's
+  link network across the plot boundary natively (vehicle gauges read
+  world transmitters — verified live). Both fixes user-verified in
+  dev ("both worked"). 1.10.1 was never uploaded — upload 1.10.2 only.
+  Roadmap seed from today: a "who's transmitting on this frequency"
+  debug view (phantom-copy confusion bit 3× in one day).
+
+## Previous status (2026-08-03 — v1.10.1 tagged; uploads pending)
+
+- **v1.10.1 (Sable/Create-Aeronautics compat hotfix)** — first tester
+  bug report against 1.10.0: swivel-mounted tablets on a physicalized
+  contraption (Sable sub-level) flung to yaw=75 (the MOUNT_MAX_TILT
+  clamp) and couldn't be re-aimed. Root cause proven numerically in
+  the dev client (CA + Sable 2.0.3 jars now live in `run/mods` for
+  repro): plot-frame block vs world-frame player, 28.9M-block aim
+  vector. Fix = `compat/SableCompat` reflection shim + 32-block
+  computeAim guard + localized payload range checks/sounds/drops (see
+  CLAUDE.md gotcha). VERIFIED in dev: wrench re-aim tracks (~20
+  samples), bezel landscape flip both ways, soft-dep boot without
+  Sable clean; pip taps confirmed by the user on the physicalized
+  tablet in a second dev pass ("ok it works", 2026-08-03). Release:
+  committed (64539af), tagged v1.10.1, pushed same day. REMAINING:
+  user uploads to CurseForge + Modrinth and updates the family
+  server/pack (server-side halves matter: aim math + payload range
+  checks — update BOTH sides).
+
+## Previous status (2026-07-29 — v1.10.0 LIVE EVERYWHERE)
 
 - **v1.10.0 LIVE 2026-07-29** (tagged + pushed 2026-07-28, commit
   b5d1941, tag v1.10.0, merged to main; user modpack-tested "tested
@@ -445,8 +925,43 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
    was DROPPED by user decision 2026-07-21 ("let the testers find
    bugs") — do NOT re-propose it; those areas are simply where to look
    first if a report comes in.
+7. **App Store categories** (user-requested 2026-08-08, mid-beta.2) —
+   the shelf is now 26 programs deep (utilities, games, media with
+   Twitch joining); group it with category headers, filter chips, or
+   per-category tabs instead of one flat scrolling list. Client UI
+   only, no wire/persistence change — pairs-safe, no registrar bump.
+   Design open: headers (cheapest, `StoreScreen` already scrolls),
+   filter chips (needs a selected-category client state), or tabs
+   (biggest rework, competes with the existing scroll). Needs a
+   category assignment per `Program`/addon entry either way — scope
+   that decision first.
 
 ## Parked (don't propose unless the user re-raises)
+
+- **Display Link target app** — parked 2026-08-09 mid-brainstorm
+  ("lets shelf this whole idea for now"), revives the tier-2 item from
+  the 2026-07-22 factory-gauges scoping. Agreed core before parking:
+  the tablet block registers as a Create `DisplayTarget`, so Create's
+  native Display Link flow (click target with the link item → place
+  link on source) accepts placed tablets — Create does all gathering
+  and source config, we render pushed text lines (likely a new
+  Program with kiosk face/GUI/overlay, undesigned). OPEN question
+  where the park hit: the user also wants binding a link to a HELD
+  tablet ("display data on the go") — clicking a placed Display Link
+  with the tablet item. Options laid out: (B) identity-based wireless
+  bind to the tablet item, works in hand/chest/placed — the real
+  want, but ~2+ sessions (identity tracking, no Create precedent) vs
+  (C) v1 = placed-targets only, ~1 session. No decision made.
+
+- **Survival tablet cloning** — parked 2026-08-09 ("backburner",
+  scoped in-session): creative pick-block already full-clones
+  (everything incl. paint rides the item). Survival options if it
+  comes back: (1) crafting-grid clone, the written-book pattern —
+  configured tablet + blank → both configured, ~half session, no
+  wire changes, could ride any release; (2) deployer "flashing
+  station" on the assembly line — Create-flavored, heavier. Open
+  scope Qs recorded: clone everything vs config-only (painting?),
+  does a clone copy the anvil name.
 
 - **Orbital Cannon launch-control app** — parked 2026-07-29 mid-
   brainstorm ("I have an idea for this for later", before any design

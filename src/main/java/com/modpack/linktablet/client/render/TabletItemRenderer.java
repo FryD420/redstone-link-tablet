@@ -80,9 +80,50 @@ public class TabletItemRenderer extends BlockEntityWithoutLevelRenderer {
         ScreenTheme theme = stack.getOrDefault(ModDataComponents.THEME.get(), ScreenTheme.DARK);
         // Held items ignore the stored screen rotation — it's a mounting
         // concern; the hand always shows portrait.
-        TabletScreenRenderer.render(poseStack, buffers, signals, listLayout, 0, theme, lit,
-                packedLight, heldPips(stack));
+        String twitchChannel = com.modpack.linktablet.client.ClientPrefs.twitchChannel();
+        if (ownHand(context, stack)
+                && com.modpack.linktablet.Program.TWITCH.key()
+                        .equals(com.modpack.linktablet.client.ClientPrefs.lastProgram())
+                && !twitchChannel.isEmpty()) {
+            // Resume-aware hand face (user decision 2026-08-09, option A):
+            // your OWN first-person tablet shows the chat wall when Twitch
+            // was the last program you used — the item carries no program
+            // state, so the PERSONAL resume pref + personal channel drive
+            // it. Only YOUR hands (first person, or your own F5 third
+            // person via stack identity) — frames, ground, and other
+            // players' hands keep the signals face: the pref is
+            // viewer-local and must not paint tablets that aren't
+            // "yours". renderTwitchFace's
+            // touchFace heartbeat handles the socket lifecycle exactly
+            // like a kiosk face — put the tablet away and the channel
+            // expires.
+            TabletScreenRenderer.renderTwitchFace(poseStack, buffers, twitchChannel, 0, theme,
+                    lit, packedLight, 1, 1, 0);
+        } else {
+            TabletScreenRenderer.render(poseStack, buffers, signals, listLayout, 0, theme, lit,
+                    packedLight, heldPips(stack));
+        }
         poseStack.popPose();
+    }
+
+    /** Your own hands only — the contexts where "this tablet is mine"
+     * holds, so the viewer-local resume pref may drive the face.
+     * First person is yours by definition; third person (F5) is
+     * verified by stack REFERENCE identity against the local player's
+     * hands (the isScreenLit precedent) — other players' tablets render
+     * from their own entity's stack instances and fall through. */
+    private static boolean ownHand(ItemDisplayContext context, ItemStack stack) {
+        if (context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND) {
+            return true;
+        }
+        if (context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND) {
+            var player = Minecraft.getInstance().player;
+            return player != null
+                    && (stack == player.getMainHandItem() || stack == player.getOffhandItem());
+        }
+        return false;
     }
 
     /**

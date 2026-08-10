@@ -1,7 +1,9 @@
 package com.modpack.linktablet.network;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.PaintCanvas;
 import com.modpack.linktablet.block.TabletBlockEntity;
+import com.modpack.linktablet.block.TabletScreenMath;
 import com.modpack.linktablet.compat.TabletTransmitterHandler;
 import com.modpack.linktablet.frequency.Signal;
 import com.modpack.linktablet.item.TabletItem;
@@ -24,13 +26,16 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -88,12 +93,24 @@ public class ModNetworking {
         }
     }
 
+    /**
+     * Payload range check, Sable-aware (1.10.1): a physicalized tablet's
+     * pos is plot-space while the player is world-space — localize the
+     * eye first or every payload for a vehicle tablet fails validation.
+     * Identity (and free) for normal tablets.
+     */
+    private static double tabletDistSqr(Player player, BlockPos pos) {
+        net.minecraft.world.phys.Vec3 eye = com.modpack.linktablet.compat.SableCompat
+                .localizeNear(player.level(), pos, player.getEyePosition());
+        return eye.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
     @Nullable
     private static SignalHost resolve(Player player, SignalTarget target) {
         if (target.pos().isPresent()) {
             BlockPos pos = target.pos().get();
             if (!player.level().isLoaded(pos)) return null;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
             if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
             // Merged surfaces: edits land on the controller (a stale
@@ -408,7 +425,7 @@ public class ModNetworking {
         if (target.pos().isPresent()) {
             BlockPos pos = target.pos().get();
             if (!player.level().isLoaded(pos)) return null;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return null;
             if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
             TabletBlockEntity be = clicked.resolveController();
@@ -531,12 +548,179 @@ public class ModNetworking {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Frequency Monitor (1.11.0): read-only snapshots of Create's link
+    // network. Members are classified SERVER-side; labels travel as
+    // Components so block names localize on the client.
+    // ------------------------------------------------------------------
+    public static final byte MEMBER_LINK_BLOCK = 0;
+    public static final byte MEMBER_PLACED_TABLET = 1;
+    public static final byte MEMBER_PLAYER_TABLET = 2;
+    public static final byte MEMBER_OTHER = 3;
+
+    public record MonitorMember(byte type, Component label, BlockPos pos, int strength,
+                                boolean listening, boolean inRange) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorMember> STREAM_CODEC =
+                StreamCodec.of((buf, m) -> {
+                    buf.writeByte(m.type());
+                    net.minecraft.network.chat.ComponentSerialization.TRUSTED_STREAM_CODEC
+                            .encode(buf, m.label());
+                    BlockPos.STREAM_CODEC.encode(buf, m.pos());
+                    buf.writeVarInt(m.strength());
+                    buf.writeBoolean(m.listening());
+                    buf.writeBoolean(m.inRange());
+                }, buf -> new MonitorMember(
+                        buf.readByte(),
+                        net.minecraft.network.chat.ComponentSerialization.TRUSTED_STREAM_CODEC
+                                .decode(buf),
+                        BlockPos.STREAM_CODEC.decode(buf),
+                        buf.readVarInt(),
+                        buf.readBoolean(),
+                        buf.readBoolean()));
+    }
+
+    public record MonitorChannel(com.modpack.linktablet.frequency.Frequency frequency,
+                                 List<MonitorMember> members) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorChannel> STREAM_CODEC =
+                StreamCodec.composite(
+                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC,
+                        MonitorChannel::frequency,
+                        MonitorMember.STREAM_CODEC.apply(ByteBufCodecs.list(64)),
+                        MonitorChannel::members,
+                        MonitorChannel::new);
+    }
+
+    public record MonitorSubscribePayload(SignalTarget target, boolean active)
+            implements CustomPacketPayload {
+        public static final Type<MonitorSubscribePayload> TYPE = new Type<>(id("monitor_subscribe"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorSubscribePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, MonitorSubscribePayload::target,
+                        ByteBufCodecs.BOOL, MonitorSubscribePayload::active,
+                        MonitorSubscribePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Replaces the tablet's whole probe list (multi-probe, cap
+     * {@code MonitorChannels.MAX_PROBES}) — add and remove both send
+     * the full list, the SetHomeAppsPayload shape. */
+    public record SetProbePayload(SignalTarget target,
+                                  List<com.modpack.linktablet.frequency.Frequency> probes)
+            implements CustomPacketPayload {
+        public static final Type<SetProbePayload> TYPE = new Type<>(id("set_probe"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetProbePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetProbePayload::target,
+                        com.modpack.linktablet.frequency.Frequency.STREAM_CODEC
+                                .apply(ByteBufCodecs.list(
+                                        com.modpack.linktablet.frequency.MonitorChannels.MAX_PROBES)),
+                        SetProbePayload::probes,
+                        SetProbePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Opens the Monitor's add-probe container menu (1.11.0 second
+     * tester round — a real menu is what makes JEI/EMI panels show). */
+    public record OpenProbeMenuPayload(SignalTarget target) implements CustomPacketPayload {
+        public static final Type<OpenProbeMenuPayload> TYPE = new Type<>(id("open_probe_menu"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, OpenProbeMenuPayload> STREAM_CODEC =
+                SignalTarget.STREAM_CODEC.map(OpenProbeMenuPayload::new, OpenProbeMenuPayload::target);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Twitch Chat channel (1.11.0), the SetProbePayload both-target shape. */
+    public record SetTwitchChannelPayload(SignalTarget target, String channel)
+            implements CustomPacketPayload {
+        public static final Type<SetTwitchChannelPayload> TYPE = new Type<>(id("set_twitch_channel"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetTwitchChannelPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetTwitchChannelPayload::target,
+                        ByteBufCodecs.stringUtf8(25), SetTwitchChannelPayload::channel,
+                        SetTwitchChannelPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record MonitorSnapshotPayload(List<MonitorChannel> channels)
+            implements CustomPacketPayload {
+        public static final Type<MonitorSnapshotPayload> TYPE = new Type<>(id("monitor_snapshot"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, MonitorSnapshotPayload> STREAM_CODEC =
+                MonitorChannel.STREAM_CODEC.apply(ByteBufCodecs.list(64))
+                        .map(MonitorSnapshotPayload::new, MonitorSnapshotPayload::channels);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Paint on walls (1.11.0): strokes travel as sparse cell lists in
+    // CONTINUOUS surface-space index (block targets) or local canvas
+    // index (item targets) — see PaintCanvas for the index math.
+    // ------------------------------------------------------------------
+
+    /** One painted cell: index (continuous for block targets, local for
+     * item targets) + palette color (0 = blank, 1..MAX_COLOR = paint). */
+    public record PaintCell(int index, byte color) {
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintCell> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.VAR_INT, PaintCell::index,
+                        ByteBufCodecs.BYTE, PaintCell::color,
+                        PaintCell::new);
+    }
+
+    /** A stroke's sparse cell list (cap 64 — a drag gesture's worth of
+     * cells per packet, not the whole canvas). */
+    public record PaintStrokePayload(SignalTarget target, List<PaintCell> cells)
+            implements CustomPacketPayload {
+        public static final Type<PaintStrokePayload> TYPE = new Type<>(id("paint_stroke"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintStrokePayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, PaintStrokePayload::target,
+                        PaintCell.STREAM_CODEC.apply(ByteBufCodecs.list(64)), PaintStrokePayload::cells,
+                        PaintStrokePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Blanks the whole canvas (item: the whole component; block: every
+     * touched member's canvas). */
+    public record PaintClearPayload(SignalTarget target) implements CustomPacketPayload {
+        public static final Type<PaintClearPayload> TYPE = new Type<>(id("paint_clear"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, PaintClearPayload> STREAM_CODEC =
+                SignalTarget.STREAM_CODEC.map(PaintClearPayload::new, PaintClearPayload::target);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void handleSetProgram(SetProgramPayload payload, IPayloadContext context) {
         Player player = context.player();
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
-        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+        if (tabletDistSqr(player, pos)
                 > MAX_BLOCK_DISTANCE_SQ) return;
         if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
             TabletBlockEntity controller = be.resolveController();
@@ -579,7 +763,18 @@ public class ModNetworking {
         // (still inside the 1.10.0 pairing break).
         // "18": 1.10.0 signal links — Signal grew linkId + links on the
         // wire (still inside the 1.10.0 pairing break).
-        PayloadRegistrar registrar = event.registrar("18");
+        // "19": 1.11.0 Frequency Monitor — MonitorSubscribePayload,
+        // SetProbePayload, MonitorSnapshotPayload (second playToClient).
+        // "20": 1.11.0 multi-probe — SetProbePayload carries the probe
+        // LIST (cap 8; still inside the 1.11.0 pairing break, but each
+        // wire growth gets its own fence).
+        // "21": 1.11.0 probe editor — OpenProbeMenuPayload added (the
+        // add-probe container menu; still inside the 1.11.0 break).
+        // "22": 1.11.0 Twitch Chat — SetTwitchChannelPayload added (still
+        // inside the 1.11.0 break).
+        // "23": 1.11.0 paint on walls — PaintStrokePayload/PaintClearPayload
+        // added (still inside the 1.11.0 break).
+        PayloadRegistrar registrar = event.registrar("23");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -597,6 +792,217 @@ public class ModNetworking {
         registrar.playToServer(RemoveGaugePayload.TYPE, RemoveGaugePayload.STREAM_CODEC, ModNetworking::handleRemoveGauge);
         registrar.playToClient(GaugeReadingsPayload.TYPE, GaugeReadingsPayload.STREAM_CODEC, ModNetworking::handleGaugeReadings);
         registrar.playToServer(SetProgramPayload.TYPE, SetProgramPayload.STREAM_CODEC, ModNetworking::handleSetProgram);
+        registrar.playToServer(MonitorSubscribePayload.TYPE, MonitorSubscribePayload.STREAM_CODEC,
+                com.modpack.linktablet.compat.MonitorScanner::handleSubscribe);
+        registrar.playToServer(SetProbePayload.TYPE, SetProbePayload.STREAM_CODEC,
+                ModNetworking::handleSetProbe);
+        registrar.playToServer(OpenProbeMenuPayload.TYPE, OpenProbeMenuPayload.STREAM_CODEC,
+                ModNetworking::handleOpenProbeMenu);
+        registrar.playToClient(MonitorSnapshotPayload.TYPE, MonitorSnapshotPayload.STREAM_CODEC,
+                ModNetworking::handleMonitorSnapshot);
+        registrar.playToServer(SetTwitchChannelPayload.TYPE, SetTwitchChannelPayload.STREAM_CODEC,
+                ModNetworking::handleSetTwitchChannel);
+        registrar.playToServer(PaintStrokePayload.TYPE, PaintStrokePayload.STREAM_CODEC,
+                ModNetworking::handlePaintStroke);
+        registrar.playToServer(PaintClearPayload.TYPE, PaintClearPayload.STREAM_CODEC,
+                ModNetworking::handlePaintClear);
+    }
+
+    /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
+     * validation (loaded + range + tablet), then the server opens the
+     * PROBE_EDIT container menu. */
+    private static void handleOpenProbeMenu(OpenProbeMenuPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (resolve(player, payload.target()) == null) return;
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        SignalEditMenu.EditContext ctx = SignalEditMenu.EditContext.plain(payload.target(), -1);
+        serverPlayer.openMenu(new SimpleMenuProvider(
+                        (id, inv, p) -> new SignalEditMenu(ModMenus.PROBE_EDIT.get(), id, inv, ctx),
+                        Component.translatable("gui.linktablet.probe_edit.title")),
+                buf -> SignalEditMenu.EditContext.STREAM_CODEC.encode(buf, ctx));
+    }
+
+    private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {
+        Player player = context.player();
+        // Sanitize: drop empties, dedupe by Create-network identity,
+        // cap — the fromKeys shape (never trust the client's list)
+        List<com.modpack.linktablet.frequency.Frequency> probes = new ArrayList<>();
+        for (com.modpack.linktablet.frequency.Frequency probe : payload.probes()) {
+            if (probe.isEmpty() || probes.contains(probe)) continue;
+            if (probes.size() >= com.modpack.linktablet.frequency.MonitorChannels.MAX_PROBES) break;
+            probes.add(probe);
+        }
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) {
+                    controller.setMonitorProbes(probes);
+                }
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            if (probes.isEmpty()) {
+                stack.remove(ModDataComponents.MONITOR_PROBE.get());
+            } else {
+                stack.set(ModDataComponents.MONITOR_PROBE.get(), List.copyOf(probes));
+            }
+        }
+    }
+
+    private static void handleMonitorSnapshot(MonitorSnapshotPayload payload, IPayloadContext context) {
+        com.modpack.linktablet.client.ClientMonitorSnapshot.accept(payload.channels());
+    }
+
+    /** Twitch channel charset — TwitchChatService.validChannel's rule,
+     * copied (that class is client-only). */
+    private static final java.util.regex.Pattern TWITCH_CHANNEL =
+            java.util.regex.Pattern.compile("[a-z0-9_]{1,25}");
+
+    private static void handleSetTwitchChannel(SetTwitchChannelPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        String channel = payload.channel().toLowerCase(java.util.Locale.ROOT);
+        if (!channel.isEmpty() && !TWITCH_CHANNEL.matcher(channel).matches()) return;
+        if (payload.target().pos().isPresent()) {
+            BlockPos pos = payload.target().pos().get();
+            if (!player.level().isLoaded(pos)) return;
+            if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+            if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
+                TabletBlockEntity controller = be.resolveController();
+                if (controller != null) controller.setTwitchChannel(channel);
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            if (channel.isEmpty()) {
+                stack.remove(ModDataComponents.TWITCH_CHANNEL.get());
+            } else {
+                stack.set(ModDataComponents.TWITCH_CHANNEL.get(), channel);
+            }
+        }
+    }
+
+    /**
+     * The member BE at (dx, dy) SURFACE offset from a controller, or
+     * null when unloaded/absent — (0,0) is the controller itself. Mirrors
+     * the offset math {@code TabletBlockEntity.updateLit()}'s controller
+     * loop and {@code surfaceIntact()} use: {@code screenRight}/
+     * {@code screenDown} give the world axes for surface dx/dy under the
+     * controller's FACING, so this is NOT plain world-axis arithmetic.
+     */
+    @Nullable
+    private static TabletBlockEntity memberAt(Level level, TabletBlockEntity controller, int dx, int dy) {
+        if (dx == 0 && dy == 0) return controller;
+        BlockState state = controller.getBlockState();
+        BlockPos pos = controller.getBlockPos()
+                .relative(TabletScreenMath.screenRight(state), dx)
+                .relative(TabletScreenMath.screenDown(state), dy);
+        if (!level.isLoaded(pos)) return null;
+        return level.getBlockEntity(pos) instanceof TabletBlockEntity member ? member : null;
+    }
+
+    /** Resolves a stroke's block target down to its controller + surface
+     * span, the SetProbePayload/handleSetProbe resolution shape. */
+    @Nullable
+    private static TabletBlockEntity resolvePaintController(Player player, BlockPos pos) {
+        if (!player.level().isLoaded(pos)) return null;
+        if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return null;
+        if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity clicked)) return null;
+        return clicked.resolveController();
+    }
+
+    private static void handlePaintStroke(PaintStrokePayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
+            if (controller == null) return;
+            int surfaceW = controller.getSurfaceW();
+            int surfaceH = controller.getSurfaceH();
+            int contW = surfaceW * PaintCanvas.COLS;
+            int contH = surfaceH * PaintCanvas.ROWS;
+            // Group cells by owning member first — one setPaintCanvas
+            // (one sync packet) per touched member per stroke, not per cell.
+            Map<Long, Map<Integer, Byte>> byMember = new LinkedHashMap<>();
+            for (PaintCell cell : payload.cells()) {
+                if (cell.color() < 0 || cell.color() > PaintCanvas.MAX_COLOR) continue;
+                int index = cell.index();
+                if (index < 0 || index >= contW * contH) continue;
+                int contX = index % contW;
+                int contY = index / contW;
+                int dx = PaintCanvas.memberDx(contX);
+                int dy = PaintCanvas.memberDy(contY);
+                int local = PaintCanvas.localIndex(contX, contY);
+                long key = (((long) dx) << 32) | (dy & 0xFFFFFFFFL);
+                byMember.computeIfAbsent(key, k -> new LinkedHashMap<>()).put(local, cell.color());
+            }
+            Level level = player.level();
+            for (Map.Entry<Long, Map<Integer, Byte>> entry : byMember.entrySet()) {
+                int dx = (int) (entry.getKey() >> 32);
+                int dy = (int) (long) entry.getKey();
+                TabletBlockEntity member = memberAt(level, controller, dx, dy);
+                if (member == null) continue;
+                // Clone before mutating — setPaintCanvas stores by
+                // reference, and the array we hand it must never be
+                // touched again after the call (T1 aliasing rule).
+                byte[] updated = member.getPaintCanvas().clone();
+                boolean changed = false;
+                for (Map.Entry<Integer, Byte> localCell : entry.getValue().entrySet()) {
+                    int local = localCell.getKey();
+                    byte color = localCell.getValue();
+                    if (updated[local] == color) continue;
+                    updated[local] = color;
+                    changed = true;
+                }
+                if (changed) member.setPaintCanvas(updated);
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (stack.isEmpty()) return;
+        byte[] canvas = stack.getOrDefault(ModDataComponents.PAINT_CANVAS.get(), PaintCanvas.blank()).clone();
+        // Crafted/corrupt components must not throw in a payload handler.
+        if (canvas.length != PaintCanvas.CELLS) canvas = PaintCanvas.blank();
+        boolean changed = false;
+        for (PaintCell cell : payload.cells()) {
+            int index = cell.index();
+            byte color = cell.color();
+            if (index < 0 || index >= PaintCanvas.CELLS) continue;
+            if (color < 0 || color > PaintCanvas.MAX_COLOR) continue;
+            if (canvas[index] == color) continue;
+            canvas[index] = color;
+            changed = true;
+        }
+        if (!changed) return;
+        if (PaintCanvas.isBlank(canvas)) {
+            stack.remove(ModDataComponents.PAINT_CANVAS.get());
+        } else {
+            stack.set(ModDataComponents.PAINT_CANVAS.get(), canvas);
+        }
+    }
+
+    private static void handlePaintClear(PaintClearPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isPresent()) {
+            TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
+            if (controller == null) return;
+            Level level = player.level();
+            for (int dx = 0; dx < controller.getSurfaceW(); dx++) {
+                for (int dy = 0; dy < controller.getSurfaceH(); dy++) {
+                    TabletBlockEntity member = memberAt(level, controller, dx, dy);
+                    if (member != null) member.setPaintCanvas(PaintCanvas.blank());
+                }
+            }
+            return;
+        }
+        ItemStack stack = resolveStack(player, payload.target());
+        if (!stack.isEmpty()) {
+            stack.remove(ModDataComponents.PAINT_CANVAS.get());
+        }
     }
 
     private static void handleUpsertGauge(UpsertGaugePayload payload, IPayloadContext context) {
@@ -645,7 +1051,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();
@@ -673,7 +1079,7 @@ public class ModNetworking {
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
-        if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+        if (tabletDistSqr(player, pos)
                 > MAX_BLOCK_DISTANCE_SQ) return;
         if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
             com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
@@ -856,7 +1262,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();
@@ -881,7 +1287,7 @@ public class ModNetworking {
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
-            if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+            if (tabletDistSqr(player, pos)
                     > MAX_BLOCK_DISTANCE_SQ) return;
             if (player.level().getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 TabletBlockEntity controller = be.resolveController();

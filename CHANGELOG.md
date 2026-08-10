@@ -1,5 +1,118 @@
 # Changelog
 
+## 1.11.0 — 2026-08-09
+
+- **The tablet in your hand shows chat** — when Twitch Chat is the
+  last app you used and you have a channel set, your own first-person
+  tablet renders the live chat wall right on its screen (emotes and
+  all) instead of the signals grid. Put it away or switch apps and the
+  signals face returns. Other people's tablets, item frames, and
+  dropped tablets are unaffected. Client-only — beta.7 still pairs
+  with beta.4/5/6.
+- **Twitch chat gets emotes** — native Twitch emotes plus 7TV, BTTV,
+  and FFZ show as images inline in chat, animated ones included, on
+  every surface: the held app, the overlay pin, and placed/merged
+  walls. A toggle glyph next to the channel pin turns them off if
+  you'd rather have plain text (or a lighter-weight wall). Client-only
+  — no pairing impact, beta.6 pairs with beta.4/beta.5.
+- **Paint is its own app now** — with paintings persisting and showing
+  on walls, Paint outgrew the Arcade: it has its own App Store row
+  (pink chip, painting icon). The Arcade keeps the other 18 games. If
+  an earlier beta folded your Paint tile into the Arcade tile, just
+  Get Paint from the store again.
+- **Twitch chat walls read like chat now** — messages on placed
+  tablets stack as compact lines from the bottom of the screen
+  instead of spreading across the glass with big gaps; bigger merged
+  walls fit more lines at the same text size.
+
+- New app: **Twitch Chat** — a read-only viewer of a chosen Twitch
+  channel's live chat, no account or login required (anonymous guest
+  access, nothing ever sent). Works on all three surfaces: held tablet
+  (channel box + scrolling colored chat), the overlay pin (compact HUD
+  chat while you play), and placed tablets (a wall-mounted chat board —
+  set once from the block's GUI, every viewer sees it with their own
+  connection). Your personal channel is remembered per-player; a placed
+  tablet remembers its own. The tablet only talks to Twitch while chat
+  is actually on screen — close every Twitch surface and the connection
+  drops, open one and it reconnects.
+- New app: **Frequency Monitor** — see who's actually transmitting or
+  listening on a Redstone Link channel. Every frequency your signals
+  and gauges use gets a live member list: Create link blocks, placed
+  tablets, and tablets sitting in a player's inventory (named by
+  owner, so a creative phantom copy shows up as "Tablet (PlayerName)"
+  right next to the real placed one — the exact confusion behind the
+  1.10.2 "gauge pinned at 15" reports). Each member shows strength,
+  a listening/transmitting badge, and in-range vs. out-of-range
+  against your tablet's position, plus a channel summary (transmitter
+  count + effective power). Probes let you watch up to 8 extra
+  channels your tablet doesn't use: the + button opens an Add Probe
+  editor just like the signal editor — two frequency slots, your
+  inventory, an all-items search, and the JEI/EMI panel right there
+  to drag from. Remove a probe from its channel row. Distributed
+  through the App Store, same as Clock/Calculator/Gauges. Placed
+  tablets get a compact one-line-per-channel summary on the kiosk
+  face (tap it to open the full screen), and the overlay pin shows
+  the same compact lines in the mini window.
+- **JEI/EMI drag everywhere**: the ghost-drag that the signal editor
+  has had since 1.7.0 now also covers the Add Probe editor and the
+  gauge editor's frequency slots — drag an item straight from the
+  viewer panel onto any of them. (Gauge editor: JEI-only installs
+  show the panel there; EMI can't display on that screen yet.)
+- **App Store search** — a search box above the shelf filters the
+  catalog by name, description, or key.
+- **Fixed**: the gauge editor's name field never accepted typing
+  (since 1.10.0) — clicking it now focuses it, and it starts focused
+  when the editor opens.
+- **Paint on walls** (idea: Tommy) — the Paint app's canvas is no
+  longer session-only doodling: it persists on the tablet (20×14
+  cells of the 16-color signal palette), so a painting survives
+  closing the app, breaking and re-placing the tablet, and a trip
+  through a chest. Placed tablets show their canvas on the wall.
+  Merge several tablets into one surface and their canvases stitch
+  into a single mural spanning every member — paint across the seam
+  and each tablet's own slice updates; split the wall apart and each
+  tablet carries its own piece away; re-merge in the same arrangement
+  and the picture reassembles. Painting itself still happens through
+  the GUI (held, pip, or a wall's own menu) — the wall displays, it
+  doesn't take direct on-glass strokes, yet.
+- New payloads for the Monitor, Twitch Chat, and Paint push the wire
+  registrar **"18" → "23" — a pairing break**: update client and
+  server together.
+- **Arcade** — the 19 individual game apps are now one **Arcade** app:
+  a shelf with each game's best score, tap to play, ESC back to the
+  shelf. Existing tiles on your Home screen for a game (Snake, 2048,
+  etc.) become a single Arcade tile automatically, and the App Store
+  (and the launcher's add flow) shrinks to match — no more scrolling
+  past 19 games to find Clock or Gauges. Client-only change, no
+  pairing impact.
+
+## 1.10.2 — 2026-08-03
+
+- **Dedicated servers**: the Create: Aeronautics compat from 1.10.1
+  failed to activate on dedicated servers (it worked in singleplayer),
+  so vehicle tablets there still couldn't be aimed. Fixed — if you run
+  a server, update BOTH sides to 1.10.2 and skip 1.10.1 entirely.
+- **Gauges**: a freshly placed gauge tablet now shows the channel's
+  current signal immediately. Before, it displayed 0 until the signal
+  next changed, which on a steady channel looked like a frozen dial.
+  Same fix applies to the first reading in the tablet menu.
+
+## 1.10.1 — 2026-08-03
+
+- **Create: Aeronautics compat**: tablets on physicalized contraptions
+  (Sable sub-levels) now work. Swivel-mounted tablets no longer fling
+  to one fixed angle the moment the vehicle is assembled — wrench
+  re-aiming, the bezel landscape flip, screen taps, slider drags, and
+  the pinned mini-window all track correctly on a moving build, and
+  interaction sounds play at the vehicle instead of 20 million blocks
+  away. Works with Sable installed or not (soft compat, no new
+  dependency); tablets that were already stuck un-stick with one
+  wrench.
+- Safety net for the same bug class: a mounted tablet now refuses to
+  store an aim computed from an implausible position instead of
+  clamping to garbage, so future physics mods can't corrupt a stored
+  aim either.
+
 ## 1.10.0 — 2026-07-28
 
 - The tablet now boots to a **Home screen** (the start of the tablet

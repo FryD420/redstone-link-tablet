@@ -73,6 +73,17 @@ final class HeaderGlyphs {
         g.fill(x + 5, y + 8, x + 7, y + 11, color);
     }
 
+    /** Smiley — the Twitch emotes on/off toggle. */
+    static void emotes(GuiGraphics g, int x, int y, int color) {
+        g.fill(x + 2, y + 1, x + 10, y + 2, color);
+        g.fill(x + 1, y + 2, x + 2, y + 10, color);
+        g.fill(x + 10, y + 2, x + 11, y + 10, color);
+        g.fill(x + 2, y + 10, x + 10, y + 11, color);
+        g.fill(x + 4, y + 4, x + 5, y + 6, color);
+        g.fill(x + 7, y + 4, x + 8, y + 6, color);
+        g.fill(x + 4, y + 7, x + 8, y + 8, color);
+    }
+
     /** Chain links — joined by a bar unless solo (then broken apart). */
     static void link(GuiGraphics g, int x, int y, int color, boolean solo) {
         g.fill(x + 1, y + 3, x + 5, y + 4, color);

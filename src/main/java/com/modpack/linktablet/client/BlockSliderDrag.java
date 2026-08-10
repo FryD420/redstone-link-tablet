@@ -90,9 +90,15 @@ public final class BlockSliderDrag {
             return;
         }
         BlockState state = mc.level.getBlockState(pos);
+        // Sable sub-level (1.10.1): a physicalized tablet sits at plot
+        // coordinates — localize the eye before the range check and the
+        // ray projection, or dragging on a vehicle instantly cancels
+        Vec3 rawEye = player.getEyePosition();
+        Vec3 eye = com.modpack.linktablet.compat.SableCompat.localizeNear(
+                mc.level, pos, rawEye);
         if (!(state.getBlock() instanceof TabletBlock)
                 || !(mc.level.getBlockEntity(pos) instanceof TabletBlockEntity member)
-                || player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > MAX_DISTANCE_SQ) {
+                || eye.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > MAX_DISTANCE_SQ) {
             stop();
             return;
         }
@@ -109,8 +115,12 @@ public final class BlockSliderDrag {
             return;
         }
 
-        Vec3 eye = player.getEyePosition();
         Vec3 look = player.getViewVector(1.0F);
+        if (eye != rawEye) {
+            // Eye crossed into the plot frame; the look DIRECTION must
+            // follow it (directions can't self-detect, see SableCompat)
+            look = com.modpack.linktablet.compat.SableCompat.toLocalDir(mc.level, pos, look);
+        }
         // The ray hits the clicked MEMBER's plane; the surface-aware
         // helper folds in the member offset BEFORE the rotation swizzle
         // so the result lives in the same continuous space as

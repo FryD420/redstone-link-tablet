@@ -23,6 +23,13 @@ public class ClientPrefs {
      * write it — their nav lives on the block entity. */
     private static String lastProgram = "launcher";
 
+    /** Twitch Chat channel (1.11.0): the last channel typed into the
+     * Twitch Chat program, "" = never set. */
+    private static String twitchChannel = "";
+
+    /** Twitch Chat emote rendering toggle (1.11.0): default on. */
+    private static boolean twitchEmotes = true;
+
     // Pinned overlay (1.7.0): "" = no pin, "slot:<n>" = inventory slot,
     // "block:<x>,<y>,<z>" = placed tablet. Position is the window's
     // last-dragged top-left corner (-1 = never moved, use default).
@@ -98,6 +105,32 @@ public class ClientPrefs {
         save();
     }
 
+    /** Twitch Chat channel to resume. */
+    public static String twitchChannel() {
+        load();
+        return twitchChannel;
+    }
+
+    public static void setTwitchChannel(String value) {
+        load();
+        if (twitchChannel.equals(value)) return;
+        twitchChannel = value;
+        save();
+    }
+
+    /** Whether Twitch Chat renders 7TV/BTTV/FFZ/native emotes as images. */
+    public static boolean twitchEmotes() {
+        load();
+        return twitchEmotes;
+    }
+
+    public static void setTwitchEmotes(boolean value) {
+        load();
+        if (twitchEmotes == value) return;
+        twitchEmotes = value;
+        save();
+    }
+
     /** Clock app value for a key, or the fallback when never written. */
     public static String clock(String key, String fallback) {
         load();
@@ -132,6 +165,8 @@ public class ClientPrefs {
         }
         listView = Boolean.parseBoolean(props.getProperty("listView", "false"));
         lastProgram = props.getProperty("lastProgram", "launcher");
+        twitchChannel = props.getProperty("twitch.channel", "");
+        twitchEmotes = Boolean.parseBoolean(props.getProperty("twitch.emotes", "true"));
         overlayPin = props.getProperty("overlayPin", "");
         overlayX = parseInt(props.getProperty("overlayX"), -1);
         overlayY = parseInt(props.getProperty("overlayY"), -1);
@@ -161,6 +196,8 @@ public class ClientPrefs {
         Properties props = new Properties();
         props.setProperty("listView", Boolean.toString(listView));
         props.setProperty("lastProgram", lastProgram);
+        props.setProperty("twitch.channel", twitchChannel);
+        props.setProperty("twitch.emotes", Boolean.toString(twitchEmotes));
         props.setProperty("overlayPin", overlayPin);
         props.setProperty("overlayX", Integer.toString(overlayX));
         props.setProperty("overlayY", Integer.toString(overlayY));

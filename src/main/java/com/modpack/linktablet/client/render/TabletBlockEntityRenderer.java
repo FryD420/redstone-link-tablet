@@ -121,6 +121,22 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
                         be.getGauges(), gaugeReadings(be),
                         be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
                         packedLight, surfaceW, surfaceH, caseTint);
+                case MONITOR -> TabletScreenRenderer.renderMonitorFace(poseStack, buffers,
+                        com.modpack.linktablet.frequency.MonitorChannels.channelsOf(
+                                be.getSignals(), be.getGauges(), be.getMonitorProbes()),
+                        be.monitorCounts(), be.monitorPower(),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
+                case TWITCH -> TabletScreenRenderer.renderTwitchFace(poseStack, buffers,
+                        be.getTwitchChannel(),
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
+                // Paint (1.11.0): games' constant, but this face has a
+                // bespoke wall picture, so it needs its own case ABOVE the
+                // games' fall-through to the label-face default below.
+                case PAINT -> TabletScreenRenderer.renderPaintFace(poseStack, buffers, be,
+                        be.effectiveRotation(), be.getTheme(), state.getValue(TabletBlock.LIT),
+                        packedLight, surfaceW, surfaceH, caseTint);
                 // Launcher faces honor list mode too (test pass 2) — plain
                 // rows, since roster rows are doors, not toggles
                 case LAUNCHER, SIGNALS -> TabletScreenRenderer.render(poseStack, buffers, signals,

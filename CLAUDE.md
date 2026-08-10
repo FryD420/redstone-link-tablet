@@ -215,6 +215,114 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   the synced angles — pixels may trail clicks mid-glide BY DESIGN;
   never lerp the hit basis.
 
+- Sable/Create-Aeronautics compat (1.10.1): a physicalized tablet's
+  `worldPosition` is a Sable PLOT coordinate (~20.5M blocks out) while
+  players stay in world space — every mounted ray path, payload
+  range check, and sound position must localize through
+  `compat/SableCompat` (reflection soft-dep, jar-in-jar `Pose3dc`, no
+  compile dep — the shim self-disables on any bind failure).
+  BIND RULE (1.10.2): `findStatic`/`findVirtual` with explicit
+  MethodTypes, NEVER `getMethod` — reflection's method enumeration
+  resolves every overload's parameter types, and `getContainer
+  (ClientLevel)` kills NeoForge's dist cleaner on DEDICATED servers
+  (1.10.1 shipped broken there; singleplayer masked it — always
+  boot-check compat via `runServer` too, run/ is shared).
+  `localizeNear` is the one auto-detect rule (points near the block
+  pass through free); look VECTORS can't self-detect — transform them
+  iff the paired eye moved (`==` check). `computeAim`'s 32-block guard
+  is the backstop: never let a frame-mismatched aim be stored. Sable's
+  interaction dispatch itself works — only coordinates mix. Dev repro:
+  CA + Sable jars live in `run/mods`; physics assembler on a block,
+  activate.
+
+- Create link receivers (1.10.2): Create's `addToNetwork` evaluation
+  pushes the current power into the new member ONLY if it's a
+  `LinkBehaviour` (bytecode-checked, 6.0.10 `updateNetworkOf` — the
+  general loop skips the actor), so `VirtualReceiver.readInitial()`
+  must follow every `addToNetwork` or a receiver joining a static
+  channel reads 0 until the next change (the "frozen placed gauge").
+  Also: a tablet ITEM in any inventory transmits its toggled-ON
+  signals from the player every tick — in creative, placing keeps the
+  item, and the phantom copy pins receivers at max (three
+  "bug" reports in one day were this; it's stacked-transmitter
+  behavior working as designed).
+
+- Frequency Monitor (1.11.0): `MonitorChannels.channelsOf` is the ONE
+  channel table (probes in stored order, then signal freqs, then
+  gauge freqs, deduped by Create identity) — the server scanner
+  (`compat/MonitorScanner`), BE summaries, kiosk face renderer, and
+  GUI all index against the same derived list; index-mapped wire
+  forms depend on that ordering, never fork it. Probes are a LIST
+  (cap `MonitorChannels.MAX_PROBES` 8, `SetProbePayload` replaces the
+  whole list; the single-Frequency dev format decodes as a one-entry
+  list). Range math runs on RAW positions (Create's own
+  `RedstoneLinkNetworkHandler.withinRange` — same Sable-transparent
+  rule as the 1.10.1/1.10.2 network math); only the DISPLAYED
+  distance/coords localize, through `SableCompat.localizeNear`.
+  Member `ownerName` classification (inventory-tablet attribution —
+  the phantom-copy diagnosis) lives on both `TabletTransmitterHandler`
+  and `TabletReceiverHandler`, not duplicated elsewhere. New payloads
+  bumped the registrar "18"→"21" — a pairing break. Probe adding goes
+  through `ProbeEditScreen` — a REAL container menu (`SignalEditMenu`
+  reused under the PROBE_EDIT type): JEI and EMI only attach their
+  ingredient panels to `AbstractContainerScreen` (verified against
+  EMI 1.1.24's ScreenMixin bytecode — plain screens can NEVER host
+  them), so any future screen wanting viewer drag must be a container
+  menu, not a plain Screen with drag accessors. The gauge editor's
+  plain-screen drag targets work on JEI-only installs (JEI's
+  addGuiScreenHandler shows the panel); under EMI they're inert.
+
+- Twitch Chat (1.11.0): `client/TwitchChatService` is CLIENT-ONLY and
+  READ-ONLY — anonymous `justinfan` guest link to Twitch's chat relay,
+  never grow a PRIVMSG writer or any auth flow; the product is "no
+  accounts, no tokens, nothing stored." The socket exists ONLY while
+  something displays chat (screens/overlay acquire-release the channel
+  ref-count; kiosk faces don't have a lifecycle to hook, so they
+  heartbeat via `touchFace` every render, with a 100-tick expiry
+  standing in for release) — no consumer means the socket closes, full
+  stop. Channel names are validated to `[a-z0-9_]{1,25}` in TWO places
+  that must stay in sync: `TwitchChatService` (client input) and
+  `ModNetworking` (server-side, since the client class never loads on
+  a dedicated server — copy the pattern, don't share the class).
+  Logout clears every ref and drops the connection; `NoteWindows` now
+  defocuses windows before clearing as part of that fix (a general fix,
+  not Twitch-specific). Chat is unfiltered live internet content —
+  channel choice on a placed tablet carries the same trust model as
+  editing its signals (whoever can open the GUI controls the wall).
+  Emotes (1.11.0-beta.6): `client/TwitchEmotes`, `EmoteTextures`, and
+  `EmoteText` are CLIENT-ONLY, same as the socket — anonymous CDN GETs
+  only (native `static-cdn.jtvnw.net` + the 7TV/BTTV/FFZ public APIs),
+  never a token or write call. `EmoteText` is the ONE tokenizer —
+  GUI, overlay, and wall faces all lay out through it; never fork
+  matching/wrapping into a renderer. Wall emote quads ride
+  `RenderType.text` ONLY, inside the existing text pass (never a
+  custom RenderType near the cached quad consumer — see the fills→
+  items→text rule above). Caps keep it defensive: 1x source images,
+  40 decoded frames, ~256 KB download, LRU cache of 128 textures
+  (evicted ones closed). Toggle is `ClientPrefs` boolean
+  `twitch.emotes` (default on); off = pure text everywhere, the
+  potato-GPU valve.
+
+- Paint on walls (1.11.0, idea: Tommy): `PaintCanvas` (root package)
+  is the ONE geometry/mapping home — GUI, stroke handler, and renderer
+  all go through it; never fork the layout/index math into a second
+  copy. Disk form is FROZEN once shipped: `paint_canvas` component +
+  BE NBT byte array, 280 cells (20×14), 0 = blank, never written
+  all-blank. Slice rule: there is NO merged-canvas object — every
+  tablet always owns its own 20×14 slice; a merged wall's picture is
+  derived by stitching member slices at edit/render time (merge,
+  split, pickup, break all Just Work, no crop/discard/orphan). Strokes
+  are wire-encoded in CONTINUOUS surface space for block targets (the
+  server maps continuous index → member BE + local cell via
+  `TabletScreenMath.screenRight/screenDown`, the surfaceLayout
+  precedent) and in local 20×14 space for held/1×1 targets — don't
+  conflate the two spaces. `renderPaintFace` does NO index remap at
+  any rotation — the per-axis rescale on quarter turns is the correct,
+  exact-fill behavior on non-square glass (settled after a 3-round
+  review derivation); if a painting looks "off" after a rotation,
+  suspect the caller, not the renderer, and don't re-add a remap.
+  Registrar "18"→"23".
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in

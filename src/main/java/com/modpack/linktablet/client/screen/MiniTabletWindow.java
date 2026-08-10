@@ -87,6 +87,8 @@ public class MiniTabletWindow implements FloatingWindow {
                 case CLOCK -> new ClockOverlayContent();
                 case CALCULATOR -> new CalculatorOverlayContent();
                 case GAUGES -> new GaugesOverlayContent(this::view);
+                case MONITOR -> new MonitorOverlayContent(this::view);
+                case TWITCH -> new TwitchOverlayContent(this::view);
                 default -> new SignalsOverlayContent(this::view);
             };
         }
@@ -111,7 +113,11 @@ public class MiniTabletWindow implements FloatingWindow {
         if (!(mc.level.getBlockEntity(pos) instanceof com.modpack.linktablet.block.TabletBlockEntity)) {
             return false;
         }
-        return player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
+        // Sable sub-level (1.10.1): a pinned vehicle tablet sits at plot
+        // coordinates — localize the eye or the pin always reads distant
+        return com.modpack.linktablet.compat.SableCompat
+                .localizeNear(mc.level, pos, player.getEyePosition())
+                .distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
                 <= MAX_BLOCK_DISTANCE_SQ;
     }
 

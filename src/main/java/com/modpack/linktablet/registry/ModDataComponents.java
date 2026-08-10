@@ -71,6 +71,43 @@ public class ModDataComponents {
                     .networkSynchronized(com.modpack.linktablet.frequency.Gauge.STREAM_CODEC.apply(ByteBufCodecs.list()))
                     .build());
 
+    /** Frequency Monitor probe channels (1.11.0, multi-probe by user
+     * decision — cap {@code MonitorChannels.MAX_PROBES}); absent = none
+     * (never written empty — the theme idiom). The single-Frequency
+     * alternative decodes the brief pre-multi dev format (never
+     * released, but dev worlds carry it). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<com.modpack.linktablet.frequency.Frequency>>> MONITOR_PROBE =
+            DATA_COMPONENTS.register("monitor_probe", () -> DataComponentType.<List<com.modpack.linktablet.frequency.Frequency>>builder()
+                    .persistent(Codec.withAlternative(
+                            com.modpack.linktablet.frequency.Frequency.CODEC.listOf(),
+                            com.modpack.linktablet.frequency.Frequency.CODEC.xmap(
+                                    List::of, list -> list.isEmpty()
+                                            ? com.modpack.linktablet.frequency.Frequency.EMPTY
+                                            : list.get(0))))
+                    .networkSynchronized(com.modpack.linktablet.frequency.Frequency.STREAM_CODEC
+                            .apply(ByteBufCodecs.list()))
+                    .build());
+
+    /** Twitch Chat channel name (1.11.0); absent = unset, never written
+     * empty — the theme idiom. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> TWITCH_CHANNEL =
+            DATA_COMPONENTS.register("twitch_channel", () -> DataComponentType.<String>builder()
+                    .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8)
+                    .build());
+
+    /** Paint canvas (1.11.0); absent = blank (never written all-blank —
+     * the theme idiom); 280 palette indices, disk form frozen. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<byte[]>> PAINT_CANVAS =
+            DATA_COMPONENTS.register("paint_canvas", () -> DataComponentType.<byte[]>builder()
+                    .persistent(Codec.BYTE_BUFFER.xmap(buf -> {
+                        byte[] array = new byte[buf.remaining()];
+                        buf.get(array);
+                        return array;
+                    }, java.nio.ByteBuffer::wrap))
+                    .networkSynchronized(ByteBufCodecs.byteArray(com.modpack.linktablet.PaintCanvas.CELLS))
+                    .build());
+
     /** Placed-screen content rotation, quarter turns CW; absent = 0 (never written). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCREEN_ROTATION =
             DATA_COMPONENTS.register("screen_rotation", () -> DataComponentType.<Integer>builder()

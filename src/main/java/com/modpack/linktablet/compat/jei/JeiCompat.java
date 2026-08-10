@@ -1,6 +1,8 @@
 package com.modpack.linktablet.compat.jei;
 
 import com.modpack.linktablet.LinkTabletMod;
+import com.modpack.linktablet.client.screen.GaugesScreen;
+import com.modpack.linktablet.client.screen.ProbeEditScreen;
 import com.modpack.linktablet.client.screen.SignalEditScreen;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -34,6 +36,87 @@ public class JeiCompat implements IModPlugin {
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(SignalEditScreen.class, new FrequencyGhostHandler());
+        // 1.11.0 (tester request: "that dragging feature should be
+        // everywhere applicable"): the gauge editor's slots and the
+        // add-probe editor's slots are drop targets too. The probe
+        // editor is a CONTAINER menu, so JEI's panel shows natively;
+        // GaugesScreen is a plain screen — its addGuiScreenHandler below
+        // makes the panel appear on JEI-only installs (EMI can't attach
+        // to plain screens at all — see EmiCompat).
+        registration.addGhostIngredientHandler(GaugesScreen.class, new GaugeGhostHandler());
+        registration.addGhostIngredientHandler(ProbeEditScreen.class, new ProbeGhostHandler());
+        registration.addGuiScreenHandler(GaugesScreen.class,
+                screen -> guiProperties(screen, screen.panelBounds()));
+    }
+
+    /** Record components named after IGuiProperties' accessors — the
+     * record implements the interface for free. */
+    private record ScreenBounds(Class<? extends net.minecraft.client.gui.screens.Screen> screenClass,
+                                int guiLeft, int guiTop, int guiXSize, int guiYSize,
+                                int screenWidth, int screenHeight)
+            implements mezz.jei.api.gui.handlers.IGuiProperties {
+    }
+
+    private static mezz.jei.api.gui.handlers.IGuiProperties guiProperties(
+            net.minecraft.client.gui.screens.Screen screen, Rect2i panel) {
+        return new ScreenBounds(screen.getClass(), panel.getX(), panel.getY(),
+                panel.getWidth(), panel.getHeight(), screen.width, screen.height);
+    }
+
+    /** Two-slot target list over any screen exposing 18×18 slot rects;
+     * zero-area rects (closed modals) are skipped. */
+    private static <I> List<IGhostIngredientHandler.Target<I>> slotTargets(
+            ITypedIngredient<I> ingredient, int slots,
+            java.util.function.IntFunction<Rect2i> area,
+            java.util.function.ObjIntConsumer<ItemStack> stage) {
+        Optional<ItemStack> stack = ingredient.getIngredient(VanillaTypes.ITEM_STACK);
+        if (stack.isEmpty()) return List.of();
+        List<IGhostIngredientHandler.Target<I>> targets = new ArrayList<>(slots);
+        for (int slot = 0; slot < slots; slot++) {
+            Rect2i rect = area.apply(slot);
+            if (rect.getWidth() == 0) continue;
+            int target = slot;
+            targets.add(new IGhostIngredientHandler.Target<>() {
+                @Override
+                public Rect2i getArea() {
+                    return rect;
+                }
+
+                @Override
+                public void accept(I dropped) {
+                    stage.accept(stack.get(), target);
+                }
+            });
+        }
+        return targets;
+    }
+
+    private static class GaugeGhostHandler implements IGhostIngredientHandler<GaugesScreen> {
+
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(GaugesScreen screen,
+                                                   ITypedIngredient<I> ingredient, boolean doStart) {
+            return slotTargets(ingredient, 2, screen::frequencySlotArea,
+                    (stack, slot) -> screen.stageFrequencyItem(slot, stack));
+        }
+
+        @Override
+        public void onComplete() {
+        }
+    }
+
+    private static class ProbeGhostHandler implements IGhostIngredientHandler<ProbeEditScreen> {
+
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(ProbeEditScreen screen,
+                                                   ITypedIngredient<I> ingredient, boolean doStart) {
+            return slotTargets(ingredient, 2, screen::frequencySlotArea,
+                    (stack, slot) -> screen.stageFrequencyItem(slot, stack));
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     private static class FrequencyGhostHandler implements IGhostIngredientHandler<SignalEditScreen> {
