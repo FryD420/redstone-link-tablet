@@ -82,9 +82,9 @@ public class PaintScreen extends ArcadeScreen {
     enum Tool { BRUSH, FILL, LINE, RECT, EYEDROPPER }
 
     private Tool tool = Tool.BRUSH;
-    /** Undo history, newest first (Task 3 populates; declared here so
-     * the glyph row can dim while it's empty). Depth-capped at
-     * MAX_UNDO. */
+    /** Undo history, newest first, depth-capped at MAX_UNDO — one entry
+     * per finished gesture (brush stroke, fill, committed shape).
+     * Session-local: cleared with the screen. */
     private static final int MAX_UNDO = 32;
     private final java.util.ArrayDeque<UndoStep> history = new java.util.ArrayDeque<>();
 
@@ -128,16 +128,27 @@ public class PaintScreen extends ArcadeScreen {
     }
 
     /** Steps back one gesture, CONFLICT-AWARE: a cell is only reverted
-     * while it still holds this step's after-value — cells someone else
-     * painted over since are left alone (their work survives; see the
-     * design spec). Undone cells ride the normal pending→stroke wire. */
+     * while it still holds this step's after-value OR its before-value —
+     * cells someone else painted over since (a third value) are left
+     * alone (their work survives; see the design spec). Accepting the
+     * before-value too closes the flush→server-echo window on block
+     * views: a just-committed gesture's cells can briefly read their
+     * before-value again (canvas rebuilds each frame from synced BE
+     * state; pending was already cleared by flush) between the client's
+     * flush and the server's echo, and without this the step would be
+     * silently consumed with nothing reverted. Undone cells ride the
+     * normal pending→stroke wire. */
     private void undo() {
+        if (canvas == null) return;
         UndoStep step = history.poll();
-        if (step == null || canvas == null) return;
+        if (step == null) return;
         for (UndoCell cell : step.cells()) {
-            if (cell.index() < canvas.length && canvas[cell.index()] == cell.afterArgb()) {
-                canvas[cell.index()] = cell.beforeArgb();
-                pending.put(cell.index(), paletteIndexOf(cell.beforeArgb()));
+            if (cell.index() < canvas.length) {
+                int now = canvas[cell.index()];
+                if (now == cell.afterArgb() || now == cell.beforeArgb()) {
+                    canvas[cell.index()] = cell.beforeArgb();
+                    pending.put(cell.index(), paletteIndexOf(cell.beforeArgb()));
+                }
             }
         }
         flush();
