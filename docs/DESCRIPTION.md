@@ -95,7 +95,9 @@ inventory"*. When a receiver is mysteriously pinned at 15, the Monitor points
 at the spare tablet in your pocket. Out-of-range members wear a badge; wall
 tablets make it a **status board**, and the overlay pin puts it on your HUD.
 
-<!-- 📸 SCREENSHOT (1.11.0): the Monitor GUI over a contraption — a few channels with member rows visible, ideally one "inventory tablet" member and one out-of-range badge -->
+![The Frequency Monitor GUI open in a working assembly hall — two channels with classified member rows (a placed tablet and a Redstone Link), while the overlay pin mirrors the same channels on the HUD](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/monitor.png)
+
+![A Create assembly hall with a wall tablet showing the Monitor's live channel bars as a status board](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/factory-hall.png)
 
 ---
 
@@ -205,7 +207,7 @@ Shared-server note: chat is live, unfiltered internet, and anyone who can open
 a placed tablet's GUI can change its channel — same trust rules as its
 signals.
 
-<!-- 📸 SCREENSHOT (1.11.0): a merged chat wall mid-stream — colored usernames, a few animated emotes visible, ideally beside a signals wall so it reads as "part of the factory" -->
+![A cozy cabin room with a merged tablet wall streaming live Twitch chat — colored usernames scrolling down the glass while a player sits watching](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/chat-wall.png)
 
 ---
 
@@ -217,7 +219,11 @@ the seams while viewers watch your strokes land live, split the wall and each
 tablet keeps its slice, merge back and the mural reassembles. Break it, chest
 it, gift it — the art travels with the tablet.
 
-<!-- 📸 SCREENSHOT (1.11.0): a 3×2 merged wall with a finished mural, one member tablet pulled off and held in hand showing its slice -->
+![A 3×2 merged tablet wall outside a workshop showing a hand-painted sunrise mural](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mural.png)
+
+![The same wall with its member tablets rearranged — the sunrise mural remixed into a new picture](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mural-remix.png)
+
+*Every tablet keeps its slice — rearrange the wall, remix the painting.*
 
 ---
 
@@ -309,17 +315,22 @@ docs link was GitHub); the API is announced to addon authors elsewhere.
   from the `main` branch — **push banner.png to main BEFORE re-pasting the
   listings** or the image 404s.
 
-### 1.11.0 additions — text is CURRENT through 1.11.0 (Monitor/Twitch+emotes/
-### Paint rewrite 2026-08-09; games/Arcade stay unmentioned per standing
-### policy). Three NEW slots joined the queue:
+### 1.11.0 additions — SHOT 2026-08-10 (FryD42, SMP shoot), all three
+### slots embedded above:
 
-- ⬜ **monitor** — the Monitor GUI over a contraption: member rows visible,
-  ideally an "inventory tablet" member and an out-of-range badge in frame.
-- ⬜ **chat wall** — a merged Twitch chat wall mid-stream with visible emotes,
-  beside a signals wall. STRONG social-preview candidate (streamers will get
-  it instantly).
-- ⬜ **mural** — a 3×2 painted mural wall, one member tablet held in hand
-  showing its slice.
+- ✅ **monitor.png** — Monitor GUI + overlay pin in the assembly hall
+  (DoF blur sells the GUI). Bonus ✅ **factory-hall.png** — wide hall
+  shot with the Monitor wall face as a status board, embedded beside it.
+  (Skipped garnishes: inventory-tablet row, out-of-range badge.)
+- ✅ **chat-wall.png** — cozy cabin wall, player seated watching; chose
+  vibe framing over the "beside a signals wall" spec. A close-up with
+  legible emotes exists (screenshots 2026-08-10_11.42.08) but carries
+  HUD clutter AND borderline live-chat text — NEVER embed unvetted
+  chat close-ups; live chat must be illegible or manually checked.
+- ✅ **mural.png** + **mural-remix.png** — mural pair with the remix
+  caption. The remix REPLACES the "held slice" framing from the old
+  slot text: held tablets render pips, not paint (item renderer is
+  signals/Twitch-only) — that framing was unshootable as written.
 
 ### 1.10.0 additions — (superseded header kept for history) two OPTIONAL
 ### slots still queued:
