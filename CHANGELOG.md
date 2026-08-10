@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.11.0 — 2026-08-09
 
 - **The tablet in your hand shows chat** — when Twitch Chat is the
   last app you used and you have a channel set, your own first-person
