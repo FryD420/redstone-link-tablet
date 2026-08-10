@@ -3,6 +3,7 @@ package com.modpack.linktablet.client.screen;
 import com.modpack.linktablet.Program;
 import com.modpack.linktablet.client.ClientHooks;
 import com.modpack.linktablet.client.ClientPrefs;
+import com.modpack.linktablet.client.EmoteText;
 import com.modpack.linktablet.client.OverlayPin;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.TwitchChatService;
@@ -14,7 +15,6 @@ import com.modpack.linktablet.theme.ScreenTheme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -182,10 +182,11 @@ public class TwitchScreen extends Screen {
     }
 
     /** One message, pre-wrapped: colored "user: " leading segment plus
-     * the text's wrapped lines, all drawn at the same continuation
-     * indent (see the class doc's wrapping note). */
+     * the text's wrapped lines (now emote-aware, see {@link EmoteText}),
+     * all drawn at the same continuation indent (see the class doc's
+     * wrapping note). */
     private record Row(Component prefix, int prefixColor, int indent,
-                       List<FormattedCharSequence> lines, int height) {
+                       List<EmoteText.Line> lines, int height) {
     }
 
     private List<Row> buildRows(List<TwitchChatService.ChatMessage> messages, int width) {
@@ -195,8 +196,8 @@ public class TwitchScreen extends Screen {
             int prefixWidth = font.width(prefix);
             int indent = Math.min(prefixWidth, Math.max(MIN_TEXT_W, width - MIN_TEXT_W));
             int textWidth = Math.max(MIN_TEXT_W, width - indent);
-            List<FormattedCharSequence> lines =
-                    font.split(Component.literal(m.text()), textWidth);
+            List<EmoteText.Line> lines = EmoteText.wrap(font,
+                    EmoteText.segments(m, currentChannel()), textWidth, LINE_H);
             rows.add(new Row(prefix, m.color(), indent, lines, lines.size() * LINE_H));
         }
         return rows;
@@ -270,6 +271,10 @@ public class TwitchScreen extends Screen {
         return homeBtnX() + MODE_BTN_SIZE + 4;
     }
 
+    private int emoteBtnX() {
+        return pinBtnX() + MODE_BTN_SIZE + 4;
+    }
+
     private int modeBtnY() {
         return bodyTop() + 8;
     }
@@ -303,6 +308,9 @@ public class TwitchScreen extends Screen {
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        HeaderGlyphs.emotes(graphics, emoteBtnX(), modeBtnY(),
+                ClientPrefs.twitchEmotes() ? theme.accent
+                        : overBtn(mouseX, mouseY, emoteBtnX()) ? theme.glyphHover : theme.textFaint);
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         renderChannelRow(graphics, theme, mouseX, mouseY, partialTick);
@@ -326,10 +334,10 @@ public class TwitchScreen extends Screen {
             for (Row r : rows) {
                 if (y + r.height() >= listTop() && y <= listBottom()) {
                     graphics.drawString(font, r.prefix(), rowX(), y, r.prefixColor(), theme.textShadow);
-                    List<FormattedCharSequence> lines = r.lines();
+                    List<EmoteText.Line> lines = r.lines();
                     for (int i = 0; i < lines.size(); i++) {
-                        graphics.drawString(font, lines.get(i), rowX() + r.indent(), y + i * LINE_H,
-                                theme.textPrimary, theme.textShadow);
+                        EmoteText.drawGui(graphics, font, lines.get(i), rowX() + r.indent(),
+                                y + i * LINE_H, LINE_H, theme.textPrimary, theme.textShadow);
                     }
                 }
                 y += r.height() + MSG_GAP;
@@ -378,6 +386,11 @@ public class TwitchScreen extends Screen {
                 OverlayPin.pin(view, Program.TWITCH);
                 UISounds.tick(1.5F);
             }
+            return true;
+        }
+        if (button == 0 && overBtn(mouseX, mouseY, emoteBtnX())) {
+            ClientPrefs.setTwitchEmotes(!ClientPrefs.twitchEmotes());
+            UISounds.tick(ClientPrefs.twitchEmotes() ? 1.5F : 1.0F);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
