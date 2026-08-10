@@ -2,6 +2,8 @@ package com.modpack.linktablet.client.render;
 
 import com.modpack.linktablet.LinkTabletMod;
 import com.modpack.linktablet.block.TabletScreenMath;
+import com.modpack.linktablet.client.EmoteText;
+import com.modpack.linktablet.client.EmoteTextures;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.TwitchChatService;
 import com.modpack.linktablet.frequency.Signal;
@@ -9,6 +11,7 @@ import com.modpack.linktablet.theme.ScreenTheme;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.LightTexture;
@@ -22,6 +25,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -947,8 +952,10 @@ public final class TabletScreenRenderer {
      * Touches the service's per-frame presence heartbeat FIRST, before
      * any layout math — the face's presence keeps the channel joined;
      * once chunk culling stops the touches, the service parts it on its
-     * own. Text-only content beyond the shared background, so the strict
-     * pass order holds trivially.
+     * own. Emotes (1.11.0) are the only non-text content: the line walk
+     * queues them as {@link EmoteQuad}s and flushes them AFTER every
+     * label, so the pass order stays base quads → text → emote images
+     * and no cached VertexConsumer is ever interleaved.
      */
     public static void renderTwitchFace(PoseStack poseStack, MultiBufferSource buffers,
                                         String channel, int rot, ScreenTheme theme, boolean backlit,
@@ -994,6 +1001,10 @@ public final class TabletScreenRenderer {
         float u1 = base.u1() - inset;
         float scale = LIST_TEXT_H / 16f / FONT_LINE;
         int maxPx = (int) ((u1 - u0) * FONT_LINE / LIST_TEXT_H);
+        // Emote images carry their own textures, so they can't ride the
+        // font batches: queue them here and flush once, after every
+        // label (see flushEmoteQuads).
+        List<EmoteQuad> emoteQuads = new ArrayList<>();
 
         // Newest message (last in the oldest→newest list) sits on the
         // bottom line; older messages fill upward.
@@ -1011,12 +1022,98 @@ public final class TabletScreenRenderer {
             }
             drawLabel(poseStack, buffers, font, prefix, u0, top, scale,
                     false, false, message.color(), bgLight);
-            float textU0 = u0 + prefixWidth * LIST_TEXT_H / FONT_LINE;
-            String text = TextFit.ellipsize(font, message.text(), maxPx - prefixWidth);
-            drawLabel(poseStack, buffers, font, text, textU0, top, scale,
-                    false, false, theme.textPrimary, bgLight);
+
+            // Segment walk (1.11.0 emotes): text draws immediately, emote
+            // images queue for the flush below. One shared cursor in glass
+            // texels (advanceU) and one shared budget in FONT PIXELS
+            // (budgetPx) — the same u0/maxPx budget the plain-text line
+            // used, so the beta.5 bleed insets apply unchanged.
+            float advanceU = u0 + prefixWidth * LIST_TEXT_H / FONT_LINE;
+            int budgetPx = maxPx - prefixWidth;
+            for (EmoteText.Segment seg : EmoteText.segments(message, channel)) {
+                if (budgetPx <= 0) break;
+                if (seg instanceof EmoteText.EmoteSeg es) {
+                    EmoteTextures.Sprite sprite = EmoteTextures.get(es.emote());
+                    if (sprite == null) {
+                        // Not loaded yet (or failed): the emote's text name,
+                        // the same fallback EmoteText.drawGui takes.
+                        String name = TextFit.ellipsize(font, es.emote().name(), budgetPx);
+                        drawLabel(poseStack, buffers, font, name, advanceU, top, scale,
+                                false, false, theme.textPrimary, bgLight);
+                        int drawn = font.width(name);
+                        advanceU += drawn * LIST_TEXT_H / FONT_LINE;
+                        budgetPx = name.equals(es.emote().name()) ? budgetPx - drawn : 0;
+                        continue;
+                    }
+                    int wPx = EmoteText.emoteWidth(es.emote(), font, (int) FONT_LINE);
+                    if (wPx > budgetPx) break; // no partial emotes on a wall line
+                    emoteQuads.add(new EmoteQuad(sprite, advanceU, top,
+                            wPx * LIST_TEXT_H / FONT_LINE, LIST_TEXT_H));
+                    advanceU += wPx * LIST_TEXT_H / FONT_LINE;
+                    budgetPx -= wPx;
+                } else if (seg instanceof EmoteText.TextSeg ts) {
+                    String draw = TextFit.ellipsize(font, ts.text(), budgetPx);
+                    drawLabel(poseStack, buffers, font, draw, advanceU, top, scale,
+                            false, false, theme.textPrimary, bgLight);
+                    int drawn = font.width(draw);
+                    advanceU += drawn * LIST_TEXT_H / FONT_LINE;
+                    budgetPx = draw.equals(ts.text()) ? budgetPx - drawn : 0;
+                }
+            }
         }
+        flushEmoteQuads(buffers, base.pose(), emoteQuads, bgLight);
         poseStack.popPose();
+    }
+
+    /**
+     * One queued emote image, in the face's own glass-texel space:
+     * {@code (u, v)} is the top-left corner (the label cursor and the
+     * line top), {@code w}/{@code h} the drawn size in texels.
+     */
+    private record EmoteQuad(EmoteTextures.Sprite sprite, float u, float v, float w, float h) {
+    }
+
+    /**
+     * Emote images, drawn AFTER every label of the chat wall (never
+     * interleaved with a cached VertexConsumer — the 1.2.1/1.3.0 pass
+     * rule). Geometry sits in the class's screen-local mapping: texel
+     * {@code (u, v)} → local {@code (u/16, y, v/16)}, screen normal +Y,
+     * wound TL→BL→BR→TR, exactly like {@link #fillRect} and like
+     * vanilla's own glyph quads once {@link #drawLabel}'s +90° X spin
+     * has laid font space flat. Height is the icon hairline
+     * ({@code LAYER * 3.5}): emotes are image content, and being flat
+     * quads they need none of {@link #renderIcon}'s depth lift — they
+     * stay a hair under the text layer they never overlap. The buffer
+     * is {@link RenderType#text}, the font's OWN family (translucent,
+     * lightmapped, POSITION_COLOR_TEX_LIGHTMAP — position, color, uv,
+     * light and nothing else), so this is still the text pass with a
+     * different texture bound. Sorted by texture so repeats of one
+     * emote share a batch. Sheets stack frames vertically, so a frame
+     * is the full width and one {@code 1/frameCount} v-slice.
+     */
+    private static void flushEmoteQuads(MultiBufferSource buffers, PoseStack.Pose pose,
+                                        List<EmoteQuad> quads, int light) {
+        if (quads.isEmpty()) return;
+        quads.sort(Comparator.comparing(q -> q.sprite().texture()));
+        long now = Util.getMillis();
+        ResourceLocation bound = null;
+        VertexConsumer vc = null;
+        for (EmoteQuad q : quads) {
+            if (!q.sprite().texture().equals(bound)) {
+                bound = q.sprite().texture();
+                vc = buffers.getBuffer(RenderType.text(bound));
+            }
+            int frame = EmoteTextures.frameAt(q.sprite(), now);
+            float t0 = frame / (float) q.sprite().frameCount();
+            float t1 = (frame + 1) / (float) q.sprite().frameCount();
+            float x0 = q.u() / 16f, z0 = q.v() / 16f;
+            float x1 = (q.u() + q.w()) / 16f, z1 = (q.v() + q.h()) / 16f;
+            float y = LAYER * 3.5f;
+            vc.addVertex(pose, x0, y, z0).setColor(-1).setUv(0f, t0).setLight(light);
+            vc.addVertex(pose, x0, y, z1).setColor(-1).setUv(0f, t1).setLight(light);
+            vc.addVertex(pose, x1, y, z1).setColor(-1).setUv(1f, t1).setLight(light);
+            vc.addVertex(pose, x1, y, z0).setColor(-1).setUv(1f, t0).setLight(light);
+        }
     }
 
     /**
