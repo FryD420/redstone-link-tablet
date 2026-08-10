@@ -14,9 +14,10 @@ at the repo root (auto-loaded every Claude session).
   Fix (user decision, option A "resume"): `TabletItemRenderer` now
   renders `renderTwitchFace` on your OWN first-person tablet iff
   `ClientPrefs.lastProgram == "twitch"` AND the personal channel is
-  set — FIRST_PERSON_*_HAND contexts ONLY (frames/ground/other
-  players keep pips; the resume pref is viewer-local). touchFace
-  rides for free (kiosk lifecycle). Twitch-only for now — extending
+  set — your OWN hands only: FIRST_PERSON_*_HAND contexts, plus F5
+  third person via stack REFERENCE identity against the local
+  player's hands (frames/ground/other players keep pips; the resume
+  pref is viewer-local). touchFace rides for free (kiosk lifecycle). Twitch-only for now — extending
   the resume face to other programs is an open idea, not committed.
 - **1.11.0-beta.6 built earlier this session** (Twitch chat emotes —
   native + 7TV/BTTV/FFZ, animated, on all three surfaces, toggle
