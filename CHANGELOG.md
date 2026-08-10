@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.11.1 — 2026-08-10
+
+- **Paint grew a toolbox** — bucket fill (floods across merged-wall
+  seams), line and rectangle tools with a live preview, an eyedropper,
+  and a 32-step undo that never reverts paint someone else laid down
+  after you. The tools live in the header bar as little painted
+  miniatures — the brush tip, pour stream, and dropper sample all show
+  your selected color. B/F/L/R/I pick tools, Z undoes. Client-only,
+  pairs with 1.11.0.
+- **Fast paint strokes don't skip anymore** — dragging quickly across
+  the Paint canvas now fills every cell along the sweep instead of
+  leaving gaps where the cursor out-ran the brush. Held tablets and
+  walls both.
+- **Long chat messages wrap on the pinned overlay** — the Twitch
+  overlay pane now wraps messages onto as many lines as they need
+  (same look as the full chat screen) instead of cutting everything
+  after the first line. The pane keeps a compact overall budget:
+  newest messages fill from the bottom, older ones drop off sooner
+  when the chat runs long-winded. Client-only, pairs with 1.11.0.
+
 ## 1.11.0 — 2026-08-09
 
 - **The tablet in your hand shows chat** — when Twitch Chat is the

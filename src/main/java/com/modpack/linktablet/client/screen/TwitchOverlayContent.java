@@ -7,10 +7,13 @@ import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.TwitchChatService;
 import com.modpack.linktablet.theme.ScreenTheme;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -37,19 +40,31 @@ import java.util.function.Supplier;
  * naturally, the same "defocus can be followed by more renders while
  * the pin lives on" case {@link MonitorOverlayContent} documents.
  *
- * <p>Message text (1.11.0 emotes): each row is exactly one line
- * ({@link #ROW_H} tall, never wraps), so the message text is tokenized
- * via {@code EmoteText.segments} and wrapped via {@code EmoteText.wrap}
- * only to find the first line that fits {@link #ROW_H}-tall emotes in
- * the remaining row width — anything past that first line is simply
- * not drawn, the same "pane never scrolls" truncation the class already
- * accepts elsewhere. The colored "user: " prefix has no emotes and
- * keeps its own {@link TextFit#ellipsize} handling.
+ * <p>Message text (1.11.0 emotes; wrap rework post-1.11.0): messages
+ * wrap to as many {@link #ROW_H} lines as they need — {@link
+ * TwitchScreen}'s exact row shape (colored prefix drawn once, every
+ * wrapped line at the same clamped indent, layout through {@code
+ * EmoteText.wrap}) — under one TOTAL line budget, {@link #MAX_LINES}:
+ * rows fill newest-first from the bottom, an older message that
+ * doesn't wholly fit the remaining budget is dropped (never shown
+ * partially), and only the newest message may truncate — when it
+ * alone overflows the whole budget it caps its lines and spends the
+ * last one on an "…" marker. The 1.11.0 draw-only-line-one hard cut
+ * read as broken (user report 2026-08-10), which answered beta.6's
+ * open "does the hard cut read clean" question.
  */
 public class TwitchOverlayContent implements OverlayContent {
 
     private static final int ROW_H = 10;
+    /** Newest messages considered (the ring-buffer slice), not a
+     * guarantee they all show — the line budget below decides that. */
     private static final int MAX_ROWS = 8;
+    /** Total wrapped-line budget across all messages — the pane's whole
+     * vertical footprint (10 × {@link #ROW_H} = 100, still inside
+     * MiniTabletWindow's body cap, so the window never scroll-clips). */
+    private static final int MAX_LINES = 10;
+    /** Mirrors {@link TwitchScreen}'s continuation-indent clamp. */
+    private static final int MIN_TEXT_W = 20;
 
     private final Supplier<SignalView> view;
     /** Channel this content currently holds a {@link TwitchChatService}
@@ -104,12 +119,60 @@ public class TwitchOverlayContent implements OverlayContent {
         };
     }
 
+    /** One message laid out for the pane — {@link TwitchScreen}'s Row
+     * shape plus the truncation marker (newest-message-only, see the
+     * class doc). */
+    private record Row(String prefix, int prefixColor, int indent,
+                       List<EmoteText.Line> lines, boolean truncated) {
+        int lineCount() {
+            return lines.size() + (truncated ? 1 : 0);
+        }
+    }
+
+    /** Lays out the newest messages against the {@link #MAX_LINES}
+     * budget, newest-first from the bottom; returns rows oldest-first
+     * (draw order). Older messages only appear whole; only the newest
+     * may truncate. Called by BOTH {@link #height} and {@link #render}
+     * each frame — cheap for ≤{@link #MAX_ROWS} messages, and exactly
+     * how {@link TwitchScreen} rebuilds its rows per frame. */
+    private List<Row> buildRows(Font font, List<TwitchChatService.ChatMessage> messages,
+                                String channel, int rowWidth) {
+        List<Row> rows = new ArrayList<>();
+        int budget = MAX_LINES;
+        for (int i = messages.size() - 1; i >= 0 && budget > 0; i--) {
+            TwitchChatService.ChatMessage m = messages.get(i);
+            String prefix = m.user() + ": ";
+            int prefixWidth = font.width(prefix);
+            int indent = Math.min(prefixWidth, Math.max(MIN_TEXT_W, rowWidth - MIN_TEXT_W));
+            int textWidth = Math.max(MIN_TEXT_W, rowWidth - indent);
+            List<EmoteText.Line> lines = EmoteText.wrap(font,
+                    EmoteText.segments(m, channel), textWidth, ROW_H);
+            boolean truncated = false;
+            if (lines.size() > budget) {
+                if (!rows.isEmpty()) break; // older messages never show partially
+                // Newest alone overflows the whole budget: cap it and
+                // spend the final budgeted line on the "…" marker.
+                lines = List.copyOf(lines.subList(0, Math.max(1, budget - 1)));
+                truncated = true;
+            }
+            rows.add(new Row(prefix, m.color(), indent, lines, truncated));
+            budget -= lines.size() + (truncated ? 1 : 0);
+        }
+        Collections.reverse(rows);
+        return rows;
+    }
+
     @Override
     public int height(int rowWidth) {
         String channel = currentChannel();
         List<TwitchChatService.ChatMessage> messages = lastMessages(channel);
         Component status = statusMessage(channel, messages);
-        return status != null ? ROW_H : messages.size() * ROW_H;
+        if (status != null) return ROW_H;
+        int lineTotal = 0;
+        for (Row row : buildRows(Minecraft.getInstance().font, messages, channel, rowWidth)) {
+            lineTotal += row.lineCount();
+        }
+        return lineTotal * ROW_H;
     }
 
     @Override
@@ -128,27 +191,40 @@ public class TwitchOverlayContent implements OverlayContent {
             return;
         }
 
-        for (int i = 0; i < messages.size(); i++) {
-            int ry = top + i * ROW_H;
-            if (ry + ROW_H < clipTop || ry > clipBottom) continue;
-            renderRow(graphics, font, theme, messages.get(i), channel, x, ry, rowWidth);
+        int ry = top;
+        for (Row row : buildRows(font, messages, channel, rowWidth)) {
+            ry = drawRow(graphics, font, theme, row, x, ry, rowWidth, clipTop, clipBottom);
         }
     }
 
-    private void renderRow(GuiGraphics graphics, Font font, ScreenTheme theme,
-                           TwitchChatService.ChatMessage message, String channel, int x, int ry, int rowWidth) {
-        String prefix = message.user() + ": ";
-        int prefixWidth = font.width(prefix);
-        if (prefixWidth >= rowWidth) {
-            String shown = TextFit.ellipsize(font, prefix, rowWidth);
-            graphics.drawString(font, shown, x, ry + 1, message.color(), theme.textShadow);
-            return;
+    private static boolean lineVisible(int ry, int clipTop, int clipBottom) {
+        return ry + ROW_H >= clipTop && ry <= clipBottom;
+    }
+
+    /** Draws one laid-out row (prefix on the first line, wrapped lines
+     * at the row's indent, optional "…" marker line) and returns the y
+     * below it. */
+    private int drawRow(GuiGraphics graphics, Font font, ScreenTheme theme, Row row,
+                        int x, int ry, int rowWidth, int clipTop, int clipBottom) {
+        if (lineVisible(ry, clipTop, clipBottom)) {
+            String shownPrefix = TextFit.ellipsize(font, row.prefix(), rowWidth);
+            graphics.drawString(font, shownPrefix, x, ry + 1, row.prefixColor(), theme.textShadow);
         }
-        graphics.drawString(font, prefix, x, ry + 1, message.color(), theme.textShadow);
-        List<EmoteText.Line> lines = EmoteText.wrap(font,
-                EmoteText.segments(message, channel), rowWidth - prefixWidth, ROW_H);
-        EmoteText.drawGui(graphics, font, lines.get(0), x + prefixWidth, ry + 1,
-                ROW_H, theme.textPrimary, theme.textShadow);
+        for (EmoteText.Line line : row.lines()) {
+            if (lineVisible(ry, clipTop, clipBottom)) {
+                EmoteText.drawGui(graphics, font, line, x + row.indent(), ry + 1,
+                        ROW_H, theme.textPrimary, theme.textShadow);
+            }
+            ry += ROW_H;
+        }
+        if (row.truncated()) {
+            if (lineVisible(ry, clipTop, clipBottom)) {
+                graphics.drawString(font, "…", x + row.indent(), ry + 1,
+                        theme.textFaint, theme.textShadow);
+            }
+            ry += ROW_H;
+        }
+        return ry;
     }
 
     @Override

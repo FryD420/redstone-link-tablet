@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 🎨 "Paint" (persisted, 1.11.0): a sixteen-color doodle pad — left-click
- * paints, right-click erases, drag to sweep, C clears. Held/slotted
+ * 🎨 "Paint" (persisted 1.11.0; tools 1.11.x): a sixteen-color canvas —
+ * brush/fill/line/rect/eyedropper tools with conflict-aware undo
+ * (left = paint, right = erase, C clears, Z undoes; every tool is a
+ * client-side gesture that decomposes into ordinary stroke cells). Held/slotted
  * tablets edit their own {@link PaintCanvas#COLS}×{@link PaintCanvas#ROWS}
  * slice; a placed tablet edits its (possibly merged) wall canvas, stitched
  * live from every member's own slice by {@link #stitchArgb} — the same
@@ -74,6 +76,121 @@ public class PaintScreen extends ArcadeScreen {
     private boolean dragging = false;
     private int selected = 6;
 
+    /** Active drawing tool (1.11.x Paint v2). BRUSH is the classic
+     * paint/erase; the rest are client-side gestures that decompose to
+     * ordinary cells — see the design spec. */
+    enum Tool { BRUSH, FILL, LINE, RECT, EYEDROPPER }
+
+    private Tool tool = Tool.BRUSH;
+    /** Undo history, newest first, depth-capped at MAX_UNDO — one entry
+     * per finished gesture (brush stroke, fill, committed shape).
+     * Session-local: cleared with the screen. */
+    private static final int MAX_UNDO = 32;
+    private final java.util.ArrayDeque<UndoStep> history = new java.util.ArrayDeque<>();
+
+    /** Cells of the in-progress gesture: index → {beforeArgb,
+     * afterArgb}. before is captured on FIRST touch (the stitched
+     * baseline on block views — same array the render overlay uses),
+     * after is last-write-wins. endGesture() turns it into one
+     * UndoStep. */
+    private final java.util.LinkedHashMap<Integer, int[]> gesture = new java.util.LinkedHashMap<>();
+
+    /** One finished gesture (brush stroke, fill, committed shape) →
+     * one undo step. No-op when nothing was painted. */
+    private void endGesture() {
+        if (gesture.isEmpty()) return;
+        java.util.List<UndoCell> cells = new java.util.ArrayList<>(gesture.size());
+        for (java.util.Map.Entry<Integer, int[]> e : gesture.entrySet()) {
+            cells.add(new UndoCell(e.getKey(), e.getValue()[0], e.getValue()[1]));
+        }
+        gesture.clear();
+        history.push(new UndoStep(cells));
+        while (history.size() > MAX_UNDO) history.removeLast();
+    }
+
+    /** Inverse of {@link #paletteArgb}: 0 for blank (or any unknown
+     * value), else the 1-based palette color. */
+    private static byte paletteIndexOf(int argb) {
+        for (int i = 0; i < PALETTE.length; i++) {
+            if (PALETTE[i] == argb) return (byte) (i + 1);
+        }
+        return 0;
+    }
+
+    private record UndoCell(int index, int beforeArgb, int afterArgb) {}
+
+    private record UndoStep(java.util.List<UndoCell> cells) {}
+
+    private void selectTool(Tool t) {
+        cancelShape(); // a tool switch aborts any in-progress shape (stale-anchor commit guard)
+        tool = t;
+        UISounds.tick(1.3F);
+    }
+
+    /** Steps back one gesture, CONFLICT-AWARE: a cell is only reverted
+     * while it still holds this step's after-value OR its before-value —
+     * cells someone else painted over since (a third value) are left
+     * alone (their work survives; see the design spec). Accepting the
+     * before-value too closes the flush→server-echo window on block
+     * views: a just-committed gesture's cells can briefly read their
+     * before-value again (canvas rebuilds each frame from synced BE
+     * state; pending was already cleared by flush) between the client's
+     * flush and the server's echo, and without this the step would be
+     * silently consumed with nothing reverted. Undone cells ride the
+     * normal pending→stroke wire. */
+    private void undo() {
+        if (canvas == null) return;
+        UndoStep step = history.poll();
+        if (step == null) return;
+        for (UndoCell cell : step.cells()) {
+            if (cell.index() < canvas.length) {
+                int now = canvas[cell.index()];
+                if (now == cell.afterArgb() || now == cell.beforeArgb()) {
+                    canvas[cell.index()] = cell.beforeArgb();
+                    pending.put(cell.index(), paletteIndexOf(cell.beforeArgb()));
+                }
+            }
+        }
+        flush();
+    }
+
+    private int swatchRowY() {
+        return boardY() + rows * cell + 4;
+    }
+
+    // ------------------------------------------------------------------
+    // Header tool bar (tools live in the cabinet plaque, right-aligned:
+    // five tool glyphs + the undo arrow — the board strip stays colors-only)
+    // ------------------------------------------------------------------
+
+    /** Header glyph size and pitch (glyph + gap) — 12px uses the full
+     * plaque height (top()+3 .. top()+15, underline row below). */
+    private static final int GLYPH = 12;
+    private static final int GLYPH_PITCH = GLYPH + 3;
+    /** Glyph slots: 0..4 = tools, 5 = undo (extra gap before it). */
+    private static final int GLYPH_SLOTS = Tool.values().length + 1;
+
+    private int headerGlyphX(int slot) {
+        int total = GLYPH_SLOTS * GLYPH_PITCH - 3 + 3; // glyph row + the undo gap
+        return left() + panelWidth() - PAD - total + slot * GLYPH_PITCH
+                + (slot == GLYPH_SLOTS - 1 ? 3 : 0);
+    }
+
+    private int headerGlyphY() {
+        return top() + 3; // plaque spans top()+2..top()+16; glyph 12px + underline row
+    }
+
+    /** Which header slot a click lands in, or -1 (0..4 tools, 5 undo). */
+    private int headerGlyphAt(double mouseX, double mouseY) {
+        int gy = headerGlyphY();
+        if (mouseY < gy - 1 || mouseY >= gy + GLYPH + 2) return -1;
+        for (int slot = 0; slot < GLYPH_SLOTS; slot++) {
+            int gx = headerGlyphX(slot);
+            if (mouseX >= gx - 1 && mouseX < gx + GLYPH + 1) return slot;
+        }
+        return -1;
+    }
+
     public PaintScreen(SignalView view, boolean returnToTablet) {
         super("paint", view, returnToTablet);
     }
@@ -85,7 +202,8 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     protected int boardH() {
-        return rows * cell + SWATCH + 4;
+        // canvas + gap + swatch row (tools live in the header plaque)
+        return rows * cell + 4 + SWATCH;
     }
 
     // ------------------------------------------------------------------
@@ -184,6 +302,30 @@ public class PaintScreen extends ArcadeScreen {
     // Strokes
     // ------------------------------------------------------------------
 
+    /** Anchor of the in-progress stroke (continuous cell index), -1 when
+     * no previous cell — fast drags deliver cursor positions several
+     * cells apart, and each new position draws a {@link PaintCanvas#line}
+     * from this anchor so the stroke never gaps. */
+    private int lastStrokeCell = -1;
+
+    /** In-progress shape gesture (LINE/RECT): anchor + current cell,
+     * −1 = none. The preview is a pure render overlay — cells enter
+     * pending only on commit (release), never mid-drag. */
+    private int shapeStartX = -1, shapeStartY = -1, shapeEndX = -1, shapeEndY = -1;
+    private int shapeButton = 0;
+
+    private void shapeCells(PaintCanvas.CellVisitor visitor) {
+        if (tool == Tool.RECT) {
+            PaintCanvas.rectOutline(shapeStartX, shapeStartY, shapeEndX, shapeEndY, visitor);
+        } else {
+            PaintCanvas.line(shapeStartX, shapeStartY, shapeEndX, shapeEndY, visitor);
+        }
+    }
+
+    private void cancelShape() {
+        shapeStartX = shapeStartY = shapeEndX = shapeEndY = -1;
+    }
+
     private boolean apply(double mouseX, double mouseY, int button) {
         // canvas is first populated by layout() (called from render()); a
         // mouse event arriving before the first frame must not NPE.
@@ -191,11 +333,21 @@ public class PaintScreen extends ArcadeScreen {
         int cx = (int) Math.floor((mouseX - boardX()) / cell);
         int cy = (int) Math.floor((mouseY - boardY()) / cell);
         if (cx < 0 || cx >= cols || cy < 0 || cy >= rows) return false;
-        int index = cy * cols + cx;
         byte color = (byte) (button == 1 ? 0 : selected + 1);
+        if (dragging && lastStrokeCell >= 0) {
+            PaintCanvas.line(lastStrokeCell % cols, lastStrokeCell / cols, cx, cy,
+                    (x, y) -> paintCell(y * cols + x, color));
+        } else {
+            paintCell(cy * cols + cx, color);
+        }
+        lastStrokeCell = cy * cols + cx;
+        return true;
+    }
+
+    private void paintCell(int index, byte color) {
+        gesture.computeIfAbsent(index, i -> new int[]{canvas[i], 0})[1] = paletteArgb(color);
         canvas[index] = paletteArgb(color);
         pending.put(index, color);
-        return true;
     }
 
     private void flush() {
@@ -220,8 +372,20 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Palette strip below the canvas
-        int py = boardY() + rows * cell + 4;
+        // Header tool bar, then the palette strip below the canvas
+        int slot = headerGlyphAt(mouseX, mouseY);
+        if (slot >= 0) {
+            if (slot == GLYPH_SLOTS - 1) {
+                if (!history.isEmpty()) {
+                    undo();
+                    UISounds.tick(0.8F);
+                }
+            } else {
+                selectTool(Tool.values()[slot]);
+            }
+            return true;
+        }
+        int py = swatchRowY();
         if (mouseY >= py && mouseY < py + SWATCH) {
             int index = (int) ((mouseX - boardX()) / (SWATCH + 1));
             if (index >= 0 && index < PALETTE.length) {
@@ -229,8 +393,49 @@ public class PaintScreen extends ArcadeScreen {
                 UISounds.tick(1.3F);
                 return true;
             }
+            return true;
         }
-        if (apply(mouseX, mouseY, button)) {
+        if (tool == Tool.FILL && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                byte color = (byte) (button == 1 ? 0 : selected + 1);
+                int start = cy * cols + cx;
+                if (canvas[start] != paletteArgb(color)) { // same-color fill is a no-op
+                    for (int idx : PaintCanvas.floodRegion(canvas, cols, rows, start)) {
+                        paintCell(idx, color);
+                    }
+                    endGesture();
+                    flush();
+                    UISounds.tick(button == 1 ? 0.9F : 1.1F);
+                }
+                return true;
+            }
+        }
+        if ((tool == Tool.LINE || tool == Tool.RECT) && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                shapeStartX = shapeEndX = cx;
+                shapeStartY = shapeEndY = cy;
+                shapeButton = button;
+                UISounds.tick(1.1F);
+                return true;
+            }
+        }
+        if (tool == Tool.EYEDROPPER && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                byte picked = paletteIndexOf(canvas[cy * cols + cx]);
+                if (picked != 0) { // blank tap stays on the eyedropper
+                    selected = picked - 1;
+                    selectTool(Tool.BRUSH); // auto-return, like every paint app
+                }
+                return true;
+            }
+        }
+        if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             UISounds.tick(button == 1 ? 0.9F : 1.1F);
             return true;
@@ -240,7 +445,12 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (apply(mouseX, mouseY, button)) {
+        if (shapeStartX >= 0) {
+            shapeEndX = Mth.clamp((int) Math.floor((mouseX - boardX()) / cell), 0, cols - 1);
+            shapeEndY = Mth.clamp((int) Math.floor((mouseY - boardY()) / cell), 0, rows - 1);
+            return true;
+        }
+        if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             return true;
         }
@@ -249,8 +459,19 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (shapeStartX >= 0) {
+            byte color = (byte) (shapeButton == 1 ? 0 : selected + 1);
+            shapeCells((x, y) -> paintCell(y * cols + x, color));
+            cancelShape();
+            endGesture();
+            flush();
+            UISounds.tick(shapeButton == 1 ? 0.9F : 1.1F);
+            return true;
+        }
+        lastStrokeCell = -1;
         if (dragging) {
             dragging = false;
+            endGesture();
             flush();
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -258,8 +479,23 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == 256 && shapeStartX >= 0) { // ESC mid-shape: cancel, keep screen
+            cancelShape();
+            return true;
+        }
+        switch (keyCode) {
+            case 66 -> { selectTool(Tool.BRUSH); return true; }      // B
+            case 70 -> { selectTool(Tool.FILL); return true; }       // F
+            case 76 -> { selectTool(Tool.LINE); return true; }       // L
+            case 82 -> { selectTool(Tool.RECT); return true; }       // R
+            case 73 -> { selectTool(Tool.EYEDROPPER); return true; } // I
+            case 90 -> { undo(); return true; }                      // Z
+            default -> { }
+        }
         if (keyCode == 67) { // C clears
             pending.clear();
+            gesture.clear();
+            history.clear();
             if (canvas != null) java.util.Arrays.fill(canvas, 0);
             PacketDistributor.sendToServer(new ModNetworking.PaintClearPayload(view.target()));
             UISounds.page();
@@ -271,6 +507,9 @@ public class PaintScreen extends ArcadeScreen {
     @Override
     public void onClose() {
         dragging = false;
+        lastStrokeCell = -1;
+        cancelShape();
+        endGesture();
         flush();
         super.onClose();
     }
@@ -283,7 +522,8 @@ public class PaintScreen extends ArcadeScreen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         layout();
         super.render(graphics, mouseX, mouseY, partialTick);
-        renderCabinet(graphics, "🎨");
+        renderCabinet(graphics, ""); // the tool bar takes the tally corner
+        renderHeaderTools(graphics);
         int bx = boardX();
         int by = boardY();
         for (int i = 0; i < canvas.length; i++) {
@@ -292,7 +532,14 @@ public class PaintScreen extends ArcadeScreen {
             int y = by + (i / cols) * cell;
             graphics.fill(x, y, x + cell, y + cell, canvas[i]);
         }
-        int py = by + rows * cell + 4;
+        if (shapeStartX >= 0) {
+            int ghost = (PALETTE[selected] & 0x00FFFFFF) | 0x80000000;
+            int ghostArgb = shapeButton == 1 ? 0x80101216 : ghost;
+            shapeCells((cx2, cy2) -> graphics.fill(
+                    bx + cx2 * cell, by + cy2 * cell,
+                    bx + cx2 * cell + cell, by + cy2 * cell + cell, ghostArgb));
+        }
+        int py = swatchRowY();
         for (int i = 0; i < PALETTE.length; i++) {
             int x = bx + i * (SWATCH + 1);
             graphics.fill(x, py, x + SWATCH, py + SWATCH, PALETTE[i]);
@@ -300,5 +547,125 @@ public class PaintScreen extends ArcadeScreen {
                 graphics.fill(x, py - 2, x + SWATCH, py - 1, 0xFFE8EAF0);
             }
         }
+    }
+
+    /** The header tool bar: five tool glyphs + undo, right-aligned in
+     * the cabinet plaque. Selected tool sits on an inset chip with an
+     * accent underline; undo dims while there's nothing to step back. */
+    private void renderHeaderTools(GuiGraphics graphics) {
+        var theme = theme();
+        int gy = headerGlyphY();
+        Tool[] tools = Tool.values();
+        for (int i = 0; i < tools.length; i++) {
+            int gx = headerGlyphX(i);
+            if (tools[i] == tool) {
+                graphics.fill(gx - 1, gy - 1, gx + GLYPH + 1, gy + GLYPH, theme.screenBgOff);
+                graphics.fill(gx - 1, gy + GLYPH, gx + GLYPH + 1, gy + GLYPH + 1, theme.accent);
+            }
+            renderToolGlyph(graphics, tools[i], gx, gy, theme.textPrimary, theme.textMuted);
+        }
+        renderUndoGlyph(graphics, headerGlyphX(GLYPH_SLOTS - 1), gy,
+                !history.isEmpty(), theme.textPrimary, theme.textFaint);
+    }
+
+    /** Two-thirds brightness — shading tone for the held-color art. */
+    private static int darken(int argb) {
+        int r = (argb >> 16 & 0xFF) * 2 / 3;
+        int gr = (argb >> 8 & 0xFF) * 2 / 3;
+        int b = (argb & 0xFF) * 2 / 3;
+        return 0xFF000000 | r << 16 | gr << 8 | b;
+    }
+
+    // Fixed material shades for the header art (wood/steel/rubber/glass) —
+    // mid-tones that read on every theme; the wood/steel bases are the
+    // palette's own brown and gray so nothing clashes with the swatches.
+    private static final int WOOD = 0xFF835432, WOOD_HI = 0xFF9C6A42;
+    private static final int STEEL = 0xFF9D9D97, STEEL_HI = 0xFFBFC1BD, STEEL_DK = 0xFF6F7377;
+    private static final int RUBBER = 0xFFB02E26, RUBBER_HI = 0xFFD1554A;
+    private static final int GLASS = 0xFFAFC6CF, GLASS_HI = 0xFFE8EAF0;
+
+    /** Procedural 12×12 tool glyphs — material-colored miniatures
+     * (wooden handles, steel fittings, rubber bulb, glass barrel), with
+     * the SELECTED color live on the brush bristles, the fill pour, and
+     * the eyedropper's sampled drop: the header doubles as a color
+     * readout. Line/rect stay theme-inked wireframes with accent
+     * drag-handles. */
+    private void renderToolGlyph(GuiGraphics g, Tool t, int x, int y, int ink, int detail) {
+        int held = PALETTE[selected];
+        int heldDk = darken(held);
+        int accent = theme().accent;
+        switch (t) {
+            case BRUSH -> {
+                g.fill(x + 9, y, x + 12, y + 3, WOOD);         // handle knob
+                g.fill(x + 10, y, x + 11, y + 1, WOOD_HI);     // knob highlight
+                g.fill(x + 7, y + 2, x + 10, y + 5, WOOD);     // handle
+                g.fill(x + 8, y + 2, x + 9, y + 3, WOOD_HI);   // grain stripe
+                g.fill(x + 5, y + 4, x + 8, y + 7, STEEL);     // ferrule
+                g.fill(x + 5, y + 6, x + 8, y + 7, STEEL_DK);  // crimp line
+                g.fill(x + 2, y + 6, x + 6, y + 10, held);     // bristles
+                g.fill(x + 4, y + 8, x + 6, y + 10, heldDk);   // bristle shade
+                g.fill(x + 1, y + 8, x + 3, y + 11, held);     // tip point
+                g.fill(x + 2, y + 11, x + 3, y + 12, heldDk);  // paint drip
+            }
+            case FILL -> {
+                g.fill(x + 3, y, x + 8, y + 1, WOOD);          // bail handle
+                g.fill(x + 2, y + 1, x + 3, y + 3, WOOD);      // handle posts
+                g.fill(x + 7, y + 1, x + 8, y + 2, WOOD);
+                g.fill(x + 1, y + 3, x + 8, y + 4, STEEL_DK);  // rim
+                g.fill(x + 1, y + 4, x + 8, y + 11, STEEL);    // bucket body
+                g.fill(x + 2, y + 5, x + 3, y + 10, STEEL_HI); // sheen
+                g.fill(x + 1, y + 10, x + 8, y + 11, STEEL_DK);// base shadow
+                g.fill(x + 8, y + 5, x + 9, y + 9, held);      // pour stream
+                g.fill(x + 9, y + 5, x + 10, y + 9, heldDk);   // stream edge
+                g.fill(x + 9, y + 9, x + 11, y + 12, held);    // splash
+                g.fill(x + 8, y + 11, x + 9, y + 12, heldDk);  // splash dot
+            }
+            case LINE -> {
+                g.fill(x, y + 9, x + 3, y + 12, ink);          // end handle
+                g.fill(x + 1, y + 10, x + 2, y + 11, accent);  // handle core
+                g.fill(x + 3, y + 7, x + 5, y + 9, detail);    // stair diagonal
+                g.fill(x + 4, y + 7, x + 5, y + 8, ink);       // stair core
+                g.fill(x + 5, y + 5, x + 7, y + 7, detail);
+                g.fill(x + 6, y + 5, x + 7, y + 6, ink);
+                g.fill(x + 7, y + 3, x + 9, y + 5, detail);
+                g.fill(x + 8, y + 3, x + 9, y + 4, ink);
+                g.fill(x + 9, y, x + 12, y + 3, ink);          // end handle
+                g.fill(x + 10, y + 1, x + 11, y + 2, accent);  // handle core
+            }
+            case RECT -> {
+                g.fill(x + 1, y + 2, x + 11, y + 3, ink);      // top
+                g.fill(x + 1, y + 9, x + 11, y + 10, ink);     // bottom
+                g.fill(x + 1, y + 2, x + 2, y + 9, ink);       // left
+                g.fill(x + 10, y + 2, x + 11, y + 9, ink);     // right
+                g.fill(x + 5, y + 2, x + 7, y + 3, detail);    // edge ticks
+                g.fill(x + 5, y + 9, x + 7, y + 10, detail);
+                g.fill(x, y + 1, x + 3, y + 4, accent);        // TL drag handle
+                g.fill(x + 1, y + 2, x + 2, y + 3, ink);       // handle core
+                g.fill(x + 9, y + 8, x + 12, y + 11, accent);  // BR drag handle
+                g.fill(x + 10, y + 9, x + 11, y + 10, ink);    // handle core
+            }
+            case EYEDROPPER -> {
+                g.fill(x + 8, y, x + 12, y + 4, RUBBER);       // rubber bulb
+                g.fill(x + 9, y + 1, x + 10, y + 2, RUBBER_HI);// bulb shine
+                g.fill(x + 7, y + 3, x + 9, y + 5, STEEL);     // shoulder
+                g.fill(x + 6, y + 4, x + 8, y + 6, STEEL_DK);  // neck band
+                g.fill(x + 4, y + 5, x + 7, y + 8, GLASS);     // glass barrel
+                g.fill(x + 5, y + 6, x + 6, y + 7, GLASS_HI);  // glass shine
+                g.fill(x + 3, y + 7, x + 5, y + 9, STEEL_DK);  // taper
+                g.fill(x + 2, y + 8, x + 4, y + 10, STEEL);    // steel tip
+                g.fill(x, y + 10, x + 2, y + 12, held);        // sampled drop
+            }
+        }
+    }
+
+    private void renderUndoGlyph(GuiGraphics g, int x, int y, boolean enabled, int ink, int faint) {
+        int c = enabled ? ink : faint;
+        int tip = enabled ? theme().accent : faint;
+        g.fill(x, y + 5, x + 4, y + 8, c);                     // arrow head, wide row
+        g.fill(x + 2, y + 3, x + 4, y + 5, c);                 // head upper step
+        g.fill(x + 2, y + 8, x + 4, y + 10, c);                // head lower step
+        g.fill(x + 3, y + 7, x + 9, y + 9, c);                 // shaft sweeping right
+        g.fill(x + 8, y + 3, x + 10, y + 8, c);                // riser
+        g.fill(x + 7, y + 2, x + 9, y + 4, tip);               // curl tip
     }
 }
