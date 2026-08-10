@@ -5,7 +5,12 @@ at the repo root (auto-loaded every Claude session).
 
 ## ▶ START HERE next session (state as of 2026-08-09 end of day)
 
-- **1.11.0-beta.7 supersedes beta.6 same-session** (beta.6 was never
+- **1.11.0-beta.8 is the DISTRIBUTION build** (same content as
+  beta.7; renumbered at distribution time, user call 2026-08-09 —
+  beta.6/7 jars were never sent and are deleted locally). The user
+  is testing beta.8 and preparing the RELEASE; the full consolidated
+  1.11.0 checklist went out with the jar.
+- **1.11.0-beta.7 superseded beta.6 same-session** (beta.6 was never
   distributed; new number per the beta.3 overwritten-jar lesson):
   the user's first emotes dev pass ("booted fine", emotes rendering
   in GUI + wall confirmed by screenshot) surfaced that the HELD
