@@ -385,6 +385,18 @@ public class PaintScreen extends ArcadeScreen {
                 return true;
             }
         }
+        if (tool == Tool.EYEDROPPER && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                byte picked = paletteIndexOf(canvas[cy * cols + cx]);
+                if (picked != 0) { // blank tap stays on the eyedropper
+                    selected = picked - 1;
+                    selectTool(Tool.BRUSH); // auto-return, like every paint app
+                }
+                return true;
+            }
+        }
         if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             UISounds.tick(button == 1 ? 0.9F : 1.1F);
