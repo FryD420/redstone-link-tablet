@@ -86,6 +86,35 @@ public class PaintScreen extends ArcadeScreen {
     private static final int MAX_UNDO = 32;
     private final java.util.ArrayDeque<UndoStep> history = new java.util.ArrayDeque<>();
 
+    /** Cells of the in-progress gesture: index → {beforeArgb,
+     * afterArgb}. before is captured on FIRST touch (the stitched
+     * baseline on block views — same array the render overlay uses),
+     * after is last-write-wins. endGesture() turns it into one
+     * UndoStep. */
+    private final java.util.LinkedHashMap<Integer, int[]> gesture = new java.util.LinkedHashMap<>();
+
+    /** One finished gesture (brush stroke, fill, committed shape) →
+     * one undo step. No-op when nothing was painted. */
+    private void endGesture() {
+        if (gesture.isEmpty()) return;
+        java.util.List<UndoCell> cells = new java.util.ArrayList<>(gesture.size());
+        for (java.util.Map.Entry<Integer, int[]> e : gesture.entrySet()) {
+            cells.add(new UndoCell(e.getKey(), e.getValue()[0], e.getValue()[1]));
+        }
+        gesture.clear();
+        history.push(new UndoStep(cells));
+        while (history.size() > MAX_UNDO) history.removeLast();
+    }
+
+    /** Inverse of {@link #paletteArgb}: 0 for blank (or any unknown
+     * value), else the 1-based palette color. */
+    private static byte paletteIndexOf(int argb) {
+        for (int i = 0; i < PALETTE.length; i++) {
+            if (PALETTE[i] == argb) return (byte) (i + 1);
+        }
+        return 0;
+    }
+
     private record UndoCell(int index, int beforeArgb, int afterArgb) {}
 
     private record UndoStep(java.util.List<UndoCell> cells) {}
@@ -95,8 +124,20 @@ public class PaintScreen extends ArcadeScreen {
         UISounds.tick(1.3F);
     }
 
-    /** Filled by Task 3 (conflict-aware replay). */
+    /** Steps back one gesture, CONFLICT-AWARE: a cell is only reverted
+     * while it still holds this step's after-value — cells someone else
+     * painted over since are left alone (their work survives; see the
+     * design spec). Undone cells ride the normal pending→stroke wire. */
     private void undo() {
+        UndoStep step = history.poll();
+        if (step == null || canvas == null) return;
+        for (UndoCell cell : step.cells()) {
+            if (cell.index() < canvas.length && canvas[cell.index()] == cell.afterArgb()) {
+                canvas[cell.index()] = cell.beforeArgb();
+                pending.put(cell.index(), paletteIndexOf(cell.beforeArgb()));
+            }
+        }
+        flush();
     }
 
     private int toolRowY() {
@@ -243,6 +284,7 @@ public class PaintScreen extends ArcadeScreen {
     }
 
     private void paintCell(int index, byte color) {
+        gesture.computeIfAbsent(index, i -> new int[]{canvas[i], 0})[1] = paletteArgb(color);
         canvas[index] = paletteArgb(color);
         pending.put(index, color);
     }
@@ -273,8 +315,10 @@ public class PaintScreen extends ArcadeScreen {
         int ty = toolRowY();
         if (mouseY >= ty && mouseY < ty + SWATCH) {
             if (mouseX >= undoGlyphX() && mouseX < undoGlyphX() + SWATCH) {
-                undo();
-                UISounds.tick(0.8F);
+                if (!history.isEmpty()) {
+                    undo();
+                    UISounds.tick(0.8F);
+                }
                 return true;
             }
             int index = (int) ((mouseX - boardX()) / (SWATCH + 1));
@@ -316,6 +360,7 @@ public class PaintScreen extends ArcadeScreen {
         lastStrokeCell = -1;
         if (dragging) {
             dragging = false;
+            endGesture();
             flush();
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -334,6 +379,8 @@ public class PaintScreen extends ArcadeScreen {
         }
         if (keyCode == 67) { // C clears
             pending.clear();
+            gesture.clear();
+            history.clear();
             if (canvas != null) java.util.Arrays.fill(canvas, 0);
             PacketDistributor.sendToServer(new ModNetworking.PaintClearPayload(view.target()));
             UISounds.page();
@@ -346,6 +393,7 @@ public class PaintScreen extends ArcadeScreen {
     public void onClose() {
         dragging = false;
         lastStrokeCell = -1;
+        endGesture();
         flush();
         super.onClose();
     }
