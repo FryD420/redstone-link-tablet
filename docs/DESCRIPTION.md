@@ -16,14 +16,13 @@
 
 **A smart-home control panel for your Create contraptions.**
 
-The **Link Tablet** is a handheld device with a real touchscreen OS that drives
-[Create](https://modrinth.com/mod/create)'s Redstone Links remotely. Lights, doors,
-trains, farms, the entire factory — name them, give them an icon, and control them
-from one screen, anywhere in link range. It boots to a **Home screen of apps** —
-signals, gauges, a clock, a **live network monitor**, even **Twitch chat** and a
-**paint canvas**, with more from the built-in **App Store** — mounts on walls
-where tablets merge into one **wall-sized display**, and pins a **mini-tablet to
-your HUD** so you can flip switches without ever opening a GUI.
+The **Link Tablet** is a handheld touchscreen that drives
+[Create](https://modrinth.com/mod/create)'s Redstone Links remotely. Name your
+lights, doors, trains, and machines, give them icons, and flip them from one
+screen anywhere in link range. It boots to a **Home screen of apps** — signals,
+gauges, a clock, a **live network monitor**, even **Twitch chat** and a **paint
+canvas** — mounts on walls where tablets **merge into one big display**, and
+pins a **mini-tablet to your HUD**.
 
 ![The tablet GUI over a floating-island vista — a slider, a timer, and toggle signals in the list, two sticky-note windows pinned beside it, and a placed tablet in the corner](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/hero4.png)
 
@@ -31,32 +30,23 @@ your HUD** so you can flip switches without ever opening a GUI.
 
 ## 📱 A pocket OS
 
-The tablet opens to a **Home screen** — an app launcher you arrange yourself.
-The **App Store** tile lists everything installed with a description and a
-one-click Get/Remove; your Home screen is yours, per tablet. The apps:
+The tablet opens to a **Home screen** you arrange yourself; the built-in
+**App Store** (searchable) installs and removes apps per tablet:
 
 - **Signals** — the control grid below; every tablet starts with it.
-- **Clock** — daily **alarms**, a **world clock** with every real timezone
-  (searchable), a **countdown timer**, and a **stopwatch**. Alarms and timers
-  ring even with the tablet closed, and keep real wall-clock time across
-  sessions. A placed tablet showing the Clock is a **wall clock** — big digital
-  time and date on the glass, merged walls included.
-- **Calculator** — a proper four-function calculator with click buttons and
-  full keyboard entry; a placed tablet shows its **live tape on the wall**.
-- **Gauges** — the reverse of Signals: **live dials that listen** on Redstone
-  Link frequencies and show the received 0–15. Name each dial, pick its channel
-  and color. Held tablets hear what you'd hear; placed tablets hear what a real
-  link at that spot would — and merged walls make great **factory dashboards**.
-- **Monitor** — an **X-ray for your link network** (see below).
-- **Twitch Chat** — live stream chat on your tablet, your HUD, or a wall —
-  emotes included, no account needed (see below).
-- **Paint** — a pixel canvas that persists on the tablet and shows on walls
-  (see below).
+- **Clock** — alarms, a searchable world clock, timer, stopwatch. They ring
+  even with the tablet closed; a placed Clock tablet is a **wall clock**.
+- **Calculator** — click buttons or type; a placed tablet shows its
+  **live tape on the wall**.
+- **Gauges** — the reverse of Signals: **live dials that listen** on link
+  frequencies and show the received 0–15. Merged walls make great
+  **factory dashboards**.
+- **Monitor** — an **X-ray for your link network** (below).
+- **Twitch Chat** — live stream chat, emotes included, no account (below).
+- **Paint** — a persistent pixel canvas that shows on walls (below).
 
-Placed tablets show whatever app they're on right on the glass — tap it to open
-the app, **tap the bezel ring to go Home** — and the wall screen follows your
-GUI navigation, so the kiosk and the menu always agree. The App Store has a
-**search box** now, too — the shelf got big.
+Placed tablets show their app right on the glass — tap to open it, **tap the
+bezel to go Home** — and the wall follows your GUI navigation.
 
 <!-- 📸 SCREENSHOT (optional, 1.10.0): the Home screen GUI next to a placed wall-clock tablet and a gauges wall — "it's an OS" in one image -->
 
@@ -64,65 +54,46 @@ GUI navigation, so the kiosk and the menu always agree. The App Store has a
 
 ## 🎛️ Signals, not levers
 
-- **Up to 32 signals per tablet** (and 32 more per tablet on merged multi-tablet
-  screens), each with a name, color, an optional item icon, and its own state —
-  shown as an icon grid or a list of toggle switches, with drag-to-rearrange in
-  both layouts.
-- **Four signal types**, cycled right in the editor:
-  - **Toggle** — classic on/off with a persistent state.
-  - **Hold** — transmits only while you hold the button. Doorbells, dispensers,
-    one-shot pulses — a disconnect can never leave the signal stuck on.
-  - **Slider** — the signal follows the slider, 0 to 15. Dim lights, throttle
-    trains, meter item flow.
-  - **Timer** — tap it and it transmits for a set time (0.1 s to 30 s), then
-    switches off by itself. Tap again to restart the clock.
-- **Scenes** — one signal can drive up to 8 frequencies at once ("Shut down the
-  factory", "Open all doors").
-- **Signal links** — signals can drive each other: link up to 8 targets per
-  signal and set each to *turn ON*, *turn OFF*, or *follow* the tapped signal's
-  new state. One tap on "Night mode" turns the lights off, the alarm perimeter
-  on, and fires the door-timer — links chain, loops are safe, and linked tiles
-  wear a little chain glyph. A linked signal doesn't even need a frequency of
-  its own: make pure **scene master buttons** that only drive other signals.
-- **Per-signal strength** — when several signals drive the same frequency, the
-  strongest wins, exactly like stacked Redstone Links.
-
-You can see all of them working in the screenshot above — a slider mid-drag, a
-timer, and toggles side by side.
+- **Up to 32 signals per tablet** (+32 per tablet on merged walls), each with a
+  name, color, item icon, and state — grid or list view, drag to rearrange.
+- **Four types**: **Toggle** (on/off), **Hold** (transmits only while held — a
+  disconnect can never leave it stuck on), **Slider** (0–15), **Timer**
+  (transmits for 0.1–30 s, then switches off by itself).
+- **Scenes** — one signal drives up to 8 frequencies at once ("Shut down the
+  factory").
+- **Signal links** — signals drive each other: up to 8 targets each, set to
+  *turn ON*, *turn OFF*, or *follow*. Links chain, loops are safe, and a linked
+  signal needs no frequency of its own — pure **scene master buttons**.
+- **Per-signal strength** — strongest wins, exactly like stacked Redstone
+  Links.
 
 ---
 
 ## 📡 Real Create frequencies
 
-Signals tune to Create's item-pair frequencies — anything a Redstone Link or Linked
-Controller can trigger, the tablet can too:
+Signals tune to Create's item-pair frequencies — anything a Redstone Link can
+trigger, the tablet can too:
 
-- The signal editor includes **your real inventory** with vanilla drag mechanics:
-  drop an item on the frequency slots (they take a copy — nothing is consumed),
-  or use the searchable all-items picker for things you don't carry.
-- Running **JEI or EMI**? Drag an item straight from the ingredient panel onto
-  a frequency slot — no need to own it at all.
-- **One-item frequencies** work, matching Create's own links.
-- Frequencies carry the **full item, components included** — frequency-card mods
-  (Create Unique Cards and friends), dyed items, and renamed gear all count as
-  distinct channels, exactly matching what Create's links distinguish.
+- The editor includes **your real inventory** (slots take a copy — nothing is
+  consumed) plus a searchable all-items picker.
+- **JEI/EMI**: drag straight from the ingredient panel onto a frequency slot.
+- One-item frequencies work, and frequencies carry the **full item, components
+  included** — frequency-card mods, dyed and renamed items all count as
+  distinct channels, exactly like Create's own links.
 
-> 📋 **Tip — quick-add:** right-click any Redstone Link (or anything with a link
-> frequency, like elevator contacts) while holding the tablet — the editor opens
-> with that frequency pre-filled and a name suggested. Just hit Save.
+> 📋 **Tip — quick-add:** right-click any Redstone Link while holding the
+> tablet — the editor opens with that frequency pre-filled. Just hit Save.
 
 ---
 
 ## 🔎 Who's on this frequency?
 
-The **Monitor** app is an X-ray for your link network. It lists every channel
-your tablet touches — and any channel you **probe** (drop in a frequency pair,
-up to 8) — with the live power on each one and **every member transmitting or
-listening**: real Redstone Links, placed tablets, and even *"a tablet in
-someone's inventory"* — so when a receiver is mysteriously pinned at 15, the
-Monitor tells you it's the spare tablet in your own pocket. Out-of-range
-members wear a badge, a wall tablet showing the Monitor is a live **status
-board**, and the overlay pin puts the readout on your HUD.
+The **Monitor** app lists every channel your tablet touches — plus any you
+**probe** (up to 8) — with live power and **every member transmitting or
+listening**: Redstone Links, placed tablets, even *"a tablet in someone's
+inventory"*. When a receiver is mysteriously pinned at 15, the Monitor points
+at the spare tablet in your pocket. Out-of-range members wear a badge; wall
+tablets make it a **status board**, and the overlay pin puts it on your HUD.
 
 <!-- 📸 SCREENSHOT (1.11.0): the Monitor GUI over a contraption — a few channels with member rows visible, ideally one "inventory tablet" member and one out-of-range badge -->
 
@@ -130,42 +101,30 @@ board**, and the overlay pin puts the readout on your HUD.
 
 ## 🎚️ Sliders you can feel
 
-Sliders drag live in the GUI, and on a placed tablet you **click-and-slide right
-on the glass**: hold the button on a slider's tile and sweep your crosshair — the
-value tracks it exactly. Every slider shows its numeric signal level wherever it
-renders, and you can limit one to a min/max range — set a minimum above 0 and
-that machine never fully turns off.
+Sliders drag live in the GUI, and on a placed tablet you **click-and-slide
+right on the glass**. Every slider shows its numeric level, and an optional
+min/max range means a machine never fully turns off.
 
 ---
 
 ## 📝 Sticky notes for your factory
 
-Every signal can carry a free-text note, opened from a little glyph on its tile.
-Notes are **floating windows**: drag them by the title bar, open several at once,
-and they stay with you — over the tablet, over your inventory and other screens
-(fully editable there), and pinned read-only on your HUD while you play. They
-politely stay out of settings menus and other screens where they don't belong.
-Perfect for "flush the sorter before enabling" warnings or a train schedule —
-you can see two of them pinned in the screenshot up top.
+Every signal can carry a note in a **floating window**: drag it anywhere, keep
+several open, and they follow you — over the tablet, over your inventory, even
+pinned read-only on your HUD. Perfect for "flush the sorter before enabling"
+warnings — two of them are pinned in the screenshot up top.
 
 ---
 
 ## 📌 Pin it to your HUD
 
 The pin button keeps a **floating mini-tablet on your screen while you play** —
-and it's **per-app**: pin Signals for live switch rows, pin Gauges for a
-heads-up dial cluster (a vehicle dashboard while you drive), pin the Clock, pin
-a working Calculator mini-pad, or pin the launcher itself as an app dock. The
-window is draggable anywhere and remembers its spot and pin across sessions. Press the **"Use Pinned Tablet" key
-(default B)** to free your mouse chat-style and tap toggles, drag sliders, or
-hold buttons — mid-mining, mid-flight, no GUI ever opens. It's also clickable
-with the normal cursor over your inventory or chat, and a right-click on any
-row jumps into the full tablet interface. (There's an "Open Tablet" keybind
-too, unbound by default, that opens the tablet from anywhere in your
-inventory.)
-
-Pin a placed tablet and it dims when you wander out of edit range; pin a
-carried one and it follows the item around your inventory.
+per app: live switch rows, a heads-up gauge cluster, the clock, a working
+mini calculator, or the launcher as an app dock. Press the **"Use Pinned
+Tablet" key (default B)** to free your mouse chat-style and tap toggles, drag
+sliders, or hold buttons mid-mining — no GUI ever opens. Right-click any row
+to jump into the full interface; the window remembers its spot across
+sessions.
 
 <!-- 📸 SCREENSHOT: the pinned mini-tablet on the HUD during gameplay — mining or riding a train, a slider mid-drag, hotbar visible so it reads as "playing, not in a menu" -->
 
@@ -173,28 +132,21 @@ carried one and it follows the item around your inventory.
 
 ## ✨ The screen is real
 
-The tablet's physical screen isn't a texture — it renders your actual signals,
-live, on both the held and the placed tablet. Tiles size themselves to the signal
-count (a few signals get big tiles; a full tablet converges on a dense grid),
-active signals glow, timers glow for as long as their pulse runs, and each tablet
-remembers whether you last used it in grid or list view.
-
-And on a placed tablet, **the screen is touchable**: tap a signal right on the
-glass to toggle it, hold a Hold button, slide a slider — no GUI needed. Tap the
-bezel for the full interface.
+The physical screen isn't a texture — it renders your actual signals live,
+held or placed. Tiles size themselves to the signal count, active signals
+glow, and on a placed tablet **the glass is touchable**: tap to toggle, hold a
+Hold button, slide a slider — no GUI needed. Tap the bezel for the full
+interface.
 
 ---
 
 ## 🧱 Place it on the wall
 
 Sneak + right-click any surface to mount the tablet on a wall, floor, or
-ceiling — it becomes a block that transmits from its own position while the
-chunk is loaded, and its screen glows whenever a signal is running. Sneak +
-right-click with an empty hand picks it back up; everything survives the trip.
-
-Got a Create wrench? Wrench the glass to rotate the screen content 90°, wrench
-the edge to spin the tablet — wall tablets physically flip between portrait and
-landscape.
+ceiling — it transmits from its own position and its screen glows while a
+signal runs. Sneak + right-click with an empty hand picks it back up;
+everything survives the trip. A Create wrench rotates the screen content
+(glass) or physically flips the tablet between portrait and landscape (edge).
 
 ![A shaded Create factory hall with a wall-mounted tablet showing its live switch list](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mounted-factory2.png)
 
@@ -202,29 +154,17 @@ landscape.
 
 ## 🎯 Aim it anywhere
 
-Flat against the wall not doing it for you? Craft a **Swivel Mount** — an iron
-nugget atop two brass sheets — and place the empty stand on any floor, wall, or
-ceiling, then click a tablet onto it (or use the mount directly on a tablet
-that's already placed). Either way the tablet pops onto a little ball-joint
-stand. Wrench the glass and it **swings around to aim straight at your eyes**,
-wherever you're standing — walk to your favorite spot at the control desk, one
-click, perfect angle. Wrench the bezel to flip between portrait and landscape,
-and sneak-wrench the glass to rotate the screen content.
+Craft a **Swivel Mount** — an iron nugget atop two brass sheets — place the
+stand on any surface, and click a tablet onto its ball joint. Wrench the glass
+and it **swings around to aim straight at your eyes**, wherever you're
+standing — one click, perfect angle. Wrench the bezel for landscape; sneak +
+right-click swaps tablets and **leaves the stand as furniture**. The tilted
+glass stays fully touchable.
 
-Stands are furniture: sneak + right-click the tablet and it comes off **leaving
-the empty stand in place**, ready for the next tablet — swap dashboards between
-consoles like cartridges. Grab the stand itself to take everything.
-
-The tilted glass stays fully touchable — taps, holds, and click-and-slide all
-land exactly where you're looking. Mounted tablets keep to themselves (they
-never merge into a wall display), so they're perfect as angled standalone
-consoles in front of one.
-
-And here's the party trick: **power the mount with redstone and the screen
-follows you** — it smoothly tracks the nearest player like the enchanting
-table's book, gliding as you walk the control room. Cut the power and it
-freezes exactly where it's pointing: aim it by standing in the right spot,
-lock it with a lever.
+And the party trick: **power the mount with redstone and the screen follows
+you**, gliding after the nearest player like the enchanting table's book. Cut
+the power and it freezes exactly where it points — aim by standing in the
+right spot, lock with a lever.
 
 <!-- 📸 SCREENSHOT (optional, 1.10.0): follow mode — ideally a short GIF of a powered swivel tablet tracking the player past a console; a still with lever + angled tablet works too -->
 
@@ -232,23 +172,17 @@ lock it with a lever.
 
 ## 🖥️ One screen, many tablets
 
-Mount tablets side by side — same wall, floor, or ceiling; new ones
-auto-match their neighbor's orientation — and they **merge into one big
-display, up to 4 wide by 3 tall**: a single continuous glass panel with a
-case-colored bezel frame and no seams. Your signals spread across the whole
-surface at bigger tiles, taps and click-and-slide work anywhere on the
-glass, list rows run its full width, the entire wall lights up together —
-and every merged tablet raises the signal cap by another 32. Dye the lead
-tablet and the whole frame dyes; wrench the glass and the whole screen's
-content rotates.
+Mount tablets side by side and they **merge into one big display, up to
+4 wide by 3 tall**: a single continuous glass panel, no seams. Signals spread
+across the whole surface at bigger tiles, taps and click-and-slide work
+anywhere on the glass — and every merged tablet raises the signal cap by
+another 32. Dye the lead tablet and the whole frame dyes.
 
 <p align="center"><strong style="color:#f2c94c; font-size:1.3em;">🧮 A 4×3 wall = 12 merged tablets — 384 signals on one screen</strong></p>
 
-Merging is always safe: every tablet keeps its own signals dormant and gets
-them back the moment it's split off. And it's always your choice — a
-**chain-link button** in the screen header breaks a merged surface back
-into independent tablets, or keeps a single tablet standalone so you can
-build a bank of separate dashboards side by side.
+Merging is always safe — every tablet keeps its own signals and gets them back
+the moment it's split off — and always your choice: a **chain-link button**
+keeps a tablet standalone or breaks a wall back apart.
 
 <!-- 📸 SCREENSHOT: a merged tablet wall (3×2 or 4×3) in a factory setting, dyed bezel, a good mix of signal tiles — the new hero candidate; bonus if a hand is mid-tap on the glass -->
 
@@ -256,25 +190,20 @@ build a bank of separate dashboards side by side.
 
 ## 💬 Your stream chat, in the game
 
-The **Twitch Chat** app shows any channel's live chat — **no account, no login,
-no tokens, nothing stored**: it's an anonymous, strictly read-only view of the
-public chat. Type a channel name and chat flows onto your held tablet, pins to
-your HUD while you play, or fills a placed tablet as a **chat wall** — set the
-channel once on the block and every viewer sees it. Build a merged wall and
-your chat gets the big-screen treatment next to the factory dashboards.
+Type a channel name and its live chat flows onto your held tablet, your HUD,
+or a placed **chat wall** every viewer sees — merged walls give it the
+big-screen treatment. **No account, no login, nothing stored**: an anonymous,
+strictly read-only view of public chat, connected only while chat is actually
+on a screen somewhere.
 
 And it's real chat: **emotes render as actual images** — Twitch's own plus
-**7TV, BetterTTV, and FrankerFaceZ**, animated ones animating — so the wall
-looks like chat, not a text log. (A toggle in the header switches back to plain
-text if you prefer.) Keep Twitch as your last-used app and **the tablet in your
-hand becomes a pocket chat screen**, live even in third person — moderate your
-chat from inside the mine.
+**7TV, BetterTTV, and FrankerFaceZ**, animated ones animating (a header toggle
+switches back to plain text). Keep Twitch as your last-used app and **the
+tablet in your hand becomes a pocket chat screen**, even in third person.
 
-The connection only exists while chat is actually on a screen somewhere — close
-every Twitch surface and the tablet stops talking to Twitch entirely. Fair
-warning for shared servers: chat is live, unfiltered internet, and anyone who
-can open a placed tablet's GUI can change its channel — same trust rules as
-editing its signals.
+Shared-server note: chat is live, unfiltered internet, and anyone who can open
+a placed tablet's GUI can change its channel — same trust rules as its
+signals.
 
 <!-- 📸 SCREENSHOT (1.11.0): a merged chat wall mid-stream — colored usernames, a few animated emotes visible, ideally beside a signals wall so it reads as "part of the factory" -->
 
@@ -282,13 +211,11 @@ editing its signals.
 
 ## 🖌️ Paint on the walls
 
-The **Paint** app is a pixel canvas that lives on the tablet — doodle on the
-held tablet, and the picture **persists and shows right on the glass** when you
-place it. Every tablet carries its own canvas slice, so merged walls become
-**murals**: paint across the seams on the wall's GUI (viewers watch your
-strokes land live), split the wall and each tablet keeps its piece, merge them
-back and the mural reassembles. Break it, chest it, gift it — the art travels
-with the tablet.
+A pixel canvas that lives on the tablet: doodle, place it, and the picture
+**shows right on the glass**. Merged walls become **murals** — paint across
+the seams while viewers watch your strokes land live, split the wall and each
+tablet keeps its slice, merge back and the mural reassembles. Break it, chest
+it, gift it — the art travels with the tablet.
 
 <!-- 📸 SCREENSHOT (1.11.0): a 3×2 merged wall with a finished mural, one member tablet pulled off and held in hand showing its slice -->
 
@@ -297,18 +224,14 @@ with the tablet.
 ## 🎨 Make it yours
 
 - **8 UI themes** — Dark, Light, AMOLED, Brass, Terminal, PurpleFox, Parchment,
-  and Avionics — stored per tablet, recoloring the GUI and the physical screen
-  for everyone. The whole interface is styled in Create's own visual language:
-  wooden rails, parchment plaques, beveled buttons.
-- **16 dyed cases** — craft the tablet with any dye to recolor it, signals
-  preserved, re-dye whenever. Dunk it in a water cauldron (or an encased fan's
-  washing stream) to strip the dye again.
-- **A full set of UI sounds** — toggle clicks with distinct on/off pitch, a save
-  chime, frequency ticks, and a faint click nearby players hear when someone
-  flips a signal.
-- **Name your tablets** — rename one on an anvil and the name becomes its title
-  in the GUI and on the pinned overlay. "Smeltery", "Train Yard", "Base
-  Defense" — the name survives placing and picking up.
+  Avionics — stored per tablet, styling GUI and glass alike in Create's own
+  visual language.
+- **16 dyed cases** — craft with any dye; wash it off in a cauldron or a fan's
+  washing stream.
+- **A full set of UI sounds**, including a faint click nearby players hear when
+  someone flips a signal.
+- **Name your tablets** on an anvil — the name titles the GUI and overlay and
+  survives placing and picking up.
 
 ![The tablet GUI in four themes — Dark, Light, Parchment, and Avionics](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/themes.png)
 
@@ -318,37 +241,25 @@ with the tablet.
 
 ## 🏭 Getting started
 
-The tablet comes off a real assembly line — this is brass-age manufacturing,
-not crafting. Shape a **Tablet Case** from five brass sheets, then send it down
-a belt past three Deployers:
-
-- **Link Logic Board** — a Redstone Link and Linked Controller rehoused with an
-  electron tube. The radio.
-- **Clockwork Cell** — cogwheel, polished rose quartz, and a winding key. The
-  power.
-- **Quartz Display** — tinted glass backed with rose quartz, screwed on last.
-  The screen.
-
-The in-progress tablet visibly gains each part as it moves down the line, and
-JEI/EMI shows the whole sequence on the tablet's page. (The finished tablet
-lives in the vanilla Redstone creative tab too.)
+The tablet comes off a real assembly line — brass-age manufacturing, not
+crafting. Shape a **Tablet Case** from five brass sheets, then send it down a
+belt past three Deployers: the **Link Logic Board** (the radio), the
+**Clockwork Cell** (the power), and the **Quartz Display** (the screen). The
+in-progress tablet visibly gains each part, and JEI/EMI shows the whole
+sequence.
 
 <!-- 📸 SCREENSHOT: the assembly line in action — belt with three deployers, an in-progress tablet mid-line showing the seated board/cell, finished tablet coming off the end -->
 
 Then:
 
 1. **Right-click** to open the tablet, tap **+** to create a signal.
-2. Pick the frequency items (exactly like tuning a Redstone Link) and hit
-   **Add** — repeat to stack a scene — then **Save**.
+2. Pick the frequency items (like tuning a Redstone Link), **Add**, **Save**.
 3. Set your receiving Redstone Links to the same frequency.
 4. **Left-click toggles, right-click edits.**
 
-There's also a **Ponder scene** — hold W over the tablet item — that walks
-through mounting, linking, and the quick-add shortcut.
-
-While a signal is on and the tablet is anywhere in your inventory, you are the
-transmitter — range and chunk behavior match Create's handheld Linked
-Controller. Mounted tablets transmit from the block instead.
+There's a **Ponder scene** too — hold W over the tablet item. A tablet
+anywhere in your inventory transmits like Create's handheld Linked Controller;
+placed tablets transmit from the block.
 
 ---
 
@@ -356,15 +267,11 @@ Controller. Mounted tablets transmit from the block instead.
 
 - **Minecraft 1.21.1 · NeoForge · Java 21 · requires Create 6.x** (server and client).
 - Full multiplayer support: server-authoritative edits, per-player transmitters.
-- Plays nicely with other link-network senders — receivers take the strongest
-  signal, like stacked Redstone Links.
-- Frequency-card mods (component-based frequency items) work out of the box.
-- Optional **JEI and EMI** integration: drag ingredients straight into the
-  frequency slots.
-- **Twitch Chat is fully client-side and optional** — it connects anonymously
-  to Twitch's public chat (and the public emote services) only while chat is
-  actually on a screen, sends nothing, and stores nothing. No account involved,
-  ever; it does nothing at all on the server side.
+- Plays nicely with other link-network senders; frequency-card mods work out of
+  the box; optional **JEI/EMI** drag integration.
+- **Twitch Chat is client-side and optional** — anonymous and read-only,
+  connected only while chat is on a screen; nothing sent, nothing stored, and
+  it does nothing at all on the server side.
 - MIT licensed, free to use in any modpack.
 
 ---
