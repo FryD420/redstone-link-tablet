@@ -10,7 +10,7 @@
 
 <p align="center"><img src="https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/banner.png" alt="Create: Redstone Link Tablet"></p>
 
-<p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://discord.gg/JwkHGpE527"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/social/discord-singular_64h.png?raw=true" alt="Join the Discord" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
+<p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://discord.gg/JwkHGpE527"><img src="https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/discord-badge.png" alt="Help develop on Discord" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
 
 ---
 
@@ -303,6 +303,13 @@ no source/issues/changelog link in the paste content. The raw.githubusercontent
 image embeds stay (that's just hosting, invisible in the rendered page).
 The ADDON-API developer bullet was removed entirely (same decision — its only
 docs link was GitHub); the API is announced to addon authors elsewhere.
+
+### Discord badge (2026-08-10, Claude-generated — no shoot needed)
+
+- ✅ **discord-badge.png** — custom cozy-style badge ("Help develop on
+  Discord"), colors sampled from devins-badges v3. Regenerate after
+  edits to `docs/discord-badge.html` with the chrome command in that
+  file's header comment. Push to main BEFORE re-pasting (raw embed).
 
 ### Banner (2026-07-29, Claude-generated — no shoot needed)
 
