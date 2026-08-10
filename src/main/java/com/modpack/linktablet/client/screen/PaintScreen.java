@@ -120,6 +120,7 @@ public class PaintScreen extends ArcadeScreen {
     private record UndoStep(java.util.List<UndoCell> cells) {}
 
     private void selectTool(Tool t) {
+        cancelShape(); // a tool switch aborts any in-progress shape (stale-anchor commit guard)
         tool = t;
         UISounds.tick(1.3F);
     }
