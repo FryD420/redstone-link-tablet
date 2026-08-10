@@ -154,12 +154,41 @@ public class PaintScreen extends ArcadeScreen {
         flush();
     }
 
-    private int toolRowY() {
+    private int swatchRowY() {
         return boardY() + rows * cell + 4;
     }
 
-    private int swatchRowY() {
-        return toolRowY() + SWATCH + 2;
+    // ------------------------------------------------------------------
+    // Header tool bar (tools live in the cabinet plaque, right-aligned:
+    // five tool glyphs + the undo arrow — the board strip stays colors-only)
+    // ------------------------------------------------------------------
+
+    /** Header glyph size and pitch (glyph + gap) — 12px uses the full
+     * plaque height (top()+3 .. top()+15, underline row below). */
+    private static final int GLYPH = 12;
+    private static final int GLYPH_PITCH = GLYPH + 3;
+    /** Glyph slots: 0..4 = tools, 5 = undo (extra gap before it). */
+    private static final int GLYPH_SLOTS = Tool.values().length + 1;
+
+    private int headerGlyphX(int slot) {
+        int total = GLYPH_SLOTS * GLYPH_PITCH - 3 + 3; // glyph row + the undo gap
+        return left() + panelWidth() - PAD - total + slot * GLYPH_PITCH
+                + (slot == GLYPH_SLOTS - 1 ? 3 : 0);
+    }
+
+    private int headerGlyphY() {
+        return top() + 3; // plaque spans top()+2..top()+16; glyph 12px + underline row
+    }
+
+    /** Which header slot a click lands in, or -1 (0..4 tools, 5 undo). */
+    private int headerGlyphAt(double mouseX, double mouseY) {
+        int gy = headerGlyphY();
+        if (mouseY < gy - 1 || mouseY >= gy + GLYPH + 2) return -1;
+        for (int slot = 0; slot < GLYPH_SLOTS; slot++) {
+            int gx = headerGlyphX(slot);
+            if (mouseX >= gx - 1 && mouseX < gx + GLYPH + 1) return slot;
+        }
+        return -1;
     }
 
     public PaintScreen(SignalView view, boolean returnToTablet) {
@@ -173,8 +202,8 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     protected int boardH() {
-        // canvas + gap + tool row + gap + swatch row
-        return rows * cell + 4 + SWATCH + 2 + SWATCH;
+        // canvas + gap + swatch row (tools live in the header plaque)
+        return rows * cell + 4 + SWATCH;
     }
 
     // ------------------------------------------------------------------
@@ -185,7 +214,7 @@ public class PaintScreen extends ArcadeScreen {
         cols = Math.max(1, view.surfaceW()) * PaintCanvas.COLS;
         rows = Math.max(1, view.surfaceH()) * PaintCanvas.ROWS;
         int availW = Math.max(1, width - PAD * 2 - MARGIN);
-        int availH = Math.max(1, height - HEADER - PAD * 2 - 4 - SWATCH - 2 - SWATCH - 4 - MARGIN);
+        int availH = Math.max(1, height - HEADER - PAD * 2 - 4 - SWATCH - 4 - MARGIN);
         cell = Mth.clamp(Math.min(availW / cols, availH / rows), 2, 7);
 
         if (view instanceof SignalView.Block block) {
@@ -343,22 +372,18 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Tool row, then palette strip, below the canvas
-        int ty = toolRowY();
-        if (mouseY >= ty && mouseY < ty + SWATCH) {
-            if (mouseX >= undoGlyphX() && mouseX < undoGlyphX() + SWATCH) {
+        // Header tool bar, then the palette strip below the canvas
+        int slot = headerGlyphAt(mouseX, mouseY);
+        if (slot >= 0) {
+            if (slot == GLYPH_SLOTS - 1) {
                 if (!history.isEmpty()) {
                     undo();
                     UISounds.tick(0.8F);
                 }
-                return true;
+            } else {
+                selectTool(Tool.values()[slot]);
             }
-            int index = (int) ((mouseX - boardX()) / (SWATCH + 1));
-            if (index >= 0 && index < Tool.values().length) {
-                selectTool(Tool.values()[index]);
-                return true;
-            }
-            return true; // dead strip space never paints
+            return true;
         }
         int py = swatchRowY();
         if (mouseY >= py && mouseY < py + SWATCH) {
@@ -497,7 +522,8 @@ public class PaintScreen extends ArcadeScreen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         layout();
         super.render(graphics, mouseX, mouseY, partialTick);
-        renderCabinet(graphics, "🎨");
+        renderCabinet(graphics, ""); // the tool bar takes the tally corner
+        renderHeaderTools(graphics);
         int bx = boardX();
         int by = boardY();
         for (int i = 0; i < canvas.length; i++) {
@@ -513,19 +539,6 @@ public class PaintScreen extends ArcadeScreen {
                     bx + cx2 * cell, by + cy2 * cell,
                     bx + cx2 * cell + cell, by + cy2 * cell + cell, ghostArgb));
         }
-        int ty = toolRowY();
-        Tool[] tools = Tool.values();
-        for (int i = 0; i < tools.length; i++) {
-            int x = bx + i * (SWATCH + 1);
-            renderToolGlyph(graphics, tools[i], x, ty);
-            if (tools[i] == tool) {
-                graphics.fill(x, ty - 2, x + SWATCH, ty - 1, 0xFFE8EAF0);
-            }
-        }
-        // Undo sits at the far right of the tool row — a momentary
-        // button, not a mode; dimmed while there is nothing to undo.
-        renderUndoGlyph(graphics, undoGlyphX(), ty, !history.isEmpty());
-
         int py = swatchRowY();
         for (int i = 0; i < PALETTE.length; i++) {
             int x = bx + i * (SWATCH + 1);
@@ -536,48 +549,123 @@ public class PaintScreen extends ArcadeScreen {
         }
     }
 
-    private int undoGlyphX() {
-        return boardX() + Math.max(Tool.values().length * (SWATCH + 1) + SWATCH,
-                cols * cell - SWATCH);
+    /** The header tool bar: five tool glyphs + undo, right-aligned in
+     * the cabinet plaque. Selected tool sits on an inset chip with an
+     * accent underline; undo dims while there's nothing to step back. */
+    private void renderHeaderTools(GuiGraphics graphics) {
+        var theme = theme();
+        int gy = headerGlyphY();
+        Tool[] tools = Tool.values();
+        for (int i = 0; i < tools.length; i++) {
+            int gx = headerGlyphX(i);
+            if (tools[i] == tool) {
+                graphics.fill(gx - 1, gy - 1, gx + GLYPH + 1, gy + GLYPH, theme.screenBgOff);
+                graphics.fill(gx - 1, gy + GLYPH, gx + GLYPH + 1, gy + GLYPH + 1, theme.accent);
+            }
+            renderToolGlyph(graphics, tools[i], gx, gy, theme.textPrimary, theme.textMuted);
+        }
+        renderUndoGlyph(graphics, headerGlyphX(GLYPH_SLOTS - 1), gy,
+                !history.isEmpty(), theme.textPrimary, theme.textFaint);
     }
 
-    /** Procedural 8×8 tool glyphs, house style (fills only). */
-    private void renderToolGlyph(GuiGraphics g, Tool t, int x, int y) {
-        int ink = 0xFFE8EAF0;
+    /** Two-thirds brightness — shading tone for the held-color art. */
+    private static int darken(int argb) {
+        int r = (argb >> 16 & 0xFF) * 2 / 3;
+        int gr = (argb >> 8 & 0xFF) * 2 / 3;
+        int b = (argb & 0xFF) * 2 / 3;
+        return 0xFF000000 | r << 16 | gr << 8 | b;
+    }
+
+    // Fixed material shades for the header art (wood/steel/rubber/glass) —
+    // mid-tones that read on every theme; the wood/steel bases are the
+    // palette's own brown and gray so nothing clashes with the swatches.
+    private static final int WOOD = 0xFF835432, WOOD_HI = 0xFF9C6A42;
+    private static final int STEEL = 0xFF9D9D97, STEEL_HI = 0xFFBFC1BD, STEEL_DK = 0xFF6F7377;
+    private static final int RUBBER = 0xFFB02E26, RUBBER_HI = 0xFFD1554A;
+    private static final int GLASS = 0xFFAFC6CF, GLASS_HI = 0xFFE8EAF0;
+
+    /** Procedural 12×12 tool glyphs — material-colored miniatures
+     * (wooden handles, steel fittings, rubber bulb, glass barrel), with
+     * the SELECTED color live on the brush bristles, the fill pour, and
+     * the eyedropper's sampled drop: the header doubles as a color
+     * readout. Line/rect stay theme-inked wireframes with accent
+     * drag-handles. */
+    private void renderToolGlyph(GuiGraphics g, Tool t, int x, int y, int ink, int detail) {
+        int held = PALETTE[selected];
+        int heldDk = darken(held);
+        int accent = theme().accent;
         switch (t) {
             case BRUSH -> {
-                g.fill(x + 5, y, x + 8, y + 3, ink);          // tip
-                g.fill(x + 3, y + 3, x + 5, y + 5, ink);      // ferrule
-                g.fill(x + 1, y + 5, x + 3, y + 8, ink);      // handle
+                g.fill(x + 9, y, x + 12, y + 3, WOOD);         // handle knob
+                g.fill(x + 10, y, x + 11, y + 1, WOOD_HI);     // knob highlight
+                g.fill(x + 7, y + 2, x + 10, y + 5, WOOD);     // handle
+                g.fill(x + 8, y + 2, x + 9, y + 3, WOOD_HI);   // grain stripe
+                g.fill(x + 5, y + 4, x + 8, y + 7, STEEL);     // ferrule
+                g.fill(x + 5, y + 6, x + 8, y + 7, STEEL_DK);  // crimp line
+                g.fill(x + 2, y + 6, x + 6, y + 10, held);     // bristles
+                g.fill(x + 4, y + 8, x + 6, y + 10, heldDk);   // bristle shade
+                g.fill(x + 1, y + 8, x + 3, y + 11, held);     // tip point
+                g.fill(x + 2, y + 11, x + 3, y + 12, heldDk);  // paint drip
             }
             case FILL -> {
-                g.fill(x + 1, y + 2, x + 6, y + 7, ink);      // bucket
-                g.fill(x + 6, y + 4, x + 8, y + 8, ink);      // pour
+                g.fill(x + 3, y, x + 8, y + 1, WOOD);          // bail handle
+                g.fill(x + 2, y + 1, x + 3, y + 3, WOOD);      // handle posts
+                g.fill(x + 7, y + 1, x + 8, y + 2, WOOD);
+                g.fill(x + 1, y + 3, x + 8, y + 4, STEEL_DK);  // rim
+                g.fill(x + 1, y + 4, x + 8, y + 11, STEEL);    // bucket body
+                g.fill(x + 2, y + 5, x + 3, y + 10, STEEL_HI); // sheen
+                g.fill(x + 1, y + 10, x + 8, y + 11, STEEL_DK);// base shadow
+                g.fill(x + 8, y + 5, x + 9, y + 9, held);      // pour stream
+                g.fill(x + 9, y + 5, x + 10, y + 9, heldDk);   // stream edge
+                g.fill(x + 9, y + 9, x + 11, y + 12, held);    // splash
+                g.fill(x + 8, y + 11, x + 9, y + 12, heldDk);  // splash dot
             }
             case LINE -> {
-                g.fill(x, y + 6, x + 2, y + 8, ink);
-                g.fill(x + 2, y + 4, x + 4, y + 6, ink);
-                g.fill(x + 4, y + 2, x + 6, y + 4, ink);
-                g.fill(x + 6, y, x + 8, y + 2, ink);
+                g.fill(x, y + 9, x + 3, y + 12, ink);          // end handle
+                g.fill(x + 1, y + 10, x + 2, y + 11, accent);  // handle core
+                g.fill(x + 3, y + 7, x + 5, y + 9, detail);    // stair diagonal
+                g.fill(x + 4, y + 7, x + 5, y + 8, ink);       // stair core
+                g.fill(x + 5, y + 5, x + 7, y + 7, detail);
+                g.fill(x + 6, y + 5, x + 7, y + 6, ink);
+                g.fill(x + 7, y + 3, x + 9, y + 5, detail);
+                g.fill(x + 8, y + 3, x + 9, y + 4, ink);
+                g.fill(x + 9, y, x + 12, y + 3, ink);          // end handle
+                g.fill(x + 10, y + 1, x + 11, y + 2, accent);  // handle core
             }
             case RECT -> {
-                g.fill(x, y + 1, x + 8, y + 2, ink);          // top
-                g.fill(x, y + 6, x + 8, y + 7, ink);          // bottom
-                g.fill(x, y + 2, x + 1, y + 6, ink);          // left
-                g.fill(x + 7, y + 2, x + 8, y + 6, ink);      // right
+                g.fill(x + 1, y + 2, x + 11, y + 3, ink);      // top
+                g.fill(x + 1, y + 9, x + 11, y + 10, ink);     // bottom
+                g.fill(x + 1, y + 2, x + 2, y + 9, ink);       // left
+                g.fill(x + 10, y + 2, x + 11, y + 9, ink);     // right
+                g.fill(x + 5, y + 2, x + 7, y + 3, detail);    // edge ticks
+                g.fill(x + 5, y + 9, x + 7, y + 10, detail);
+                g.fill(x, y + 1, x + 3, y + 4, accent);        // TL drag handle
+                g.fill(x + 1, y + 2, x + 2, y + 3, ink);       // handle core
+                g.fill(x + 9, y + 8, x + 12, y + 11, accent);  // BR drag handle
+                g.fill(x + 10, y + 9, x + 11, y + 10, ink);    // handle core
             }
             case EYEDROPPER -> {
-                g.fill(x, y + 6, x + 2, y + 8, ink);          // tip
-                g.fill(x + 2, y + 3, x + 5, y + 6, ink);      // barrel
-                g.fill(x + 5, y + 1, x + 8, y + 4, ink);      // bulb
+                g.fill(x + 8, y, x + 12, y + 4, RUBBER);       // rubber bulb
+                g.fill(x + 9, y + 1, x + 10, y + 2, RUBBER_HI);// bulb shine
+                g.fill(x + 7, y + 3, x + 9, y + 5, STEEL);     // shoulder
+                g.fill(x + 6, y + 4, x + 8, y + 6, STEEL_DK);  // neck band
+                g.fill(x + 4, y + 5, x + 7, y + 8, GLASS);     // glass barrel
+                g.fill(x + 5, y + 6, x + 6, y + 7, GLASS_HI);  // glass shine
+                g.fill(x + 3, y + 7, x + 5, y + 9, STEEL_DK);  // taper
+                g.fill(x + 2, y + 8, x + 4, y + 10, STEEL);    // steel tip
+                g.fill(x, y + 10, x + 2, y + 12, held);        // sampled drop
             }
         }
     }
 
-    private void renderUndoGlyph(GuiGraphics g, int x, int y, boolean enabled) {
-        int ink = enabled ? 0xFFE8EAF0 : 0xFF5A6170;
-        g.fill(x, y + 3, x + 3, y + 6, ink);                  // arrow head block
-        g.fill(x + 3, y + 4, x + 8, y + 6, ink);              // shaft
-        g.fill(x + 6, y + 2, x + 8, y + 4, ink);              // curl
+    private void renderUndoGlyph(GuiGraphics g, int x, int y, boolean enabled, int ink, int faint) {
+        int c = enabled ? ink : faint;
+        int tip = enabled ? theme().accent : faint;
+        g.fill(x, y + 5, x + 4, y + 8, c);                     // arrow head, wide row
+        g.fill(x + 2, y + 3, x + 4, y + 5, c);                 // head upper step
+        g.fill(x + 2, y + 8, x + 4, y + 10, c);                // head lower step
+        g.fill(x + 3, y + 7, x + 9, y + 9, c);                 // shaft sweeping right
+        g.fill(x + 8, y + 3, x + 10, y + 8, c);                // riser
+        g.fill(x + 7, y + 2, x + 9, y + 4, tip);               // curl tip
     }
 }
