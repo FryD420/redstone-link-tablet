@@ -265,6 +265,24 @@ public class PaintScreen extends ArcadeScreen {
      * from this anchor so the stroke never gaps. */
     private int lastStrokeCell = -1;
 
+    /** In-progress shape gesture (LINE/RECT): anchor + current cell,
+     * −1 = none. The preview is a pure render overlay — cells enter
+     * pending only on commit (release), never mid-drag. */
+    private int shapeStartX = -1, shapeStartY = -1, shapeEndX = -1, shapeEndY = -1;
+    private int shapeButton = 0;
+
+    private void shapeCells(PaintCanvas.CellVisitor visitor) {
+        if (tool == Tool.RECT) {
+            PaintCanvas.rectOutline(shapeStartX, shapeStartY, shapeEndX, shapeEndY, visitor);
+        } else {
+            PaintCanvas.line(shapeStartX, shapeStartY, shapeEndX, shapeEndY, visitor);
+        }
+    }
+
+    private void cancelShape() {
+        shapeStartX = shapeStartY = shapeEndX = shapeEndY = -1;
+    }
+
     private boolean apply(double mouseX, double mouseY, int button) {
         // canvas is first populated by layout() (called from render()); a
         // mouse event arriving before the first frame must not NPE.
@@ -355,6 +373,17 @@ public class PaintScreen extends ArcadeScreen {
                 return true;
             }
         }
+        if ((tool == Tool.LINE || tool == Tool.RECT) && canvas != null) {
+            int cx = (int) Math.floor((mouseX - boardX()) / cell);
+            int cy = (int) Math.floor((mouseY - boardY()) / cell);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+                shapeStartX = shapeEndX = cx;
+                shapeStartY = shapeEndY = cy;
+                shapeButton = button;
+                UISounds.tick(1.1F);
+                return true;
+            }
+        }
         if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             UISounds.tick(button == 1 ? 0.9F : 1.1F);
@@ -365,6 +394,11 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (shapeStartX >= 0) {
+            shapeEndX = Mth.clamp((int) Math.floor((mouseX - boardX()) / cell), 0, cols - 1);
+            shapeEndY = Mth.clamp((int) Math.floor((mouseY - boardY()) / cell), 0, rows - 1);
+            return true;
+        }
         if (tool == Tool.BRUSH && apply(mouseX, mouseY, button)) {
             dragging = true;
             return true;
@@ -374,6 +408,15 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (shapeStartX >= 0) {
+            byte color = (byte) (shapeButton == 1 ? 0 : selected + 1);
+            shapeCells((x, y) -> paintCell(y * cols + x, color));
+            cancelShape();
+            endGesture();
+            flush();
+            UISounds.tick(shapeButton == 1 ? 0.9F : 1.1F);
+            return true;
+        }
         lastStrokeCell = -1;
         if (dragging) {
             dragging = false;
@@ -385,6 +428,10 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == 256 && shapeStartX >= 0) { // ESC mid-shape: cancel, keep screen
+            cancelShape();
+            return true;
+        }
         switch (keyCode) {
             case 66 -> { selectTool(Tool.BRUSH); return true; }      // B
             case 70 -> { selectTool(Tool.FILL); return true; }       // F
@@ -410,6 +457,7 @@ public class PaintScreen extends ArcadeScreen {
     public void onClose() {
         dragging = false;
         lastStrokeCell = -1;
+        cancelShape();
         endGesture();
         flush();
         super.onClose();
@@ -431,6 +479,13 @@ public class PaintScreen extends ArcadeScreen {
             int x = bx + (i % cols) * cell;
             int y = by + (i / cols) * cell;
             graphics.fill(x, y, x + cell, y + cell, canvas[i]);
+        }
+        if (shapeStartX >= 0) {
+            int ghost = (PALETTE[selected] & 0x00FFFFFF) | 0x80000000;
+            int ghostArgb = shapeButton == 1 ? 0x80101216 : ghost;
+            shapeCells((cx2, cy2) -> graphics.fill(
+                    bx + cx2 * cell, by + cy2 * cell,
+                    bx + cx2 * cell + cell, by + cy2 * cell + cell, ghostArgb));
         }
         int ty = toolRowY();
         Tool[] tools = Tool.values();
