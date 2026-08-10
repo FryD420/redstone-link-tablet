@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fast paint strokes don't skip anymore** — dragging quickly across
+  the Paint canvas now fills every cell along the sweep instead of
+  leaving gaps where the cursor out-ran the brush. Held tablets and
+  walls both.
 - **Long chat messages wrap on the pinned overlay** — the Twitch
   overlay pane now wraps messages onto as many lines as they need
   (same look as the full chat screen) instead of cutting everything

@@ -184,6 +184,12 @@ public class PaintScreen extends ArcadeScreen {
     // Strokes
     // ------------------------------------------------------------------
 
+    /** Anchor of the in-progress stroke (continuous cell index), -1 when
+     * no previous cell — fast drags deliver cursor positions several
+     * cells apart, and each new position draws a {@link PaintCanvas#line}
+     * from this anchor so the stroke never gaps. */
+    private int lastStrokeCell = -1;
+
     private boolean apply(double mouseX, double mouseY, int button) {
         // canvas is first populated by layout() (called from render()); a
         // mouse event arriving before the first frame must not NPE.
@@ -191,11 +197,20 @@ public class PaintScreen extends ArcadeScreen {
         int cx = (int) Math.floor((mouseX - boardX()) / cell);
         int cy = (int) Math.floor((mouseY - boardY()) / cell);
         if (cx < 0 || cx >= cols || cy < 0 || cy >= rows) return false;
-        int index = cy * cols + cx;
         byte color = (byte) (button == 1 ? 0 : selected + 1);
+        if (dragging && lastStrokeCell >= 0) {
+            PaintCanvas.line(lastStrokeCell % cols, lastStrokeCell / cols, cx, cy,
+                    (x, y) -> paintCell(y * cols + x, color));
+        } else {
+            paintCell(cy * cols + cx, color);
+        }
+        lastStrokeCell = cy * cols + cx;
+        return true;
+    }
+
+    private void paintCell(int index, byte color) {
         canvas[index] = paletteArgb(color);
         pending.put(index, color);
-        return true;
     }
 
     private void flush() {
@@ -249,6 +264,7 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        lastStrokeCell = -1;
         if (dragging) {
             dragging = false;
             flush();
@@ -271,6 +287,7 @@ public class PaintScreen extends ArcadeScreen {
     @Override
     public void onClose() {
         dragging = false;
+        lastStrokeCell = -1;
         flush();
         super.onClose();
     }

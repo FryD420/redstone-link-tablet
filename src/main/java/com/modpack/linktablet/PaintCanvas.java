@@ -49,6 +49,37 @@ public final class PaintCanvas {
         return (contY % ROWS) * COLS + (contX % COLS);
     }
 
+    /** Receives each cell of a {@link #line} walk. */
+    public interface CellVisitor {
+        void cell(int x, int y);
+    }
+
+    /**
+     * Visits every cell of a straight segment from (x0,y0) to (x1,y1),
+     * inclusive (Bresenham). A fast mouse drag delivers cursor positions
+     * several cells apart — the GUI stroke handler bridges each pair of
+     * consecutive positions through here so strokes never leave gaps
+     * (cell-walk geometry stays in this class, per the class doc).
+     */
+    public static void line(int x0, int y0, int x1, int y1, CellVisitor visitor) {
+        int dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy;
+        while (true) {
+            visitor.cell(x0, y0);
+            if (x0 == x1 && y0 == y1) return;
+            int e2 = 2 * err;
+            if (e2 >= dy) {
+                err += dy;
+                x0 += sx;
+            }
+            if (e2 <= dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
+
     private PaintCanvas() {
     }
 }
