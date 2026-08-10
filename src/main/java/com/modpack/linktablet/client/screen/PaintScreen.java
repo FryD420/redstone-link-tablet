@@ -74,6 +74,39 @@ public class PaintScreen extends ArcadeScreen {
     private boolean dragging = false;
     private int selected = 6;
 
+    /** Active drawing tool (1.11.x Paint v2). BRUSH is the classic
+     * paint/erase; the rest are client-side gestures that decompose to
+     * ordinary cells — see the design spec. */
+    enum Tool { BRUSH, FILL, LINE, RECT, EYEDROPPER }
+
+    private Tool tool = Tool.BRUSH;
+    /** Undo history, newest first (Task 3 populates; declared here so
+     * the glyph row can dim while it's empty). Depth-capped at
+     * MAX_UNDO. */
+    private static final int MAX_UNDO = 32;
+    private final java.util.ArrayDeque<UndoStep> history = new java.util.ArrayDeque<>();
+
+    private record UndoCell(int index, int beforeArgb, int afterArgb) {}
+
+    private record UndoStep(java.util.List<UndoCell> cells) {}
+
+    private void selectTool(Tool t) {
+        tool = t;
+        UISounds.tick(1.3F);
+    }
+
+    /** Filled by Task 3 (conflict-aware replay). */
+    private void undo() {
+    }
+
+    private int toolRowY() {
+        return boardY() + rows * cell + 4;
+    }
+
+    private int swatchRowY() {
+        return toolRowY() + SWATCH + 2;
+    }
+
     public PaintScreen(SignalView view, boolean returnToTablet) {
         super("paint", view, returnToTablet);
     }
@@ -85,7 +118,8 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     protected int boardH() {
-        return rows * cell + SWATCH + 4;
+        // canvas + gap + tool row + gap + swatch row
+        return rows * cell + 4 + SWATCH + 2 + SWATCH;
     }
 
     // ------------------------------------------------------------------
@@ -96,7 +130,7 @@ public class PaintScreen extends ArcadeScreen {
         cols = Math.max(1, view.surfaceW()) * PaintCanvas.COLS;
         rows = Math.max(1, view.surfaceH()) * PaintCanvas.ROWS;
         int availW = Math.max(1, width - PAD * 2 - MARGIN);
-        int availH = Math.max(1, height - HEADER - PAD * 2 - 4 - SWATCH - 4 - MARGIN);
+        int availH = Math.max(1, height - HEADER - PAD * 2 - 4 - SWATCH - 2 - SWATCH - 4 - MARGIN);
         cell = Mth.clamp(Math.min(availW / cols, availH / rows), 2, 7);
 
         if (view instanceof SignalView.Block block) {
@@ -235,8 +269,22 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Palette strip below the canvas
-        int py = boardY() + rows * cell + 4;
+        // Tool row, then palette strip, below the canvas
+        int ty = toolRowY();
+        if (mouseY >= ty && mouseY < ty + SWATCH) {
+            if (mouseX >= undoGlyphX() && mouseX < undoGlyphX() + SWATCH) {
+                undo();
+                UISounds.tick(0.8F);
+                return true;
+            }
+            int index = (int) ((mouseX - boardX()) / (SWATCH + 1));
+            if (index >= 0 && index < Tool.values().length) {
+                selectTool(Tool.values()[index]);
+                return true;
+            }
+            return true; // dead strip space never paints
+        }
+        int py = swatchRowY();
         if (mouseY >= py && mouseY < py + SWATCH) {
             int index = (int) ((mouseX - boardX()) / (SWATCH + 1));
             if (index >= 0 && index < PALETTE.length) {
@@ -244,6 +292,7 @@ public class PaintScreen extends ArcadeScreen {
                 UISounds.tick(1.3F);
                 return true;
             }
+            return true;
         }
         if (apply(mouseX, mouseY, button)) {
             dragging = true;
@@ -274,6 +323,15 @@ public class PaintScreen extends ArcadeScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        switch (keyCode) {
+            case 66 -> { selectTool(Tool.BRUSH); return true; }      // B
+            case 70 -> { selectTool(Tool.FILL); return true; }       // F
+            case 76 -> { selectTool(Tool.LINE); return true; }       // L
+            case 82 -> { selectTool(Tool.RECT); return true; }       // R
+            case 73 -> { selectTool(Tool.EYEDROPPER); return true; } // I
+            case 90 -> { undo(); return true; }                      // Z
+            default -> { }
+        }
         if (keyCode == 67) { // C clears
             pending.clear();
             if (canvas != null) java.util.Arrays.fill(canvas, 0);
@@ -309,7 +367,20 @@ public class PaintScreen extends ArcadeScreen {
             int y = by + (i / cols) * cell;
             graphics.fill(x, y, x + cell, y + cell, canvas[i]);
         }
-        int py = by + rows * cell + 4;
+        int ty = toolRowY();
+        Tool[] tools = Tool.values();
+        for (int i = 0; i < tools.length; i++) {
+            int x = bx + i * (SWATCH + 1);
+            renderToolGlyph(graphics, tools[i], x, ty);
+            if (tools[i] == tool) {
+                graphics.fill(x, ty - 2, x + SWATCH, ty - 1, 0xFFE8EAF0);
+            }
+        }
+        // Undo sits at the far right of the tool row — a momentary
+        // button, not a mode; dimmed while there is nothing to undo.
+        renderUndoGlyph(graphics, undoGlyphX(), ty, !history.isEmpty());
+
+        int py = swatchRowY();
         for (int i = 0; i < PALETTE.length; i++) {
             int x = bx + i * (SWATCH + 1);
             graphics.fill(x, py, x + SWATCH, py + SWATCH, PALETTE[i]);
@@ -317,5 +388,50 @@ public class PaintScreen extends ArcadeScreen {
                 graphics.fill(x, py - 2, x + SWATCH, py - 1, 0xFFE8EAF0);
             }
         }
+    }
+
+    private int undoGlyphX() {
+        return boardX() + Math.max(Tool.values().length * (SWATCH + 1) + SWATCH,
+                cols * cell - SWATCH);
+    }
+
+    /** Procedural 8×8 tool glyphs, house style (fills only). */
+    private void renderToolGlyph(GuiGraphics g, Tool t, int x, int y) {
+        int ink = 0xFFE8EAF0;
+        switch (t) {
+            case BRUSH -> {
+                g.fill(x + 5, y, x + 8, y + 3, ink);          // tip
+                g.fill(x + 3, y + 3, x + 5, y + 5, ink);      // ferrule
+                g.fill(x + 1, y + 5, x + 3, y + 8, ink);      // handle
+            }
+            case FILL -> {
+                g.fill(x + 1, y + 2, x + 6, y + 7, ink);      // bucket
+                g.fill(x + 6, y + 4, x + 8, y + 8, ink);      // pour
+            }
+            case LINE -> {
+                g.fill(x, y + 6, x + 2, y + 8, ink);
+                g.fill(x + 2, y + 4, x + 4, y + 6, ink);
+                g.fill(x + 4, y + 2, x + 6, y + 4, ink);
+                g.fill(x + 6, y, x + 8, y + 2, ink);
+            }
+            case RECT -> {
+                g.fill(x, y + 1, x + 8, y + 2, ink);          // top
+                g.fill(x, y + 6, x + 8, y + 7, ink);          // bottom
+                g.fill(x, y + 2, x + 1, y + 6, ink);          // left
+                g.fill(x + 7, y + 2, x + 8, y + 6, ink);      // right
+            }
+            case EYEDROPPER -> {
+                g.fill(x, y + 6, x + 2, y + 8, ink);          // tip
+                g.fill(x + 2, y + 3, x + 5, y + 6, ink);      // barrel
+                g.fill(x + 5, y + 1, x + 8, y + 4, ink);      // bulb
+            }
+        }
+    }
+
+    private void renderUndoGlyph(GuiGraphics g, int x, int y, boolean enabled) {
+        int ink = enabled ? 0xFFE8EAF0 : 0xFF5A6170;
+        g.fill(x, y + 3, x + 3, y + 6, ink);                  // arrow head block
+        g.fill(x + 3, y + 4, x + 8, y + 6, ink);              // shaft
+        g.fill(x + 6, y + 2, x + 8, y + 4, ink);              // curl
     }
 }
