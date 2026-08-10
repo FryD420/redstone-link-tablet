@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Paint grew a toolbox** — bucket fill (floods across merged-wall
+  seams), line and rectangle tools with a live preview, an eyedropper,
+  and a 32-step undo that never reverts paint someone else laid down
+  after you. Tool row sits above the color swatches; B/F/L/R/I pick
+  tools, Z undoes. Client-only, pairs with 1.11.0.
 - **Fast paint strokes don't skip anymore** — dragging quickly across
   the Paint canvas now fills every cell along the sweep instead of
   leaving gaps where the cursor out-ran the brush. Held tablets and

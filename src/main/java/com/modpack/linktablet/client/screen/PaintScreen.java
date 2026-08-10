@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 🎨 "Paint" (persisted, 1.11.0): a sixteen-color doodle pad — left-click
- * paints, right-click erases, drag to sweep, C clears. Held/slotted
+ * 🎨 "Paint" (persisted 1.11.0; tools 1.11.x): a sixteen-color canvas —
+ * brush/fill/line/rect/eyedropper tools with conflict-aware undo
+ * (left = paint, right = erase, C clears, Z undoes; every tool is a
+ * client-side gesture that decomposes into ordinary stroke cells). Held/slotted
  * tablets edit their own {@link PaintCanvas#COLS}×{@link PaintCanvas#ROWS}
  * slice; a placed tablet edits its (possibly merged) wall canvas, stitched
  * live from every member's own slice by {@link #stitchArgb} — the same

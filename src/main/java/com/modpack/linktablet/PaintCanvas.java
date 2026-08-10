@@ -49,7 +49,7 @@ public final class PaintCanvas {
         return (contY % ROWS) * COLS + (contX % COLS);
     }
 
-    /** Receives each cell of a {@link #line} walk. */
+    /** Receives each cell of a {@link #line}, {@link #rectOutline}, or flood walk. */
     public interface CellVisitor {
         void cell(int x, int y);
     }
