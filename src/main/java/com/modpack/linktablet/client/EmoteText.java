@@ -29,7 +29,7 @@ public final class EmoteText {
     public record Run(int x, int width, Segment seg, String text) {}
     public record Line(List<Run> runs) {}
 
-    private record Memo(int generation, boolean emotesOn, List<Segment> segments) {}
+    private record Memo(int generation, boolean emotesOn, String channel, List<Segment> segments) {}
     private static final Map<TwitchChatService.ChatMessage, Memo> MEMO = new WeakHashMap<>();
 
     // ------------------------------------------------------------------
@@ -40,11 +40,11 @@ public final class EmoteText {
         boolean on = ClientPrefs.twitchEmotes();
         int gen = TwitchEmotes.generation(channel);
         Memo memo = MEMO.get(m);
-        if (memo != null && memo.generation() == gen && memo.emotesOn() == on) {
+        if (memo != null && memo.generation() == gen && memo.emotesOn() == on && memo.channel().equals(channel)) {
             return memo.segments();
         }
         List<Segment> segs = on ? build(m, channel) : List.of(new TextSeg(m.text()));
-        MEMO.put(m, new Memo(gen, on, segs));
+        MEMO.put(m, new Memo(gen, on, channel, segs));
         return segs;
     }
 
@@ -76,7 +76,12 @@ public final class EmoteText {
     private static void words(String text, String channel, List<Segment> out) {
         StringBuilder pending = new StringBuilder();
         for (String token : text.split("(?<= )")) { // split AFTER spaces, keeps them
-            String bare = token.strip();
+            // Literal-trailing-space-only trim: strip() also eats Unicode
+            // whitespace (em-space, tabs) that the literal-space split above
+            // never isolates, which could drop leading exotic whitespace.
+            int end = token.length();
+            while (end > 0 && token.charAt(end - 1) == ' ') end--;
+            String bare = token.substring(0, end);
             TwitchEmotes.Emote e = bare.isEmpty() ? null : TwitchEmotes.resolve(bare, channel);
             if (e == null) {
                 pending.append(token);
@@ -87,7 +92,7 @@ public final class EmoteText {
                 pending.setLength(0);
             }
             out.add(new EmoteSeg(e));
-            pending.append(token, bare.length(), token.length()); // trailing space
+            pending.append(token, end, token.length()); // trailing space
         }
         if (!pending.isEmpty()) out.add(new TextSeg(pending.toString()));
     }
@@ -97,6 +102,7 @@ public final class EmoteText {
     // ------------------------------------------------------------------
 
     public static List<Line> wrap(Font font, List<Segment> segments, int maxWidth, int emoteH) {
+        maxWidth = Math.max(maxWidth, 8); // degenerate-caller guard: never narrower than one glyph
         List<Line> lines = new ArrayList<>();
         List<Run> current = new ArrayList<>();
         int x = 0;
@@ -120,6 +126,7 @@ public final class EmoteText {
                             current = new ArrayList<>();
                             x = 0;
                             head = font.plainSubstrByWidth(word, maxWidth);
+                            if (head.isEmpty()) break; // unrenderable word: discard, guarantee termination
                         }
                         x = appendText(current, lines, font, x, maxWidth, head);
                         word = word.substring(head.length());
