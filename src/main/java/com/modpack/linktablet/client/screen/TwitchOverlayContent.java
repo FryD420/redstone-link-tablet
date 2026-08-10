@@ -2,6 +2,7 @@ package com.modpack.linktablet.client.screen;
 
 import com.modpack.linktablet.api.client.OverlayContent;
 import com.modpack.linktablet.client.ClientPrefs;
+import com.modpack.linktablet.client.EmoteText;
 import com.modpack.linktablet.client.SignalView;
 import com.modpack.linktablet.client.TextFit;
 import com.modpack.linktablet.client.TwitchChatService;
@@ -15,7 +16,7 @@ import java.util.function.Supplier;
 
 /**
  * The pinned Twitch Chat body (1.11.0): the last few messages, one
- * compact ellipsized line each — colored username, then the text — live
+ * compact single line each — colored username, then the text — live
  * on the HUD. No scrolling or composing (that stays in the full {@link
  * TwitchScreen}); right-click the window opens it.
  *
@@ -35,6 +36,15 @@ import java.util.function.Supplier;
  * releases and clears the tracked channel so a later render re-acquires
  * naturally, the same "defocus can be followed by more renders while
  * the pin lives on" case {@link MonitorOverlayContent} documents.
+ *
+ * <p>Message text (1.11.0 emotes): each row is exactly one line
+ * ({@link #ROW_H} tall, never wraps), so the message text is tokenized
+ * via {@code EmoteText.segments} and wrapped via {@code EmoteText.wrap}
+ * only to find the first line that fits {@link #ROW_H}-tall emotes in
+ * the remaining row width — anything past that first line is simply
+ * not drawn, the same "pane never scrolls" truncation the class already
+ * accepts elsewhere. The colored "user: " prefix has no emotes and
+ * keeps its own {@link TextFit#ellipsize} handling.
  */
 public class TwitchOverlayContent implements OverlayContent {
 
@@ -121,12 +131,12 @@ public class TwitchOverlayContent implements OverlayContent {
         for (int i = 0; i < messages.size(); i++) {
             int ry = top + i * ROW_H;
             if (ry + ROW_H < clipTop || ry > clipBottom) continue;
-            renderRow(graphics, font, theme, messages.get(i), x, ry, rowWidth);
+            renderRow(graphics, font, theme, messages.get(i), channel, x, ry, rowWidth);
         }
     }
 
     private void renderRow(GuiGraphics graphics, Font font, ScreenTheme theme,
-                           TwitchChatService.ChatMessage message, int x, int ry, int rowWidth) {
+                           TwitchChatService.ChatMessage message, String channel, int x, int ry, int rowWidth) {
         String prefix = message.user() + ": ";
         int prefixWidth = font.width(prefix);
         if (prefixWidth >= rowWidth) {
@@ -135,8 +145,10 @@ public class TwitchOverlayContent implements OverlayContent {
             return;
         }
         graphics.drawString(font, prefix, x, ry + 1, message.color(), theme.textShadow);
-        String text = TextFit.ellipsize(font, message.text(), rowWidth - prefixWidth);
-        graphics.drawString(font, text, x + prefixWidth, ry + 1, theme.textPrimary, theme.textShadow);
+        List<EmoteText.Line> lines = EmoteText.wrap(font,
+                EmoteText.segments(message, channel), rowWidth - prefixWidth, ROW_H);
+        EmoteText.drawGui(graphics, font, lines.get(0), x + prefixWidth, ry + 1,
+                ROW_H, theme.textPrimary, theme.textShadow);
     }
 
     @Override
