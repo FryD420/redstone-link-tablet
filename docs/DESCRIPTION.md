@@ -10,7 +10,7 @@
 
 <p align="center"><img src="https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/banner.png" alt="Create: Redstone Link Tablet"></p>
 
-<p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
+<p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://discord.gg/JwkHGpE527"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/social/discord-singular_64h.png?raw=true" alt="Join the Discord" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
 
 ---
 
