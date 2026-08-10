@@ -5,26 +5,112 @@ at the repo root (auto-loaded every Claude session).
 
 ## ▶ START HERE next session (state as of 2026-08-09 end of day)
 
+- **1.11.0-beta.6 just built this session** (Twitch chat emotes —
+  native + 7TV/BTTV/FFZ, animated, on all three surfaces, toggle
+  glyph in the Twitch header; 100% client-only, registrar untouched
+  at "23" — beta.6 pairs with beta.4/beta.5). NOT yet sent to
+  testers, and the feature has NOT been seen in a running client —
+  the F2 pass below is owed before any distribution.
 - **1.11.0-beta.5 is with the testers** (jar + checklist sent
-  2026-08-09; pairs with beta.4, registrar "23"). The whole 1.11.0
-  train: Frequency Monitor + multi-probe container editor, Twitch
-  Chat, Arcade consolidation, Paint on walls (Paint its own app),
-  App Store search, focus fixes. All pushed through `1161234`.
+  2026-08-09; pairs with beta.4/beta.6, registrar "23"). The whole
+  1.11.0 train: Frequency Monitor + multi-probe container editor,
+  Twitch Chat, Arcade consolidation, Paint on walls (Paint its own
+  app), App Store search, focus fixes, now plus emotes. All pushed
+  through `1161234`, plus this session's emotes commit.
 - **Beta.5 additions user-verified in dev**: Paint store row, compact
   Twitch chat walls, bezel-clean text on all four edges (three
   screenshot-driven fix rounds, all confirmed "perfect").
-- **Remaining before RELEASE** (all user-gated): tester verdicts
-  across beta.2–5 matrices (below); the dedicated-server `runServer`
-  pass (Monitor classification + Twitch on a server — never run);
-  listing refresh (DESCRIPTION.md still describes 1.10.x — none of
-  1.11.0 is in the listing text) + the long-queued screenshot shoot;
-  then version → 1.11.0, changelog date, tag, push, uploads.
+- **Beta.6 F2 pass owed** (never run in a client yet): live channel
+  with real emotes on GUI, overlay, and a wall — wall emote
+  legibility on small/1×1 faces, aliasing, and animated playback in
+  sync across surfaces; overlay overflow now hard-cuts with no
+  trailing ellipsis (confirm that reads clean, not broken); toggle
+  glyph on/off without a relog; the full test matrix below.
+- **Remaining before RELEASE** (all user-gated): the beta.6 F2 pass
+  above; tester verdicts across beta.2–6 matrices (below); the
+  dedicated-server `runServer` pass (Monitor classification + Twitch
+  on a server — never run); listing refresh (DESCRIPTION.md still
+  describes 1.10.x — none of 1.11.0 is in the listing text) + the
+  long-queued screenshot shoot; then version → 1.11.0, changelog
+  date, tag, push, uploads.
 - **Open user calls parked in-line**: Home-from-hub kiosk renav
   (testers may answer); gauge editor container-menu conversion (EMI
   drag); App Store categories (roadmap, less urgent since the
-  Arcade); survival tablet cloning (Parked section).
+  Arcade); survival tablet cloning (Parked section); Display Link
+  target app (Parked section, shelved mid-brainstorm).
 
-## Status (2026-08-09 — 1.11.0-beta.5: Paint promoted to its own app; beta.4 = paint on walls, registrar "23", release held)
+## Status (2026-08-09 — 1.11.0-beta.6: Twitch chat emotes, registrar unchanged "23", release held)
+
+- **Twitch chat emotes** (idea from the perf/toggle discussion) —
+  inline images in Twitch chat on all three surfaces, the wall as the
+  point. Native Twitch emotes decode free from the IRC `emotes=` tag
+  (code-point-aware span math so astral-plane characters don't shift
+  later spans); third-party sets (7TV, BTTV, FFZ) fetch anonymously
+  per-channel once `room-id` is known from the first message, with
+  each provider failing soft to plain text on its own (never a crash,
+  at most one INFO per provider per channel). New client-only classes:
+  `TwitchEmotes` (set/matching state, epoch-guarded so a stale fetch
+  can't clobber a newer channel), `EmoteTextures` (async GIF/PNG
+  fetch + composite into one vertical sprite-sheet `DynamicTexture`
+  per emote, capped 1x resolution / 40 frames / ~256 KB download / LRU
+  128 with evicted textures closed), and `EmoteText` (the ONE
+  tokenizer — segments, word-wrap, and GUI draw all go through it, per
+  message memoized and invalidated per-channel when a third-party set
+  arrives). A dev-only spike, `tools/EmoteProbe`
+  (`./gradlew emoteTool`), gated the whole feature first and confirmed
+  7TV/BTTV serve GIF/PNG at 1x (the WebP-migration risk didn't bite).
+  Rendering: `TwitchScreen` and the overlay pane word-wrap mixed
+  text/emote runs (an emote is an unbreakable token); wall faces stay
+  single-line bottom-stacked and ellipsized at segment granularity,
+  with emote quads drawn via `RenderType.text(sheet)` — inside the
+  existing text pass, no new custom RenderType, same bleed-inset rules
+  as text. A smiley toggle glyph next to the channel pin in
+  `TwitchScreen`'s header flips `ClientPrefs` boolean `twitch.emotes`
+  (default on); off reverts to beta.5's pure-text rendering
+  everywhere including walls and overlay — the potato-GPU valve. No
+  wire, component, NBT, or registrar change of any kind — registrar
+  stays "23"; beta.6 pairs with beta.4/beta.5.
+- **Known notes carried into the next session**: emotes have NOT yet
+  been seen in a running client — the F2 pass owed is wall emote
+  legibility on small/1×1 faces, aliasing, and animated playback
+  (does the shared animation clock actually keep GUI/overlay/wall in
+  sync), plus confirming the overlay's new hard-cut overflow (no
+  trailing ellipsis) reads clean rather than broken. `mod_version`
+  bumped to `1.11.0-beta.6` this pass — tester distribution, final
+  release name still plain `1.11.0`.
+- **Commits state**: T1–T8 (spike, native spans, third-party sets,
+  texture pipeline, tokenizer, GUI/overlay/wall rendering) are
+  committed on `tablet-overlay`; this docs + version-bump commit lands
+  right after. Not pushed this pass.
+
+**Test matrix (beta.6 additions)** — copied verbatim from
+`docs/superpowers/specs/2026-08-09-twitch-emotes-design.md` "Test
+matrix (beta.6 additions)":
+
+- Native emote mid-message renders on GUI, overlay, and wall; a
+  message with an astral emoji BEFORE an emote keeps the span
+  aligned.
+- Heavy 7TV channel: emotes pop in as sets/textures load (text →
+  image self-heal), animated ones animate in sync across GUI +
+  wall simultaneously.
+- Cap check: a 60+-frame 7TV monster animates with its frame cap,
+  no hitch on first appearance (decode is off-thread).
+- Toggle OFF → pure beta.5 text everywhere; ON again → emotes
+  return without a relog.
+- Kill the network after emotes are cached → chat goes OFFLINE as
+  today; cached emotes still animate; new-emote fetches fail soft
+  to text.
+- Merged wall + rotated wall: emote quads respect the bezel bleed
+  insets on all four edges (the beta.5 screenshot rule).
+- Unknown/failed emote (dead CDN id) renders as text, one INFO max.
+- Channel part → re-join: sets re-fetch, no stale cross-channel
+  emote matches (channel A's 7TV names must not fire in channel B).
+- Regression: username colors, wrapping indent, autoscroll,
+  status lines, socket-lifecycle (close every surface → socket
+  drops) all unchanged; registrar untouched — beta.6 client joins a
+  beta.4/5 server.
+
+## Previous status (2026-08-09 — 1.11.0-beta.5: Paint promoted to its own app; beta.4 = paint on walls, registrar "23", release held)
 
 - **beta.5 (same day, user decision after playing beta.4)**: Paint
   left the Arcade — `PAINT(25)` dropped its `game` flag, which
@@ -830,7 +916,20 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
 
 ## Parked (don't propose unless the user re-raises)
 
-- **Survival tablet cloning** — parked 2026-08-09 ("backburner",
+- **Display Link target app** — parked 2026-08-09 mid-brainstorm
+  ("lets shelf this whole idea for now"), revives the tier-2 item from
+  the 2026-07-22 factory-gauges scoping. Agreed core before parking:
+  the tablet block registers as a Create `DisplayTarget`, so Create's
+  native Display Link flow (click target with the link item → place
+  link on source) accepts placed tablets — Create does all gathering
+  and source config, we render pushed text lines (likely a new
+  Program with kiosk face/GUI/overlay, undesigned). OPEN question
+  where the park hit: the user also wants binding a link to a HELD
+  tablet ("display data on the go") — clicking a placed Display Link
+  with the tablet item. Options laid out: (B) identity-based wireless
+  bind to the tablet item, works in hand/chest/placed — the real
+  want, but ~2+ sessions (identity tracking, no Create precedent) vs
+  (C) v1 = placed-targets only, ~1 session. No decision made. — parked 2026-08-09 ("backburner",
   scoped in-session): creative pick-block already full-clones
   (everything incl. paint rides the item). Survival options if it
   comes back: (1) crafting-grid clone, the written-book pattern —

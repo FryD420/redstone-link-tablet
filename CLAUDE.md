@@ -289,6 +289,19 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   not Twitch-specific). Chat is unfiltered live internet content —
   channel choice on a placed tablet carries the same trust model as
   editing its signals (whoever can open the GUI controls the wall).
+  Emotes (1.11.0-beta.6): `client/TwitchEmotes`, `EmoteTextures`, and
+  `EmoteText` are CLIENT-ONLY, same as the socket — anonymous CDN GETs
+  only (native `static-cdn.jtvnw.net` + the 7TV/BTTV/FFZ public APIs),
+  never a token or write call. `EmoteText` is the ONE tokenizer —
+  GUI, overlay, and wall faces all lay out through it; never fork
+  matching/wrapping into a renderer. Wall emote quads ride
+  `RenderType.text` ONLY, inside the existing text pass (never a
+  custom RenderType near the cached quad consumer — see the fills→
+  items→text rule above). Caps keep it defensive: 1x source images,
+  40 decoded frames, ~256 KB download, LRU cache of 128 textures
+  (evicted ones closed). Toggle is `ClientPrefs` boolean
+  `twitch.emotes` (default on); off = pure text everywhere, the
+  potato-GPU valve.
 
 - Paint on walls (1.11.0, idea: Tommy): `PaintCanvas` (root package)
   is the ONE geometry/mapping home — GUI, stroke handler, and renderer

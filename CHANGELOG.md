@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Twitch chat gets emotes** — native Twitch emotes plus 7TV, BTTV,
+  and FFZ show as images inline in chat, animated ones included, on
+  every surface: the held app, the overlay pin, and placed/merged
+  walls. A toggle glyph next to the channel pin turns them off if
+  you'd rather have plain text (or a lighter-weight wall). Client-only
+  — no pairing impact, beta.6 pairs with beta.4/beta.5.
 - **Paint is its own app now** — with paintings persisting and showing
   on walls, Paint outgrew the Arcade: it has its own App Store row
   (pink chip, painting icon). The Arcade keeps the other 18 games. If
