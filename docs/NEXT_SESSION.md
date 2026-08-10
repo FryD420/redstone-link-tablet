@@ -929,7 +929,9 @@ Program enum (chipColor/iconItem). Reserved ids: 2=clock,
   with the tablet item. Options laid out: (B) identity-based wireless
   bind to the tablet item, works in hand/chest/placed — the real
   want, but ~2+ sessions (identity tracking, no Create precedent) vs
-  (C) v1 = placed-targets only, ~1 session. No decision made. — parked 2026-08-09 ("backburner",
+  (C) v1 = placed-targets only, ~1 session. No decision made.
+
+- **Survival tablet cloning** — parked 2026-08-09 ("backburner",
   scoped in-session): creative pick-block already full-clones
   (everything incl. paint rides the item). Survival options if it
   comes back: (1) crafting-grid clone, the written-book pattern —
