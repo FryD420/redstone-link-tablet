@@ -172,6 +172,12 @@ public final class TwitchChatService {
             if (w != null) {
                 w.shutdown();
                 worker = null;
+                // Parity with the delta-PART path below: closing the LAST
+                // surface must part emote sets too, or a reopen never refetches.
+                for (String c : JOINED) {
+                    BUFFERS.remove(c);
+                    TwitchEmotes.onChannelParted(c);
+                }
                 JOINED.clear();
                 status = Status.IDLE;
             }

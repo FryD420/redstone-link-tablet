@@ -1045,6 +1045,10 @@ public final class TabletScreenRenderer {
                         budgetPx = name.equals(es.emote().name()) ? budgetPx - drawn : 0;
                         continue;
                     }
+                    // Width comes from the tokenizer's one sizing rule.
+                    // It re-runs EmoteTextures.get on this loaded path (a
+                    // second LRU map hit, negligible) — the get above is
+                    // for the null/text fallback, not to save a lookup.
                     int wPx = EmoteText.emoteWidth(es.emote(), font, (int) FONT_LINE);
                     if (wPx > budgetPx) break; // no partial emotes on a wall line
                     emoteQuads.add(new EmoteQuad(sprite, advanceU, top,
@@ -1101,6 +1105,9 @@ public final class TabletScreenRenderer {
         for (EmoteQuad q : quads) {
             if (!q.sprite().texture().equals(bound)) {
                 bound = q.sprite().texture();
+                // RenderType.text is an unbounded Util.memoize cache keyed by
+                // texture — tiny objects, bounded by distinct emotes seen in a
+                // session; deliberate, not a leak worth a custom cache.
                 vc = buffers.getBuffer(RenderType.text(bound));
             }
             int frame = EmoteTextures.frameAt(q.sprite(), now);

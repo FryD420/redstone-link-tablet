@@ -125,12 +125,23 @@ public final class EmoteTextures {
                 }
             });
         } catch (Exception e) {
-            LOG.info("Emote {} unavailable ({})", emote.name(), e.getMessage());
-            Minecraft.getInstance().execute(() -> {
-                LOADING.remove(emote.cacheKey());
-                FAILED.add(emote.cacheKey());
-            });
+            fail(emote, e);
+        } catch (OutOfMemoryError e) {
+            // A decode that slips past the size guards can still blow the
+            // heap. Errors aren't Exceptions, so without this the LOADING
+            // entry would stick forever and the emote never retry or fall
+            // back to text — the bookkeeping MUST be posted either way.
+            fail(emote, e);
         }
+    }
+
+    /** Marks an emote FAILED from a pool thread (client-thread hop). */
+    private static void fail(TwitchEmotes.Emote emote, Throwable t) {
+        LOG.info("Emote {} unavailable ({})", emote.name(), t.toString());
+        Minecraft.getInstance().execute(() -> {
+            LOADING.remove(emote.cacheKey());
+            FAILED.add(emote.cacheKey());
+        });
     }
 
     /** Reads the body in ~8 KB chunks, aborting as soon as MAX_BYTES would
@@ -160,11 +171,13 @@ public final class EmoteTextures {
             try {
                 reader.setInput(in, false, false);
                 if (!"gif".equalsIgnoreCase(reader.getFormatName())) {
-                    BufferedImage img = reader.read(0);
-                    int w = img.getWidth();
-                    int h = img.getHeight();
+                    // Header-only dims BEFORE the decode: a 256 KB body can
+                    // claim a gigapixel canvas, and reading it first is the
+                    // allocation this guard exists to prevent (decode bomb).
+                    int w = reader.getWidth(0);
+                    int h = reader.getHeight(0);
                     if (w < 1 || h < 1 || w > 128 || h > 128) throw new IOException(w + "x" + h);
-                    return new Decoded(List.of(toArgb(img)), new int[]{0});
+                    return new Decoded(List.of(toArgb(reader.read(0))), new int[]{0});
                 }
                 return decodeGif(reader);
             } finally {
@@ -197,6 +210,12 @@ public final class EmoteTextures {
             int y = Integer.parseInt(desc.getAttribute("imageTopPosition"));
             String disposal = gce.getAttribute("disposalMethod");
             BufferedImage before = "restoreToPrevious".equals(disposal) ? copy(canvas) : null;
+            // Per-frame header dims BEFORE the decode: an ImageDescriptor may
+            // legally declare a frame larger than the logical screen, so the
+            // LSD check above does NOT bound this allocation (decode bomb).
+            int fw = reader.getWidth(i);
+            int fh = reader.getHeight(i);
+            if (fw < 1 || fh < 1 || fw > 128 || fh > 128) throw new IOException(fw + "x" + fh);
             BufferedImage raw = reader.read(i);
             Graphics2D g = canvas.createGraphics();
             g.drawImage(raw, x, y, null);
@@ -260,9 +279,18 @@ public final class EmoteTextures {
         LOADING.remove(key);
         int frames = delays.length;
         int frameH = sheet.getHeight() / frames;
-        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(LinkTabletMod.MOD_ID,
-                "twitch_emote/" + key.replace(':', '_').toLowerCase(Locale.ROOT));
-        Minecraft.getInstance().getTextureManager().register(rl, new DynamicTexture(sheet));
+        ResourceLocation rl;
+        try {
+            rl = ResourceLocation.fromNamespaceAndPath(LinkTabletMod.MOD_ID,
+                    "twitch_emote/" + key.replace(':', '_').toLowerCase(Locale.ROOT));
+            // Ownership of the NativeImage passes to the DynamicTexture only
+            // once this returns; anything thrown before that would leak the
+            // native buffer (the caller's catch only does bookkeeping).
+            Minecraft.getInstance().getTextureManager().register(rl, new DynamicTexture(sheet));
+        } catch (RuntimeException e) {
+            sheet.close();
+            throw e;
+        }
         int total = 0;
         for (int ms : delays) total += ms;
         READY.put(key, new Sprite(rl, frames, sheet.getWidth(), frameH, delays, Math.max(total, 1)));

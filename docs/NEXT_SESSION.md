@@ -66,8 +66,11 @@ at the repo root (auto-loaded every Claude session).
   existing text pass, no new custom RenderType, same bleed-inset rules
   as text. A smiley toggle glyph next to the channel pin in
   `TwitchScreen`'s header flips `ClientPrefs` boolean `twitch.emotes`
-  (default on); off reverts to beta.5's pure-text rendering
-  everywhere including walls and overlay — the potato-GPU valve. No
+  (default on); off gives text-only chat everywhere — the wall path is
+  exactly beta.5's, while GUI and overlay are functionally equivalent
+  text-only rendering (they still lay out through `EmoteText`, so wrap
+  boundaries differ slightly from `font.split` and the overlay hard-cuts
+  without a trailing ellipsis) — the potato-GPU valve. No
   wire, component, NBT, or registrar change of any kind — registrar
   stays "23"; beta.6 pairs with beta.4/beta.5.
 - **Known notes carried into the next session**: emotes have NOT yet

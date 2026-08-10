@@ -126,7 +126,12 @@ public final class EmoteText {
                             current = new ArrayList<>();
                             x = 0;
                             head = font.plainSubstrByWidth(word, maxWidth);
-                            if (head.isEmpty()) break; // unrenderable word: discard, guarantee termination
+                            // Unrenderable even on a fresh line (a glyph wider
+                            // than the row): stop splitting and let the word
+                            // append overflowing below — the same
+                            // overflow-tolerant fallback the over-wide-word
+                            // path takes, and it guarantees termination.
+                            if (head.isEmpty()) break;
                         }
                         x = appendText(current, lines, font, x, maxWidth, head);
                         word = word.substring(head.length());
