@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Long chat messages wrap on the pinned overlay** — the Twitch
+  overlay pane now wraps messages onto as many lines as they need
+  (same look as the full chat screen) instead of cutting everything
+  after the first line. The pane keeps a compact overall budget:
+  newest messages fill from the bottom, older ones drop off sooner
+  when the chat runs long-winded. Client-only, pairs with 1.11.0.
+
 ## 1.11.0 — 2026-08-09
 
 - **The tablet in your hand shows chat** — when Twitch Chat is the
