@@ -43,13 +43,14 @@ import java.util.Locale;
  * both a local commit and a server-synced value arriving for a block
  * view, so the commit path itself never has to touch acquire/release.
  *
- * <p>Message wrapping (simplification, matches the task brief's
- * allowance): the "user: " prefix is drawn once, colored, as the
- * leading segment of the first line; the message text is wrapped on
- * its own via {@code font.split} at a width that leaves room for the
- * prefix, and every wrapped line — including the first — is drawn
- * starting at that same indent, so continuation lines land flush under
- * where the text (not the username) begins.
+ * <p>Message wrapping (1.11.0 emotes): the "user: " prefix is drawn
+ * once, colored, as the leading segment of the first line; the message
+ * text is wrapped and rendered through {@link EmoteText}, which performs
+ * emote-aware wrapping (via {@code EmoteText.wrap}, per-channel and
+ * memoized) and draws lines via {@code EmoteText.drawGui}. Every wrapped
+ * line — including the first — is drawn starting at that same indent, so
+ * continuation lines land flush under where the text (not the username)
+ * begins.
  */
 public class TwitchScreen extends Screen {
 
