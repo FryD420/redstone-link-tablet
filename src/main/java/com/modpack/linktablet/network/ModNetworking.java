@@ -176,6 +176,13 @@ public class ModNetworking {
         return stack.getItem() instanceof TabletItem ? stack : ItemStack.EMPTY;
     }
 
+    /** Wrench in either hand — the screen lock's one permission token
+     * (1.12.0). No ownership: anyone holding a wrench holds the key. */
+    private static boolean holdingWrench(Player player) {
+        return player.getMainHandItem().is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH)
+                || player.getOffhandItem().is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH);
+    }
+
     // ------------------------------------------------------------------
     // Payload: toggle a signal on/off
     // ------------------------------------------------------------------
@@ -715,6 +722,25 @@ public class ModNetworking {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Payload: screen lock (1.12.0) — block targets only. The server
+    // demands a wrench in either hand BOTH ways (symmetric: it matches
+    // how a locked tablet's GUI is reached).
+    // ------------------------------------------------------------------
+    public record SetLockPayload(SignalTarget target, boolean locked) implements CustomPacketPayload {
+        public static final Type<SetLockPayload> TYPE = new Type<>(id("set_lock"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetLockPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetLockPayload::target,
+                        ByteBufCodecs.BOOL, SetLockPayload::locked,
+                        SetLockPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void handleSetProgram(SetProgramPayload payload, IPayloadContext context) {
         Player player = context.player();
         if (payload.target().pos().isEmpty()) return;
@@ -774,7 +800,10 @@ public class ModNetworking {
         // inside the 1.11.0 break).
         // "23": 1.11.0 paint on walls — PaintStrokePayload/PaintClearPayload
         // added (still inside the 1.11.0 break).
-        PayloadRegistrar registrar = event.registrar("23");
+        // "24": 1.12.0 screen lock — SetLockPayload added and every
+        // config payload gained the server-side wrench rule (PAIRING
+        // BREAK vs 1.11.x).
+        PayloadRegistrar registrar = event.registrar("24");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -806,6 +835,8 @@ public class ModNetworking {
                 ModNetworking::handlePaintStroke);
         registrar.playToServer(PaintClearPayload.TYPE, PaintClearPayload.STREAM_CODEC,
                 ModNetworking::handlePaintClear);
+        registrar.playToServer(SetLockPayload.TYPE, SetLockPayload.STREAM_CODEC,
+                ModNetworking::handleSetLock);
     }
 
     /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
@@ -1085,6 +1116,26 @@ public class ModNetworking {
             com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
                     serverLevel, pos, payload.linked());
         }
+    }
+
+    private static void handleSetLock(SetLockPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isEmpty()) return; // block-only feature
+        BlockPos pos = payload.target().pos().get();
+        if (!player.level().isLoaded(pos)) return;
+        if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+        if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return;
+        TabletBlockEntity controller = be.resolveController();
+        if (controller == null) return;
+        // Symmetric wrench rule: locking AND unlocking need the key in
+        // hand — a UI-only check would be spoofable.
+        if (!holdingWrench(player)) return;
+        if (controller.isLocked() == payload.locked()) return;
+        controller.lockSurface(payload.locked());
+        player.level().playSound(null,
+                com.modpack.linktablet.compat.SableCompat.worldBlockPos(player.level(), pos),
+                payload.locked() ? SoundEvents.IRON_TRAPDOOR_CLOSE : SoundEvents.IRON_TRAPDOOR_OPEN,
+                SoundSource.BLOCKS, 0.5F, payload.locked() ? 1.4F : 1.2F);
     }
 
     private static void handleTimed(TimedSignalPayload payload, IPayloadContext context) {
