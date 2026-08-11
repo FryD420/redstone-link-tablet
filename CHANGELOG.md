@@ -4,7 +4,7 @@
 
 ### Added
 - **Screen lock** (idea: Fluid Valve): placed tablets can be locked from the
-  GUI's new padlock button — the wrench is the key. Locked glass keeps
+  GUI's new padlock button — and the wrench unlocks. Locked glass keeps
   working (taps, holds, sliders, live faces), but every configuration
   path — editing signals, themes, apps, rotation, painting, channels,
   probes, gauges — needs a wrench in hand, enforced server-side. Any
@@ -13,6 +13,13 @@
   Locked walls show a small padlock in the glass corner. Splitting a
   locked wall leaves every piece locked; merging anything into a locked
   wall locks the whole surface.
+- **GUI title header**: the tablet's name now sits on its own plaque above
+  the panel instead of sharing the button row.
+
+### Fixed
+- **Merged screens: untouchable seam gap** — clicks between the blocks of a
+  merged screen used to fall through to the wall behind; the whole panel is
+  now clickable edge to edge.
 
 ### Changed
 - Network protocol version 24 — 1.12.0 clients/servers do not pair with

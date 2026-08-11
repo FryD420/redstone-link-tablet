@@ -220,7 +220,11 @@ public class TabletScreen extends Screen {
     }
 
     private int bodyTop() {
-        return (height - bodyHeight()) / 2;
+        // Floor of 24: the title plaque hangs in its OWN band above the
+        // panel (user request 2026-08-11 — it used to share the glyph
+        // row and the padlock button pushed the cluster under it), so
+        // a full-height body must leave it headroom.
+        return Math.max((height - bodyHeight()) / 2, 24);
     }
 
     private int gridTop() {
@@ -513,10 +517,12 @@ public class TabletScreen extends Screen {
         Component titleText = reorderMode
                 ? Component.translatable("gui.linktablet.reorder.title")
                 : view.displayName();
-        // Title on a parchment plaque hung over the top rail, Stock-Keeper style
+        // Title on a parchment plaque in its OWN band ABOVE the panel
+        // (Stock-Keeper style tab) — the glyph row keeps the full header
+        // width to itself
         int titleW = font.width(titleText);
-        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
-        drawThemedCentered(graphics, titleText, width / 2, top + 7, theme.textPrimary);
+        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top - 20, titleW + 12, 18, theme.rowBg);
+        drawThemedCentered(graphics, titleText, width / 2, top - 15, theme.textPrimary);
         renderModeButtons(graphics, mouseX, mouseY);
         // Rail crossbar between the header and the scrolling content
         Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8, theme.bodyOuter);
@@ -925,8 +931,10 @@ public class TabletScreen extends Screen {
                 return true;
             }
             if (isBlockView() && overModeBtn(mouseX, mouseY, lockBtnX())) {
-                if (holdingWrench()) {
-                    boolean locked = lockedScreen();
+                // Locking is free (an open GUI is already full config
+                // trust); only UNLOCKING needs the wrench in hand
+                boolean locked = lockedScreen();
+                if (!locked || holdingWrench()) {
                     UISounds.tick(locked ? 1.7F : 0.6F);
                     PacketDistributor.sendToServer(
                             new ModNetworking.SetLockPayload(target(), !locked));

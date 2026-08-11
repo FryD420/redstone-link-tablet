@@ -1157,9 +1157,13 @@ public class ModNetworking {
         if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return;
         TabletBlockEntity controller = be.resolveController();
         if (controller == null) return;
-        // Symmetric wrench rule: locking AND unlocking need the key in
-        // hand — a UI-only check would be spoofable.
-        if (!holdingWrench(player)) return;
+        // Asymmetric wrench rule (user decision 2026-08-11 — Fluid
+        // Valve's literal ask was "wrench-to-UNLOCK"): locking is free,
+        // because an open GUI already carries full config trust — and a
+        // main-hand wrench can't even reach the GUI on an unlocked
+        // tablet (wrench-click rotates). Unlocking needs the key in
+        // hand; the locked GUI is wrench-opened, so it naturally is.
+        if (!payload.locked() && !holdingWrench(player)) return;
         if (controller.isLocked() == payload.locked()) return;
         controller.lockSurface(payload.locked());
         player.level().playSound(null,

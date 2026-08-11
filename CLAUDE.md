@@ -328,8 +328,12 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   re-placed tablets start unlocked). ONE server choke point:
   `ModNetworking.configAllowed(player, target)` — every config-payload
   handler's first line; use payloads (toggle/momentary/slider/timed)
-  are NEVER gated. Wrench-in-either-hand is the only key (symmetric:
-  SetLockPayload demands it both ways). Members MIRROR the controller's
+  are NEVER gated. Wrench-in-either-hand is the only key, ASYMMETRIC
+  (re-decided 2026-08-11): locking is free — the open GUI is the
+  permission, and a main-hand wrench can't reach an unlocked GUI at
+  all (wrench-click rotates) — while SetLockPayload demands the
+  wrench for UNLOCK, and configAllowed demands it for config on a
+  locked target. Members MIRROR the controller's
   flag (`lockSurface` walks, scanner ORs on formation) so splits stay
   locked and merging into a locked wall can't promote an unlocked
   controller. While locked, the ENTIRE wrench map becomes "open the

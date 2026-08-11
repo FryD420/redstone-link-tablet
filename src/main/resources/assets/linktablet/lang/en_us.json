@@ -170,7 +170,7 @@
   "gui.linktablet.overlay.empty": "No signals on this tablet",
   "gui.linktablet.overlay.focus": "Pinned tablet",
   "gui.linktablet.overlay.pin": "Pin to screen",
-  "gui.linktablet.lock.lock": "Lock screen (wrench is the key)",
+  "gui.linktablet.lock.lock": "Lock screen (wrench unlocks)",
   "gui.linktablet.lock.unlock": "Unlock screen",
   "gui.linktablet.overlay.unpin": "Unpin from screen",
   "gui.linktablet.twitch.channel": "Channel",

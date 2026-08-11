@@ -124,7 +124,9 @@ public class LauncherScreen extends Screen {
     }
 
     private int bodyTop() {
-        return (height - bodyHeight()) / 2;
+        // Floor of 24: headroom for the title plaque's own band above
+        // the panel (the TabletScreen rule — keep them identical)
+        return Math.max((height - bodyHeight()) / 2, 24);
     }
 
     private int gridTop() {
@@ -294,12 +296,12 @@ public class LauncherScreen extends Screen {
         int top = bodyTop();
 
         // Same body chrome as the signal grid: themed canvas in a wood
-        // rail frame, title on a plaque hung over the top rail
+        // rail frame, title on a plaque in its OWN band above the panel
         Chrome.panel(graphics, left - 6, top - 2, panelWidth() + 12, bodyHeight() + 4, theme);
         Component titleText = view.displayName();
         int titleW = font.width(titleText);
-        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
-        graphics.drawString(font, titleText, width / 2 - titleW / 2, top + 7,
+        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top - 20, titleW + 12, 18, theme.rowBg);
+        graphics.drawString(font, titleText, width / 2 - titleW / 2, top - 15,
                 theme.textPrimary, theme.textShadow);
         renderModeButtons(graphics, mouseX, mouseY);
         Chrome.railH(graphics, left - 4, top + HEADER - 8, panelWidth() + 8, theme.bodyOuter);
@@ -466,8 +468,10 @@ public class LauncherScreen extends Screen {
                 return true;
             }
             if (isBlockView() && overModeBtn(mouseX, mouseY, lockBtnX())) {
-                if (holdingWrench()) {
-                    boolean locked = lockedScreen();
+                // Locking is free (an open GUI is already full config
+                // trust); only UNLOCKING needs the wrench in hand
+                boolean locked = lockedScreen();
+                if (!locked || holdingWrench()) {
                     UISounds.tick(locked ? 1.7F : 0.6F);
                     PacketDistributor.sendToServer(
                             new ModNetworking.SetLockPayload(view.target(), !locked));

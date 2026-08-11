@@ -34,8 +34,12 @@ deliberately batched here). CREDIT Fluid Valve in the changelog
   written false).
 - New `SetLockPayload(target, locked)` — registrar **"23"→"24",
   PAIRING BREAK**. Server handler validates: sender in range, target
-  resolves, and **a wrench in either hand** (both to lock and to
-  unlock — symmetric, and it matches how the GUI was reached).
+  resolves, and — for UNLOCK only — **a wrench in either hand**.
+  ~~Symmetric~~ RE-DECIDED 2026-08-11 (first dev pass): locking is
+  FREE — an open GUI already carries full config trust, and a
+  main-hand wrench can't reach the GUI on an unlocked tablet at all
+  (wrench-click rotates), so the symmetric rule made locking
+  undiscoverable. Fluid Valve's literal ask was "wrench-to-unlock".
 
 ## The one server rule (enforcement)
 
