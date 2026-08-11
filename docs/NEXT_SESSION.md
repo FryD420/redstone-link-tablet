@@ -3,9 +3,21 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-11 — 1.12.0 released)
+## ▶ START HERE next session (state as of 2026-08-11 — 1.12.0 LIVE)
 
-- **v1.12.0 TAGGED same day it was built** (screen lock, credit Fluid
+- **v1.12.0 LIVE EVERYWHERE** (uploads user-confirmed same day —
+  "everythings live"): screen lock + seam fix + title header shipped
+  the same day they were built (spec re-scope → SDD build → user dev
+  pass → release, one session). Remaining: tester rows below;
+  reactive hotfix posture.
+- **Next-session seed (user ask)**: replicate this workflow in a NEW
+  mod folder — "with this workflow we could make any mod". Plan: the
+  Superpowers plugin + global prefs already travel free; scaffold a
+  starter kit per project (thin CLAUDE.md encoding the loop
+  brainstorm→spec→plan→SDD→review→dev-pass→release, NEXT_SESSION.md,
+  docs/superpowers/ folders, this repo's gradle setup as the NeoForge
+  template). Details discussed at the 1.12.0 session wrap.
+- **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
   unlocked GUI, so the spec's symmetric rule was undiscoverable);
