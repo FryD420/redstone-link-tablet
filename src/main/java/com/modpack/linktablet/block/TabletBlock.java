@@ -276,6 +276,17 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hitResult) {
         if (player.isSecondaryUseActive()) {
+            // Screen lock (1.12.0): every pickup-BY-HAND path is config
+            // — unlock first. Mining still drops the tablet normally
+            // (and it places back unlocked, spec decision).
+            if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
+                    && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
+                    && lockTarget.isLocked()) {
+                if (!level.isClientSide) {
+                    denyClick(level, pos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
             // Sneak + empty hand: pick the tablet back up, data intact.
             // Mounted (1.8.1): grabbing the PANEL takes just the tablet
             // and leaves the stand as its own block for the next tablet;
@@ -350,8 +361,13 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                                 target.getSurfaceW(), target.getSurfaceH());
                 if (tile != null) {
                     if (!level.isClientSide) {
-                        target.setCurrentProgram(home.get(tile.index()));
-                        ModNetworking.playToggleClick(level, null, pos, true);
+                        if (target.isLocked()) {
+                            // Program nav is config (spec list)
+                            denyClick(level, pos);
+                        } else {
+                            target.setCurrentProgram(home.get(tile.index()));
+                            ModNetworking.playToggleClick(level, null, pos, true);
+                        }
                     }
                     return InteractionResult.sidedSuccess(level.isClientSide);
                 }
@@ -360,6 +376,14 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 // signals grid (user decision after the first kiosk
                 // test). MUST return here: falling through would
                 // hit-test the INVISIBLE signals.
+                if (target.isLocked()) {
+                    // No GUI without a wrench — the wrench-click path is
+                    // the one door in (onWrenched).
+                    if (!level.isClientSide) {
+                        denyClick(level, pos);
+                    }
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
                 if (level.isClientSide) {
                     ClientHooks.openBlockHome(controllerPos);
                 }
@@ -374,8 +398,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 // paths are separate methods and keep their bezel
                 // meanings.
                 if (!level.isClientSide) {
-                    target.setCurrentProgram(Program.LAUNCHER);
-                    ModNetworking.playToggleClick(level, null, pos, false);
+                    if (target.isLocked()) {
+                        denyClick(level, pos);
+                    } else {
+                        target.setCurrentProgram(Program.LAUNCHER);
+                        ModNetworking.playToggleClick(level, null, pos, false);
+                    }
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
             } else if (target.currentProgram() != Program.SIGNALS) {
@@ -502,6 +530,12 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                 }
                 return InteractionResult.sidedSuccess(level.isClientSide);
             }
+            if (target.isLocked()) {
+                if (!level.isClientSide) {
+                    denyClick(level, pos);
+                }
+                return InteractionResult.sidedSuccess(level.isClientSide);
+            }
             if (level.isClientSide) {
                 ClientHooks.openTabletBlockScreen(controllerPos);
             }
@@ -526,6 +560,18 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public InteractionResult onWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
+        // Screen lock (1.12.0): while locked the wrench IS the key —
+        // any wrench click, any face/region, flat or mounted, opens the
+        // GUI and replaces the whole wrench map (rotate, landscape
+        // flip, mounted re-aim all park until unlocked).
+        if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
+                && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
+                && lockTarget.isLocked()) {
+            if (level.isClientSide) {
+                ClientHooks.openTabletBlockScreen(lockTarget.getBlockPos());
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         // Mounted (1.8.0): wrench on the GLASS re-aims the screen at the
         // clicker's eyes; wrench on the BEZEL ring flips portrait ↔
         // landscape — on ANY attach face, not just walls (the mount
@@ -594,6 +640,16 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     public InteractionResult onSneakWrenched(BlockState state, UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
+        // Screen lock (1.12.0): sneak-wrench pickup paths (incl. mount
+        // pickup and the mounted glass rotate) are config — unlock first.
+        if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
+                && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
+                && lockTarget.isLocked()) {
+            if (!level.isClientSide) {
+                denyClick(level, pos);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (state.getValue(MOUNTED) && context.getPlayer() != null
                 && level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
             double[] uv = mountedWrenchUV(be, context);
@@ -633,6 +689,13 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
      */
     private static BlockPos audiblePos(Level level, BlockPos pos) {
         return com.modpack.linktablet.compat.SableCompat.worldBlockPos(level, pos);
+    }
+
+    /** Soft deny tick (1.12.0): a locked wall answers "locked", not
+     * "broken" — low-pitch off-click, distinct from the toggle sounds. */
+    private static void denyClick(Level level, BlockPos pos) {
+        level.playSound(null, audiblePos(level, pos), SoundEvents.STONE_BUTTON_CLICK_OFF,
+                SoundSource.PLAYERS, 0.3F, 0.7F);
     }
 
     /**
