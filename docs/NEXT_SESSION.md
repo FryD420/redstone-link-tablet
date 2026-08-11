@@ -11,12 +11,12 @@ at the repo root (auto-loaded every Claude session).
   pass → release, one session). Remaining: tester rows below;
   reactive hotfix posture.
 - **Next-session seed (user ask)**: replicate this workflow in a NEW
-  mod folder — "with this workflow we could make any mod". Plan: the
-  Superpowers plugin + global prefs already travel free; scaffold a
-  starter kit per project (thin CLAUDE.md encoding the loop
-  brainstorm→spec→plan→SDD→review→dev-pass→release, NEXT_SESSION.md,
-  docs/superpowers/ folders, this repo's gradle setup as the NeoForge
-  template). Details discussed at the 1.12.0 session wrap.
+  mod folder — DONE same session: template BUILT and build-verified at
+  DEV/mod-template (examplemod-0.1.0.jar) — copy + rename per its
+  START-HERE.md; Create/JEI/EMI blocks commented out, uncomment both
+  sides for a Create addon. First session in a copy: brainstorming
+  skill on the new idea. (Superpowers plugin + global prefs + per-
+  folder auto-memory travel free — only these files needed scaffolding.)
 - **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
