@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 1.12.0 — 2026-08-11
 
 ### Added
 - **Screen lock** (idea: Fluid Valve): placed tablets can be locked from the
