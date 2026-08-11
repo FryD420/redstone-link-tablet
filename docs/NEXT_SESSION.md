@@ -23,6 +23,12 @@ at the repo root (auto-loaded every Claude session).
   gets changelog-section + announcement code blocks AND the full
   CHANGELOG.md as a file, unprompted (local memory
   release-comms-workflow).
+- **License: STAYING MIT** (user decision 2026-08-11 after a full
+  deliberation — addon API growth, modpack promise, ecosystem trust
+  all favor it; repost sites are a DMCA matter not a license one).
+  Don't re-raise; if a concrete fork/monetization incident ever
+  lands, LGPL-3.0 was scoped as the fallback (future releases only —
+  shipped jars stay MIT forever).
 - **Screen lock + big button (Fluid Valve) is SPEC'D and PARKED**
   for the next pairing-break release (registrar "23"→"24"):
   docs/superpowers/specs/2026-08-10-screen-lock-design.md — use-only
