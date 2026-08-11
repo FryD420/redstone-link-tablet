@@ -3,7 +3,32 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-10 night — 1.11.1 LIVE)
+## ▶ START HERE next session (state as of 2026-08-11 — screen lock IN CODE)
+
+- **Screen lock (Fluid Valve) is IN CODE on `tablet-overlay`** through
+  commit 8872ddd, plus this T7 docs commit: BE `locked` flag with
+  member mirroring (`lockSurface`) + scanner OR-merge on formation;
+  `SetLockPayload`; `ModNetworking.configAllowed(player, target)` gates
+  all 17 config handlers (use payloads untouched); world gates (pickup
+  deny, bezel deny, wrench-map collapses to "open GUI" while locked);
+  padlock header glyph on TabletScreen + LauncherScreen with a
+  client-side wrench pre-check; locked-face padlock pip in the world
+  renderer (flat/mounted/merged). **Registrar "23"→"24" — the pairing
+  break is now OPEN**: batch any other queued wire work into this
+  release before shipping. **The one-big-button half of the original
+  spec was CUT** by user re-scope on 2026-08-11 — locked single-signal
+  tablets render the normal tile, not a giant button.
+  **Still OWED before release**: the in-world F2/dev pass (full test
+  matrix in `.superpowers/sdd/task-7-brief.md` step 6 — lock/unlock,
+  wrench map, merged-wall split/merge inheritance, mural protection,
+  follow mode, mining drops unlocked, old-world load) plus a dedicated
+  `runServer` boot gate (house rule since 1.10.2 — verify no
+  dist-cleaner errors before this pairs-breaking release ships).
+  **Credit Fluid Valve** in the changelog/announcement at release —
+  already in CHANGELOG.md's Unreleased section, keep it in the
+  Discord draft too.
+
+## Previous START HERE (state as of 2026-08-10 night — 1.11.1 LIVE)
 
 - **v1.11.1 LIVE EVERYWHERE** (d251886, tag v1.11.1, merged to main;
   uploads + refreshed listing description user-confirmed same day —

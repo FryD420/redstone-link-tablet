@@ -323,6 +323,20 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   suspect the caller, not the renderer, and don't re-add a remap.
   Registrar "18"→"23".
 
+- Screen lock (1.12.0, idea: Fluid Valve): `locked` is BLOCK-ONLY
+  (BE NBT `locked`, never written false, never an item component —
+  re-placed tablets start unlocked). ONE server choke point:
+  `ModNetworking.configAllowed(player, target)` — every config-payload
+  handler's first line; use payloads (toggle/momentary/slider/timed)
+  are NEVER gated. Wrench-in-either-hand is the only key (symmetric:
+  SetLockPayload demands it both ways). Members MIRROR the controller's
+  flag (`lockSurface` walks, scanner ORs on formation) so splits stay
+  locked and merging into a locked wall can't promote an unlocked
+  controller. While locked, the ENTIRE wrench map becomes "open the
+  GUI" and all pickup-by-hand paths deny. Program faces still open
+  their screens (viewers; config bounces) — the mural test encodes
+  this. Registrar "23"→"24".
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in
