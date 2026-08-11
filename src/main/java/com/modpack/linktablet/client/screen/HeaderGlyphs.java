@@ -99,6 +99,20 @@ final class HeaderGlyphs {
         }
     }
 
+    /** Padlock — solid body; the shackle swings open when unlocked. */
+    static void lock(GuiGraphics g, int x, int y, int color, boolean locked) {
+        if (locked) {
+            g.fill(x + 3, y + 1, x + 9, y + 2, color);
+            g.fill(x + 3, y + 2, x + 4, y + 5, color);
+            g.fill(x + 8, y + 2, x + 9, y + 5, color);
+        } else {
+            g.fill(x + 5, y + 1, x + 11, y + 2, color);
+            g.fill(x + 10, y + 2, x + 11, y + 5, color);
+            g.fill(x + 5, y + 2, x + 6, y + 4, color);
+        }
+        g.fill(x + 2, y + 5, x + 10, y + 11, color);
+    }
+
     /**
      * Theme dropdown, z-lifted above the batched content like the edit
      * screen's color swatches. Row hit math stays with the caller:

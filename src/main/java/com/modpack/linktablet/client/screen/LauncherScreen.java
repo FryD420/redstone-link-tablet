@@ -195,6 +195,11 @@ public class LauncherScreen extends Screen {
         return pinBtnX() + MODE_BTN_SIZE + 4;
     }
 
+    /** Screen-lock toggle, right of the link — placed tablets only. */
+    private int lockBtnX() {
+        return linkBtnX() + MODE_BTN_SIZE + 4;
+    }
+
     private int listBtnX() {
         return panelLeft() + panelWidth() - MODE_BTN_SIZE - 2;
     }
@@ -231,6 +236,29 @@ public class LauncherScreen extends Screen {
         }
         TabletBlockEntity resolved = be.resolveController();
         return (resolved != null ? resolved : be).isSoloScreen();
+    }
+
+    /** Whether the viewed placed tablet('s controller) is LOCKED. */
+    private boolean lockedScreen() {
+        if (!(view instanceof SignalView.Block block) || minecraft == null
+                || minecraft.level == null) {
+            return false;
+        }
+        if (!(minecraft.level.getBlockEntity(block.pos()) instanceof TabletBlockEntity be)) {
+            return false;
+        }
+        TabletBlockEntity resolved = be.resolveController();
+        return (resolved != null ? resolved : be).isLocked();
+    }
+
+    /** Wrench in either hand, client-side — the deny PRE-check only;
+     * the server enforces the same rule regardless. */
+    private boolean holdingWrench() {
+        return minecraft != null && minecraft.player != null
+                && (minecraft.player.getMainHandItem()
+                        .is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH)
+                    || minecraft.player.getOffhandItem()
+                        .is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH));
     }
 
     private int glyphColor(boolean active, boolean hovered) {
@@ -317,6 +345,9 @@ public class LauncherScreen extends Screen {
                     OverlayPin.isPinned(view, Program.LAUNCHER)
                             ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin"),
                     mouseX, mouseY);
+        } else if (isBlockView() && !themePopupOpen && overModeBtn(mouseX, mouseY, lockBtnX())) {
+            graphics.renderTooltip(font, Component.translatable(lockedScreen()
+                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock"), mouseX, mouseY);
         }
     }
 
@@ -350,6 +381,9 @@ public class LauncherScreen extends Screen {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
+            boolean locked = lockedScreen();
+            HeaderGlyphs.lock(graphics, lockBtnX(), y,
+                    glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
         }
         HeaderGlyphs.grid(graphics, gridBtnX(), y,
                 glyphColor(!list, overModeBtn(mouseX, mouseY, gridBtnX())));
@@ -429,6 +463,17 @@ public class LauncherScreen extends Screen {
                 UISounds.tick(solo ? 1.5F : 0.8F);
                 PacketDistributor.sendToServer(
                         new ModNetworking.SurfaceLinkPayload(view.target(), solo));
+                return true;
+            }
+            if (isBlockView() && overModeBtn(mouseX, mouseY, lockBtnX())) {
+                if (holdingWrench()) {
+                    boolean locked = lockedScreen();
+                    UISounds.tick(locked ? 1.7F : 0.6F);
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.SetLockPayload(view.target(), !locked));
+                } else {
+                    UISounds.tick(0.7F); // deny — the wrench is the key
+                }
                 return true;
             }
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {
