@@ -3,22 +3,26 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-10 evening — 1.11.1 tagged)
+## ▶ START HERE next session (state as of 2026-08-10 night — 1.11.1 LIVE)
 
-- **v1.11.1 TAGGED + PUSHED** (d251886, tag v1.11.1, merged --no-ff
-  to main 89c9a7f, same-day cycle): overlay chat wrap (10-line
-  bottom-anchored budget), paint fast-stroke interpolation, and the
-  full PAINT TOOLBOX — fill/line/rect/eyedropper + conflict-aware
-  32-step undo (widened for the dedicated-server flush-echo window),
-  header tool bar with material-art glyphs (3 user-driven rounds,
-  held-color readout on brush/pour/drop). ALL client-only — PAIRS
-  with 1.11.0, no coordination needed. Jar:
-  build/libs/linktablet-1.11.1.jar. Built via subagent-driven SDD
-  (7 tasks + final fable review, ledger in .superpowers/sdd/).
-  REMAINING: user uploads to both platforms + posts the Discord
-  announcement (drafted in-session); tester checklist went out with
-  the jar. Two server-only test rows ride the testers: fill+instant-Z
-  revert, two-account conflict undo.
+- **v1.11.1 LIVE EVERYWHERE** (d251886, tag v1.11.1, merged to main;
+  uploads + refreshed listing description user-confirmed same day —
+  "people are happy"): overlay chat wrap (10-line bottom-anchored
+  budget), paint fast-stroke interpolation, and the full PAINT
+  TOOLBOX — fill/line/rect/eyedropper + conflict-aware 32-step undo
+  (widened for the dedicated-server flush-echo window), header tool
+  bar with material-art glyphs (3 user-driven rounds, held-color
+  readout on brush/pour/drop). ALL client-only — PAIRS with 1.11.0.
+  Built via subagent-driven SDD (7 tasks + final fable review,
+  ledger in .superpowers/sdd/). Two server-only test rows ride the
+  testers: fill+instant-Z revert, two-account conflict undo.
+- **Listings now also carry**: the custom "Help develop on Discord"
+  badge (invite discord.gg/JwkHGpE527; source docs/discord-badge.html
+  + regen command in its header, colors sampled from devins v3) and
+  the 2026-08-10 screenshot set. New standing rule: every release
+  gets changelog-section + announcement code blocks AND the full
+  CHANGELOG.md as a file, unprompted (local memory
+  release-comms-workflow).
 - **Screen lock + big button (Fluid Valve) is SPEC'D and PARKED**
   for the next pairing-break release (registrar "23"→"24"):
   docs/superpowers/specs/2026-08-10-screen-lock-design.md — use-only
