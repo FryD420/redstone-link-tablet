@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.12.0 — 2026-08-11
+
+### Added
+- **Screen lock** (idea: Fluid Valve): placed tablets can be locked from the
+  GUI's new padlock button — and the wrench unlocks. Locked glass keeps
+  working (taps, holds, sliders, live faces), but every configuration
+  path — editing signals, themes, apps, rotation, painting, channels,
+  probes, gauges — needs a wrench in hand, enforced server-side. Any
+  wrench click on a locked tablet opens its GUI; sneak-pickup is blocked
+  while locked (mining still drops it, and it places back unlocked).
+  Locked walls show a small padlock in the glass corner. Splitting a
+  locked wall leaves every piece locked; merging anything into a locked
+  wall locks the whole surface.
+- **GUI title header**: the tablet's name now sits on its own plaque above
+  the panel instead of sharing the button row.
+
+### Fixed
+- **Merged screens: untouchable seam gap** — clicks between the blocks of a
+  merged screen used to fall through to the wall behind; the whole panel is
+  now clickable edge to edge.
+
+### Changed
+- Network protocol version 24 — 1.12.0 clients/servers do not pair with
+  1.11.x (everyone updates together, as usual).
+
 ## 1.11.1 — 2026-08-10
 
 - **Paint grew a toolbox** — bucket fill (floods across merged-wall

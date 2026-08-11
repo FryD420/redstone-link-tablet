@@ -482,6 +482,41 @@ public final class TabletScreenRenderer {
     }
 
     /**
+     * Locked-face pip (1.12.0): a ~2-texel padlock hugging the
+     * bottom-right glass corner so a locked wall reads "locked", not
+     * "broken". Drawn in the PHYSICAL frame (no content rotation — it's
+     * device status, not content) AFTER the face passes, with its OWN
+     * buffer fetch: a fresh batch, so it can never interleave with a
+     * cached consumer across an item render (the "Not building!" rule).
+     * Quads ride the icon hairline layer (3.5x).
+     */
+    public static void renderLockPip(PoseStack poseStack, MultiBufferSource buffers,
+                                     ScreenTheme theme, boolean backlit, int packedLight,
+                                     int surfaceW, int surfaceH) {
+        int members = surfaceW * surfaceH;
+        float physW = members == 1 ? TabletScreenMath.GLASS_U1 - TabletScreenMath.GLASS_U0
+                : TabletScreenMath.surfaceGlassW(surfaceW);
+        float physH = members == 1 ? TabletScreenMath.GLASS_V1 - TabletScreenMath.GLASS_V0
+                : TabletScreenMath.surfaceGlassH(surfaceH);
+        float u1 = TabletScreenMath.GLASS_U0 + physW;
+        float v1 = TabletScreenMath.GLASS_V0 + physH;
+        VertexConsumer vc = buffers.getBuffer(SCREEN_TYPE);
+        PoseStack.Pose pose = poseStack.last();
+        int light = backlit ? LightTexture.FULL_BRIGHT : packedLight;
+        int color = theme.textFaint;
+        float x1 = u1 - 0.5f;
+        float y1 = v1 - 0.5f;
+        float x0 = x1 - 1.6f;
+        float y0 = y1 - 1.9f;
+        // Shackle: top bar + two legs
+        fillRect(pose, vc, x0 + 0.35f, y0, x1 - 0.35f, y0 + 0.25f, LAYER * 3.5f, color, light);
+        fillRect(pose, vc, x0 + 0.35f, y0 + 0.25f, x0 + 0.6f, y0 + 0.9f, LAYER * 3.5f, color, light);
+        fillRect(pose, vc, x1 - 0.6f, y0 + 0.25f, x1 - 0.35f, y0 + 0.9f, LAYER * 3.5f, color, light);
+        // Body
+        fillRect(pose, vc, x0, y0 + 0.9f, x1, y1, LAYER * 3.5f, color, light);
+    }
+
+    /**
      * Addon kiosk face (the addon API): the shared screen base, then the
      * painter's BUFFERED calls flushed in the mandatory pass order —
      * all fills, then all items, then all text — so addon code cannot

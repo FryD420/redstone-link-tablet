@@ -220,7 +220,11 @@ public class TabletScreen extends Screen {
     }
 
     private int bodyTop() {
-        return (height - bodyHeight()) / 2;
+        // Floor of 24: the title plaque hangs in its OWN band above the
+        // panel (user request 2026-08-11 — it used to share the glyph
+        // row and the padlock button pushed the cluster under it), so
+        // a full-height body must leave it headroom.
+        return Math.max((height - bodyHeight()) / 2, 24);
     }
 
     private int gridTop() {
@@ -274,6 +278,11 @@ public class TabletScreen extends Screen {
         return pinBtnX() + MODE_BTN_SIZE + 4;
     }
 
+    /** Screen-lock toggle, right of the link — placed tablets only. */
+    private int lockBtnX() {
+        return linkBtnX() + MODE_BTN_SIZE + 4;
+    }
+
     private boolean isBlockView() {
         return view instanceof SignalView.Block;
     }
@@ -289,6 +298,29 @@ public class TabletScreen extends Screen {
         }
         TabletBlockEntity resolved = be.resolveController();
         return (resolved != null ? resolved : be).isSoloScreen();
+    }
+
+    /** Whether the viewed placed tablet('s controller) is LOCKED. */
+    private boolean lockedScreen() {
+        if (!(view instanceof SignalView.Block block) || minecraft == null
+                || minecraft.level == null) {
+            return false;
+        }
+        if (!(minecraft.level.getBlockEntity(block.pos()) instanceof TabletBlockEntity be)) {
+            return false;
+        }
+        TabletBlockEntity resolved = be.resolveController();
+        return (resolved != null ? resolved : be).isLocked();
+    }
+
+    /** Wrench in either hand, client-side — the deny PRE-check only;
+     * the server enforces the same rule regardless. */
+    private boolean holdingWrench() {
+        return minecraft != null && minecraft.player != null
+                && (minecraft.player.getMainHandItem()
+                        .is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH)
+                    || minecraft.player.getOffhandItem()
+                        .is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH));
     }
 
     // Theme dropdown metrics live in HeaderGlyphs (shared with the launcher)
@@ -485,10 +517,12 @@ public class TabletScreen extends Screen {
         Component titleText = reorderMode
                 ? Component.translatable("gui.linktablet.reorder.title")
                 : view.displayName();
-        // Title on a parchment plaque hung over the top rail, Stock-Keeper style
+        // Title on a parchment plaque in its OWN band ABOVE the panel
+        // (Stock-Keeper style tab) — the glyph row keeps the full header
+        // width to itself
         int titleW = font.width(titleText);
-        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top + 2, titleW + 12, 18, theme.rowBg);
-        drawThemedCentered(graphics, titleText, width / 2, top + 7, theme.textPrimary);
+        Chrome.plaque(graphics, width / 2 - titleW / 2 - 6, top - 20, titleW + 12, 18, theme.rowBg);
+        drawThemedCentered(graphics, titleText, width / 2, top - 15, theme.textPrimary);
         renderModeButtons(graphics, mouseX, mouseY);
         // Rail crossbar between the header and the scrolling content
         Chrome.railH(graphics, left - 4, gridTop() - 8, pw + 8, theme.bodyOuter);
@@ -547,6 +581,9 @@ public class TabletScreen extends Screen {
         } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, pinBtnX())) {
             graphics.renderTooltip(font, Component.translatable(OverlayPin.isPinned(view)
                     ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin"), mouseX, mouseY);
+        } else if (isBlockView() && !themePopupOpen && overModeBtn(mouseX, mouseY, lockBtnX())) {
+            graphics.renderTooltip(font, Component.translatable(lockedScreen()
+                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock"), mouseX, mouseY);
         } else if (hoveredEllipsizedName != null && !themePopupOpen) {
             graphics.renderTooltip(font, Component.literal(hoveredEllipsizedName), mouseX, mouseY);
         }
@@ -583,6 +620,9 @@ public class TabletScreen extends Screen {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
+            boolean locked = lockedScreen();
+            HeaderGlyphs.lock(graphics, lockBtnX(), y,
+                    glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
         }
     }
 
@@ -888,6 +928,19 @@ public class TabletScreen extends Screen {
                 // unlink (dissolves the whole surface when merged)
                 PacketDistributor.sendToServer(
                         new ModNetworking.SurfaceLinkPayload(target(), solo));
+                return true;
+            }
+            if (isBlockView() && overModeBtn(mouseX, mouseY, lockBtnX())) {
+                // Locking is free (an open GUI is already full config
+                // trust); only UNLOCKING needs the wrench in hand
+                boolean locked = lockedScreen();
+                if (!locked || holdingWrench()) {
+                    UISounds.tick(locked ? 1.7F : 0.6F);
+                    PacketDistributor.sendToServer(
+                            new ModNetworking.SetLockPayload(target(), !locked));
+                } else {
+                    UISounds.tick(0.7F); // deny — the wrench is the key
+                }
                 return true;
             }
             if (overModeBtn(mouseX, mouseY, gridBtnX())) {

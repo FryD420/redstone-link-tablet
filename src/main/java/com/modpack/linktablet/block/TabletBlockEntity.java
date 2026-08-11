@@ -50,6 +50,11 @@ public class TabletBlockEntity extends BlockEntity {
      * Block-only, like the surface roles: never travels on the item.
      */
     private boolean soloScreen;
+    /** Use-only screen lock (block-only — never an item component; a
+     * re-placed tablet starts unlocked). Controller-owned; members
+     * MIRROR the flag so a surface split leaves every promoted
+     * fragment still locked (spec decision, the solo-mark precedent). */
+    private boolean locked;
     /** UI theme; DARK is the default and is never persisted. */
     private ScreenTheme theme = ScreenTheme.DARK;
     /**
@@ -181,6 +186,46 @@ public class TabletBlockEntity extends BlockEntity {
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    // ---- Screen lock (1.12.0) ------------------------------------------
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    /** Per-BE setter (scanner + surface walk); syncs like the solo flag.
+     * Uses the explicit-packet {@link #syncToTracking()} path rather than
+     * a bare sendBlockUpdated: lockSurface and the scanner's formation
+     * loop call this on MANY BEs in one tick, and vanilla's batched
+     * multi-block update path DROPS block-entity data on that path (the
+     * same ghost-role lesson setSurfaceRole learned in 1.7.0). */
+    public void setLocked(boolean newLocked) {
+        if (locked == newLocked) return;
+        this.locked = newLocked;
+        setChanged();
+        syncToTracking();
+    }
+
+    /** SetLockPayload entry point, called on the CONTROLLER: locks or
+     * unlocks the whole surface — every member mirrors the flag (the
+     * setLinked walk shape) so splitting a locked mural never unlocks
+     * its pieces. */
+    public void lockSurface(boolean newLocked) {
+        setLocked(newLocked);
+        if (level == null || !isSurfaceController()) return;
+        BlockState state = getBlockState();
+        for (int dx = 0; dx < surfaceW; dx++) {
+            for (int dy = 0; dy < surfaceH; dy++) {
+                if (dx == 0 && dy == 0) continue;
+                BlockPos pos = worldPosition
+                        .relative(TabletScreenMath.screenRight(state), dx)
+                        .relative(TabletScreenMath.screenDown(state), dy);
+                if (level.getBlockEntity(pos) instanceof TabletBlockEntity member) {
+                    member.setLocked(newLocked);
+                }
+            }
         }
     }
 
@@ -758,6 +803,19 @@ public class TabletBlockEntity extends BlockEntity {
         return isSurfacePart() ? getController() : this;
     }
 
+    /** Sync this BE to every tracking client, surviving vanilla's
+     * batched multi-block update path (which DROPS BE data when many
+     * blocks change in one tick — the ghost-role lesson, 1.7.0). */
+    private void syncToTracking() {
+        if (level instanceof ServerLevel serverLevel) {
+            ClientboundBlockEntityDataPacket packet = getUpdatePacket();
+            serverLevel.getChunkSource().chunkMap
+                    .getPlayers(new net.minecraft.world.level.ChunkPos(worldPosition), false)
+                    .forEach(player -> player.connection.send(packet));
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** Scanner entry point: assigns (or clears) this member's role. */
     public void setSurfaceRole(int dx, int dy, int w, int h) {
         if (surfaceDx == dx && surfaceDy == dy && surfaceW == w && surfaceH == h) return;
@@ -772,13 +830,7 @@ public class TabletBlockEntity extends BlockEntity {
         // update path DROPS block-entity data — sendBlockUpdated with an
         // unchanged state only reaches clients on the single-block path.
         // Send the BE packet explicitly to every tracking player.
-        if (level instanceof ServerLevel serverLevel) {
-            ClientboundBlockEntityDataPacket packet = getUpdatePacket();
-            serverLevel.getChunkSource().chunkMap
-                    .getPlayers(new net.minecraft.world.level.ChunkPos(worldPosition), false)
-                    .forEach(player -> player.connection.send(packet));
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        syncToTracking();
         if (isSurfacePart()) {
             clearTransmitters();
             clearReceivers();
@@ -989,6 +1041,9 @@ public class TabletBlockEntity extends BlockEntity {
         if (soloScreen) {
             tag.putBoolean("solo_screen", true);
         }
+        if (locked) {
+            tag.putBoolean("locked", true);
+        }
         if (theme != ScreenTheme.DARK) {
             tag.putString("theme", theme.getSerializedName());
         }
@@ -1053,6 +1108,7 @@ public class TabletBlockEntity extends BlockEntity {
         this.caseColor = tag.contains("case_color") ? DyeColor.byName(tag.getString("case_color"), null) : null;
         this.screenList = tag.getBoolean("screen_list");
         this.soloScreen = tag.getBoolean("solo_screen");
+        this.locked = tag.getBoolean("locked");
         this.theme = ScreenTheme.byName(tag.getString("theme"));
         this.screenRotation = tag.getInt("screen_rotation") & 3;
         // Type sniff: string forms are current, byte/int-array forms are

@@ -3,7 +3,31 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-10 night — 1.11.1 LIVE)
+## ▶ START HERE next session (state as of 2026-08-11 — 1.12.0 released)
+
+- **v1.12.0 TAGGED same day it was built** (screen lock, credit Fluid
+  Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
+  rule re-decided in the dev pass — a main-hand wrench can't reach an
+  unlocked GUI, so the spec's symmetric rule was undiscoverable);
+  `configAllowed` choke point on all 17 config handlers; world gates;
+  padlock glyph + face pip; member mirroring + scanner OR-merge (the
+  bulk-sync ghost-role bug was re-fixed here via `syncToTracking` —
+  final review catch). PLUS two dev-pass extras: the MERGED-SEAM
+  untouchable gap fix (full-face shapes — clicks between members used
+  to fall through; wire-neutral, backport candidate) and the title
+  plaque in its own band above the panel (both block GUIs).
+  Registrar "24" — PAIRING BREAK vs 1.11.x. Big button CUT
+  (2026-08-11 re-scope). User dev pass: lock flow, seams, title all
+  confirmed "SO good" in the dev client; `runServer` boot gate run at
+  release. REMAINING: user uploads to both platforms + updates the
+  family server/pack (BOTH sides — pairing break), Discord
+  announcement (user posts). Tester rows outstanding: two-account
+  mural protection, dedicated-server lock, follow-while-locked.
+- **Listing nit queue for the next DESCRIPTION.md pass**: Paint
+  section still misses the 1.11.1 toolbox; consider a lock bullet
+  (and the seam fix implicitly makes big walls nicer) — no urgency.
+
+## Previous START HERE (state as of 2026-08-10 night — 1.11.1 LIVE)
 
 - **v1.11.1 LIVE EVERYWHERE** (d251886, tag v1.11.1, merged to main;
   uploads + refreshed listing description user-confirmed same day —

@@ -176,6 +176,33 @@ public class ModNetworking {
         return stack.getItem() instanceof TabletItem ? stack : ItemStack.EMPTY;
     }
 
+    /** Wrench in either hand — the screen lock's one permission token
+     * (1.12.0). No ownership: anyone holding a wrench holds the key. */
+    private static boolean holdingWrench(Player player) {
+        return player.getMainHandItem().is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH)
+                || player.getOffhandItem().is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH);
+    }
+
+    /**
+     * The screen lock's ONE enforcement choke point (1.12.0): on a
+     * LOCKED block target, config payloads are accepted only from a
+     * sender currently holding a wrench (either hand). Called first by
+     * every config-payload handler — never fork per-handler variants.
+     * Use payloads (toggle/momentary/slider/timed) never call this.
+     * Held/slot tablets can't lock, so item targets always pass.
+     * Malformed block targets pass too: the handler's own resolution
+     * rejects them a line later.
+     */
+    private static boolean configAllowed(Player player, SignalTarget target) {
+        if (target.pos().isEmpty()) return true;
+        BlockPos pos = target.pos().get();
+        if (!player.level().isLoaded(pos)) return true;
+        if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return true;
+        TabletBlockEntity controller = be.resolveController();
+        if (controller == null || !controller.isLocked()) return true;
+        return holdingWrench(player);
+    }
+
     // ------------------------------------------------------------------
     // Payload: toggle a signal on/off
     // ------------------------------------------------------------------
@@ -715,8 +742,28 @@ public class ModNetworking {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Payload: screen lock (1.12.0) — block targets only. The server
+    // demands a wrench in either hand BOTH ways (symmetric: it matches
+    // how a locked tablet's GUI is reached).
+    // ------------------------------------------------------------------
+    public record SetLockPayload(SignalTarget target, boolean locked) implements CustomPacketPayload {
+        public static final Type<SetLockPayload> TYPE = new Type<>(id("set_lock"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SetLockPayload> STREAM_CODEC =
+                StreamCodec.composite(
+                        SignalTarget.STREAM_CODEC, SetLockPayload::target,
+                        ByteBufCodecs.BOOL, SetLockPayload::locked,
+                        SetLockPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     private static void handleSetProgram(SetProgramPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
@@ -774,7 +821,10 @@ public class ModNetworking {
         // inside the 1.11.0 break).
         // "23": 1.11.0 paint on walls — PaintStrokePayload/PaintClearPayload
         // added (still inside the 1.11.0 break).
-        PayloadRegistrar registrar = event.registrar("23");
+        // "24": 1.12.0 screen lock — SetLockPayload added and every
+        // config payload gained the server-side wrench rule (PAIRING
+        // BREAK vs 1.11.x).
+        PayloadRegistrar registrar = event.registrar("24");
         registrar.playToServer(ToggleSignalPayload.TYPE, ToggleSignalPayload.STREAM_CODEC, ModNetworking::handleToggle);
         registrar.playToServer(MomentarySignalPayload.TYPE, MomentarySignalPayload.STREAM_CODEC, ModNetworking::handleMomentary);
         registrar.playToServer(UpsertSignalPayload.TYPE, UpsertSignalPayload.STREAM_CODEC, ModNetworking::handleUpsert);
@@ -806,6 +856,8 @@ public class ModNetworking {
                 ModNetworking::handlePaintStroke);
         registrar.playToServer(PaintClearPayload.TYPE, PaintClearPayload.STREAM_CODEC,
                 ModNetworking::handlePaintClear);
+        registrar.playToServer(SetLockPayload.TYPE, SetLockPayload.STREAM_CODEC,
+                ModNetworking::handleSetLock);
     }
 
     /** Mirrors {@link #handleOpenEditMenu}: resolve() carries the whole
@@ -813,6 +865,7 @@ public class ModNetworking {
      * PROBE_EDIT container menu. */
     private static void handleOpenProbeMenu(OpenProbeMenuPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (resolve(player, payload.target()) == null) return;
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         SignalEditMenu.EditContext ctx = SignalEditMenu.EditContext.plain(payload.target(), -1);
@@ -824,6 +877,7 @@ public class ModNetworking {
 
     private static void handleSetProbe(SetProbePayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         // Sanitize: drop empties, dedupe by Create-network identity,
         // cap — the fromKeys shape (never trust the client's list)
         List<com.modpack.linktablet.frequency.Frequency> probes = new ArrayList<>();
@@ -865,6 +919,7 @@ public class ModNetworking {
 
     private static void handleSetTwitchChannel(SetTwitchChannelPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         String channel = payload.channel().toLowerCase(java.util.Locale.ROOT);
         if (!channel.isEmpty() && !TWITCH_CHANNEL.matcher(channel).matches()) return;
         if (payload.target().pos().isPresent()) {
@@ -918,6 +973,7 @@ public class ModNetworking {
 
     private static void handlePaintStroke(PaintStrokePayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isPresent()) {
             TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
             if (controller == null) return;
@@ -987,6 +1043,7 @@ public class ModNetworking {
 
     private static void handlePaintClear(PaintClearPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isPresent()) {
             TabletBlockEntity controller = resolvePaintController(player, payload.target().pos().get());
             if (controller == null) return;
@@ -1006,6 +1063,7 @@ public class ModNetworking {
     }
 
     private static void handleUpsertGauge(UpsertGaugePayload payload, IPayloadContext context) {
+        if (!configAllowed(context.player(), payload.target())) return;
         GaugeHost host = resolveGauges(context.player(), payload.target());
         if (host == null) return;
         com.modpack.linktablet.frequency.Gauge gauge = payload.gauge().sanitized();
@@ -1024,6 +1082,7 @@ public class ModNetworking {
     }
 
     private static void handleRemoveGauge(RemoveGaugePayload payload, IPayloadContext context) {
+        if (!configAllowed(context.player(), payload.target())) return;
         GaugeHost host = resolveGauges(context.player(), payload.target());
         if (host == null) return;
         List<com.modpack.linktablet.frequency.Gauge> gauges = host.gauges();
@@ -1043,6 +1102,7 @@ public class ModNetworking {
      * sanitizes (unknown/launcher keys drop, dedupe, empty → default). */
     private static void handleSetHomeApps(SetHomeAppsPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         // Sanity cap, above the whole catalog (the wire codec also caps
         // the list at 64)
         if (payload.keys().size() > 64) return;
@@ -1076,6 +1136,7 @@ public class ModNetworking {
 
     private static void handleSurfaceLink(SurfaceLinkPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isEmpty()) return;
         BlockPos pos = payload.target().pos().get();
         if (!player.level().isLoaded(pos)) return;
@@ -1085,6 +1146,30 @@ public class ModNetworking {
             com.modpack.linktablet.block.TabletSurfaceScanner.setLinked(
                     serverLevel, pos, payload.linked());
         }
+    }
+
+    private static void handleSetLock(SetLockPayload payload, IPayloadContext context) {
+        Player player = context.player();
+        if (payload.target().pos().isEmpty()) return; // block-only feature
+        BlockPos pos = payload.target().pos().get();
+        if (!player.level().isLoaded(pos)) return;
+        if (tabletDistSqr(player, pos) > MAX_BLOCK_DISTANCE_SQ) return;
+        if (!(player.level().getBlockEntity(pos) instanceof TabletBlockEntity be)) return;
+        TabletBlockEntity controller = be.resolveController();
+        if (controller == null) return;
+        // Asymmetric wrench rule (user decision 2026-08-11 — Fluid
+        // Valve's literal ask was "wrench-to-UNLOCK"): locking is free,
+        // because an open GUI already carries full config trust — and a
+        // main-hand wrench can't even reach the GUI on an unlocked
+        // tablet (wrench-click rotates). Unlocking needs the key in
+        // hand; the locked GUI is wrench-opened, so it naturally is.
+        if (!payload.locked() && !holdingWrench(player)) return;
+        if (controller.isLocked() == payload.locked()) return;
+        controller.lockSurface(payload.locked());
+        player.level().playSound(null,
+                com.modpack.linktablet.compat.SableCompat.worldBlockPos(player.level(), pos),
+                payload.locked() ? SoundEvents.IRON_TRAPDOOR_CLOSE : SoundEvents.IRON_TRAPDOOR_OPEN,
+                SoundSource.BLOCKS, 0.5F, payload.locked() ? 1.4F : 1.2F);
     }
 
     private static void handleTimed(TimedSignalPayload payload, IPayloadContext context) {
@@ -1102,6 +1187,7 @@ public class ModNetworking {
     }
 
     private static void handleSetNote(SetNotePayload payload, IPayloadContext context) {
+        if (!configAllowed(context.player(), payload.target())) return;
         SignalHost host = resolve(context.player(), payload.target());
         if (host == null) return;
         List<Signal> signals = host.signals();
@@ -1135,6 +1221,7 @@ public class ModNetworking {
 
     private static void handleOpenEditMenu(OpenEditMenuPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.context().target())) return;
         SignalEditMenu.EditContext ctx = payload.context();
         SignalHost host = resolve(player, ctx.target());
         if (host == null) return;
@@ -1212,6 +1299,7 @@ public class ModNetworking {
     }
 
     private static void handleUpsert(UpsertSignalPayload payload, IPayloadContext context) {
+        if (!configAllowed(context.player(), payload.target())) return;
         SignalHost host = resolve(context.player(), payload.target());
         if (host == null) return;
         // Never trust a client-supplied id: the stored signal's id wins
@@ -1242,6 +1330,7 @@ public class ModNetworking {
 
     private static void handleReorder(ReorderSignalPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         SignalHost host = resolve(player, payload.target());
         if (host == null) return;
         List<Signal> signals = host.signals();
@@ -1259,6 +1348,7 @@ public class ModNetworking {
 
     private static void handleScreenLayout(ScreenLayoutPayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
@@ -1284,6 +1374,7 @@ public class ModNetworking {
 
     private static void handleSetTheme(SetThemePayload payload, IPayloadContext context) {
         Player player = context.player();
+        if (!configAllowed(player, payload.target())) return;
         if (payload.target().pos().isPresent()) {
             BlockPos pos = payload.target().pos().get();
             if (!player.level().isLoaded(pos)) return;
@@ -1310,6 +1401,7 @@ public class ModNetworking {
     }
 
     private static void handleRemove(RemoveSignalPayload payload, IPayloadContext context) {
+        if (!configAllowed(context.player(), payload.target())) return;
         SignalHost host = resolve(context.player(), payload.target());
         if (host == null) return;
         List<Signal> signals = host.signals();
