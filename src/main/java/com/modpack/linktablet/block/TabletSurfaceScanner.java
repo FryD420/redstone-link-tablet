@@ -84,6 +84,18 @@ public final class TabletSurfaceScanner {
         }
         if (members.isEmpty()) return;
 
+        // Screen lock (1.12.0): a surface containing ANY locked member
+        // forms locked — otherwise placing one fresh tablet against a
+        // locked wall could promote an UNLOCKED controller and open the
+        // whole surface's config (every edit lands on the controller).
+        boolean anyLocked = false;
+        for (BlockPos pos : members) {
+            if (level.getBlockEntity(pos) instanceof TabletBlockEntity be && be.isLocked()) {
+                anyLocked = true;
+                break;
+            }
+        }
+
         // Project onto screen space and test the filled rectangle
         int minR = Integer.MAX_VALUE, maxR = Integer.MIN_VALUE;
         int minD = Integer.MAX_VALUE, maxD = Integer.MIN_VALUE;
@@ -118,6 +130,7 @@ public final class TabletSurfaceScanner {
                 int dR = project(pos, origin, right) - minR;
                 int dD = project(pos, origin, down) - minD;
                 be.setSurfaceRole(dR, dD, w, h);
+                be.setLocked(anyLocked);
             } else {
                 be.setSurfaceRole(0, 0, 1, 1);
             }
