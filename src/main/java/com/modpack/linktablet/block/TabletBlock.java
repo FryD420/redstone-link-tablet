@@ -78,6 +78,20 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     private static final VoxelShape WALL_S_LAND = Block.box(1, 2, 0, 15, 14, 1);
     private static final VoxelShape WALL_E_LAND = Block.box(0, 2, 1, 1, 14, 15);
     private static final VoxelShape WALL_W_LAND = Block.box(15, 2, 1, 16, 14, 15);
+    // Merged members present the FULL block face: the raised surface
+    // panel covers the whole face (1.7.0), but the case-sized boxes left
+    // a ~4-texel dead band at member seams where clicks fell through to
+    // the support behind ("untouchable gap"). The hit math is already
+    // continuous across full faces (screenUV + the 16·dx member offset),
+    // so a face-filling shape makes seams clickable with no math change;
+    // the surface's own outer margins correctly read as bezel (Home).
+    // Standalone/solo/mounted tablets keep the case silhouette.
+    private static final VoxelShape MERGED_FLOOR = Block.box(0, 0, 0, 16, 1, 16);
+    private static final VoxelShape MERGED_CEILING = Block.box(0, 15, 0, 16, 16, 16);
+    private static final VoxelShape MERGED_WALL_N = Block.box(0, 0, 15, 16, 16, 16);
+    private static final VoxelShape MERGED_WALL_S = Block.box(0, 0, 0, 16, 16, 1);
+    private static final VoxelShape MERGED_WALL_E = Block.box(0, 0, 0, 1, 16, 16);
+    private static final VoxelShape MERGED_WALL_W = Block.box(15, 0, 0, 16, 16, 16);
     // Mounted: one coarse box per attach face — VoxelShapes can't tilt,
     // so this just has to contain the stand plus the swiveling panel
     private static final VoxelShape MOUNT_FLOOR = Block.box(2, 0, 2, 14, 11, 14);
@@ -120,6 +134,18 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
                     case EAST -> MOUNT_WALL_E;
                     case WEST -> MOUNT_WALL_W;
                     default -> MOUNT_WALL_N;
+                };
+            };
+        }
+        if (level.getBlockEntity(pos) instanceof TabletBlockEntity be && be.isMerged()) {
+            return switch (state.getValue(FACE)) {
+                case FLOOR -> MERGED_FLOOR;
+                case CEILING -> MERGED_CEILING;
+                case WALL -> switch (facing) {
+                    case SOUTH -> MERGED_WALL_S;
+                    case EAST -> MERGED_WALL_E;
+                    case WEST -> MERGED_WALL_W;
+                    default -> MERGED_WALL_N;
                 };
             };
         }
