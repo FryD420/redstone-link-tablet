@@ -98,13 +98,29 @@ public class TabletBlockEntityRenderer implements BlockEntityRenderer<TabletBloc
         poseStack.popPose();
     }
 
+    /** Face dispatch + the lock pip on top (1.12.0) — one wrapper so
+     * flat and mounted passes stay a single call site. */
+    private static void renderFace(TabletBlockEntity be, BlockState state, List<Signal> signals,
+                                   com.modpack.linktablet.api.TabletProgram program,
+                                   PoseStack poseStack, MultiBufferSource buffers, int packedLight,
+                                   int surfaceW, int surfaceH, int caseTint, float partialTick) {
+        renderFaceContent(be, state, signals, program, poseStack, buffers, packedLight,
+                surfaceW, surfaceH, caseTint, partialTick);
+        // Only controllers reach here (parts return early in render),
+        // so the BE's own flag is authoritative.
+        if (be.isLocked()) {
+            TabletScreenRenderer.renderLockPip(poseStack, buffers, be.getTheme(),
+                    state.getValue(TabletBlock.LIT), packedLight, surfaceW, surfaceH);
+        }
+    }
+
     /**
      * One face dispatch for both the flat and mounted passes: built-ins
      * keep their bespoke faces, addon programs draw through their API
      * {@code facePainter} (buffered — the three-pass order is enforced
      * by the flush), and everything else labels the door.
      */
-    private static void renderFace(TabletBlockEntity be, BlockState state, List<Signal> signals,
+    private static void renderFaceContent(TabletBlockEntity be, BlockState state, List<Signal> signals,
                                    com.modpack.linktablet.api.TabletProgram program,
                                    PoseStack poseStack, MultiBufferSource buffers, int packedLight,
                                    int surfaceW, int surfaceH, int caseTint, float partialTick) {
