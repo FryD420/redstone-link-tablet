@@ -247,6 +247,15 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         // Swivel mount install (1.8.0): stand appears, tablet aims at
         // the installer's eyes. Merged surfaces must be split first.
         if (stack.is(ModItems.SWIVEL_MOUNT.get()) && !state.getValue(MOUNTED)) {
+            // Screen lock (1.12.0): installing a mount re-aims the
+            // screen without a wrench — that's config, so a locked
+            // tablet denies it like every other wrenchless config path.
+            if (lockedController(level, pos) != null) {
+                if (!level.isClientSide) {
+                    denyClick(level, pos);
+                }
+                return ItemInteractionResult.FAIL;
+            }
             if (level.getBlockEntity(pos) instanceof TabletBlockEntity be) {
                 if (be.isMerged()) {
                     if (!level.isClientSide) {
@@ -279,9 +288,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
             // Screen lock (1.12.0): every pickup-BY-HAND path is config
             // — unlock first. Mining still drops the tablet normally
             // (and it places back unlocked, spec decision).
-            if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
-                    && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
-                    && lockTarget.isLocked()) {
+            if (lockedController(level, pos) != null) {
                 if (!level.isClientSide) {
                     denyClick(level, pos);
                 }
@@ -564,9 +571,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         // any wrench click, any face/region, flat or mounted, opens the
         // GUI and replaces the whole wrench map (rotate, landscape
         // flip, mounted re-aim all park until unlocked).
-        if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
-                && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
-                && lockTarget.isLocked()) {
+        if (lockedController(level, pos) instanceof TabletBlockEntity lockTarget) {
             if (level.isClientSide) {
                 ClientHooks.openTabletBlockScreen(lockTarget.getBlockPos());
             }
@@ -642,9 +647,7 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
         BlockPos pos = context.getClickedPos();
         // Screen lock (1.12.0): sneak-wrench pickup paths (incl. mount
         // pickup and the mounted glass rotate) are config — unlock first.
-        if (level.getBlockEntity(pos) instanceof TabletBlockEntity lockBe
-                && lockBe.resolveController() instanceof TabletBlockEntity lockTarget
-                && lockTarget.isLocked()) {
+        if (lockedController(level, pos) != null) {
             if (!level.isClientSide) {
                 denyClick(level, pos);
             }
@@ -696,6 +699,15 @@ public class TabletBlock extends FaceAttachedHorizontalDirectionalBlock implemen
     private static void denyClick(Level level, BlockPos pos) {
         level.playSound(null, audiblePos(level, pos), SoundEvents.STONE_BUTTON_CLICK_OFF,
                 SoundSource.PLAYERS, 0.3F, 0.7F);
+    }
+
+    /** The clicked tablet's controller when THAT surface is locked,
+     * else null — the one lock lookup for every world gate (1.12.0). */
+    @org.jetbrains.annotations.Nullable
+    private static TabletBlockEntity lockedController(Level level, BlockPos pos) {
+        if (!(level.getBlockEntity(pos) instanceof TabletBlockEntity be)) return null;
+        TabletBlockEntity controller = be.resolveController();
+        return controller != null && controller.isLocked() ? controller : null;
     }
 
     /**

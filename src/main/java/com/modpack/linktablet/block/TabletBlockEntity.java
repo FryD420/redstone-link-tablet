@@ -195,14 +195,17 @@ public class TabletBlockEntity extends BlockEntity {
         return locked;
     }
 
-    /** Per-BE setter (scanner + surface walk); syncs like the solo flag. */
+    /** Per-BE setter (scanner + surface walk); syncs like the solo flag.
+     * Uses the explicit-packet {@link #syncToTracking()} path rather than
+     * a bare sendBlockUpdated: lockSurface and the scanner's formation
+     * loop call this on MANY BEs in one tick, and vanilla's batched
+     * multi-block update path DROPS block-entity data on that path (the
+     * same ghost-role lesson setSurfaceRole learned in 1.7.0). */
     public void setLocked(boolean newLocked) {
         if (locked == newLocked) return;
         this.locked = newLocked;
         setChanged();
-        if (level != null) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        syncToTracking();
     }
 
     /** SetLockPayload entry point, called on the CONTROLLER: locks or
@@ -800,6 +803,19 @@ public class TabletBlockEntity extends BlockEntity {
         return isSurfacePart() ? getController() : this;
     }
 
+    /** Sync this BE to every tracking client, surviving vanilla's
+     * batched multi-block update path (which DROPS BE data when many
+     * blocks change in one tick — the ghost-role lesson, 1.7.0). */
+    private void syncToTracking() {
+        if (level instanceof ServerLevel serverLevel) {
+            ClientboundBlockEntityDataPacket packet = getUpdatePacket();
+            serverLevel.getChunkSource().chunkMap
+                    .getPlayers(new net.minecraft.world.level.ChunkPos(worldPosition), false)
+                    .forEach(player -> player.connection.send(packet));
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     /** Scanner entry point: assigns (or clears) this member's role. */
     public void setSurfaceRole(int dx, int dy, int w, int h) {
         if (surfaceDx == dx && surfaceDy == dy && surfaceW == w && surfaceH == h) return;
@@ -814,13 +830,7 @@ public class TabletBlockEntity extends BlockEntity {
         // update path DROPS block-entity data — sendBlockUpdated with an
         // unchanged state only reaches clients on the single-block path.
         // Send the BE packet explicitly to every tracking player.
-        if (level instanceof ServerLevel serverLevel) {
-            ClientboundBlockEntityDataPacket packet = getUpdatePacket();
-            serverLevel.getChunkSource().chunkMap
-                    .getPlayers(new net.minecraft.world.level.ChunkPos(worldPosition), false)
-                    .forEach(player -> player.connection.send(packet));
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        syncToTracking();
         if (isSurfacePart()) {
             clearTransmitters();
             clearReceivers();
