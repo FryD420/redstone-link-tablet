@@ -1,6 +1,9 @@
-# Screen lock + one-big-button (design)
+# Screen lock (design)
 
 Date: 2026-08-10 · Status: approved (user, same day)
+Re-scoped 2026-08-11 (user): the one-big-button half is CUT from v1 —
+lock only. Locked single-signal tablets render the normal grid; the
+full-glass lone-tile idea stays a possible follow-up, not committed.
 Origin: tester request via the official Discord (Fluid Valve — giant
 locked button, wrench-to-unlock, no rotation while locked), plus the
 user's wall-painting lock from the Paint v2 brainstorm (2026-08-10,
@@ -14,8 +17,9 @@ deliberately batched here). CREDIT Fluid Valve in the changelog
 - **Anyone with a wrench unlocks** — the wrench is the key, no
   ownership system. Any wrench click on a locked tablet opens the
   GUI (Fluid Valve's exact flow).
-- **Big button is automatic**: locked + exactly one roster signal →
-  that signal renders full-glass. No separate mode flag.
+- ~~Big button is automatic~~ — CUT 2026-08-11 (user re-scope): no
+  full-glass rendering; locked tablets keep the normal grid at every
+  signal count.
 - Sneak-wrench **pickup is blocked while locked** (unlock first;
   mining the block still drops it normally).
 - Ships in the NEXT pairing-break release (registrar "23"→"24") —
@@ -71,20 +75,6 @@ Locked placed tablet:
 - Follow mode: a powered mount keeps following (it's display, not
   config) — but wrench re-aim needs unlock like everything else.
 
-## Big button (lock + lone signal)
-
-- `TabletScreenMath` gains the full-glass lone-tile rect used when
-  `locked && signalCount == 1` — extending the existing
-  `loneTileRect` bespoke-square path, ONE derivation feeding
-  renderer AND both hit-test paths (flat + mounted), per the house
-  one-source rule.
-- Works for every signal type: toggle/momentary/timer fire; a lone
-  slider becomes a full-glass slider (drag through the existing
-  `Signal.valueFromFraction` mapping).
-- 2+ signals locked = normal grid at normal sizes.
-- Merged walls: same rule on the stitched surface (one signal on a
-  4×3 wall = one wall-sized button).
-
 ## UI
 
 - Padlock glyph joins the block-GUI header row (`HeaderGlyphs`
@@ -99,6 +89,9 @@ Locked placed tablet:
 
 ## Explicitly out of scope
 
+- The one-big-button (full-glass lone-signal tile while locked) —
+  cut from v1 by user re-scope 2026-08-11; possible follow-up if
+  testers ask again.
 - Ownership/locker-only unlock (rejected: new player-UUID concept).
 - Per-app lock behavior (rejected: one semantics everywhere).
 - Locking HELD tablets (block-only feature).
@@ -114,11 +107,10 @@ Locked placed tablet:
 - Wrench map while locked: content rotate, landscape flip, mounted
   re-aim, sneak-wrench pickup — all blocked; same actions work
   again after unlock.
-- Big button: single-signal tablet locked → full-glass button
-  (toggle + momentary + timer + lone slider drag); add a second
-  signal (wrench + GUI) → grid returns.
+- Single-signal tablet locked → renders the NORMAL tile (big button
+  cut), and taps/sliders on it still work.
 - Merged wall: lock controller → whole surface locked incl. member
-  bezels; one-signal merged wall = wall-sized button; split while
+  bezels; split while
   locked → EVERY promoted fragment controller INHERITS the lock
   (decided: splitting a locked mural must not unlock its pieces;
   mirrors how solo-marking propagates on unlink).
