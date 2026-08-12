@@ -17,6 +17,9 @@ at the repo root (auto-loaded every Claude session).
   sides for a Create addon. First session in a copy: brainstorming
   skill on the new idea. (Superpowers plugin + global prefs + per-
   folder auto-memory travel free — only these files needed scaffolding.)
+  Template addendum: docs/DESCRIPTION.md listing SKELETON + listing
+  rules now baked in. TODO: mod-template has NO git repo yet — init +
+  push to a FryD420 repo so the GitHub backup plan covers it.
 - **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
