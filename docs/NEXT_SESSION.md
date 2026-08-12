@@ -20,11 +20,14 @@ at the repo root (auto-loaded every Claude session).
   Template addendum: docs/DESCRIPTION.md listing SKELETON + listing
   rules now baked in. TODO: mod-template has NO git repo yet — init +
   push to a FryD420 repo so the GitHub backup plan covers it.
-- **Bug/behavior queue (user, night wrap)**: signals must STOP when a
-  tablet is DROPPED as a world item entity — investigate before
-  fixing (transmitters are player-inventory-scan driven, so a ground
-  item should already be silent; find what actually keeps the signal
-  alive). In-inventory transmission stays BY DESIGN (1.10.2).
+- **Feature queue (user, night wrap — corrected same night)**: a
+  DROPPED tablet (world item entity) should KEEP transmitting its
+  toggled-ON signals from where it lies — today it goes silent
+  (transmitters are player-inventory-scan driven; ground items fall
+  off the network). Needs a brainstorm/spec: ItemEntity tracking,
+  range anchored at the item, despawn/pickup cleanup, momentary/timer
+  semantics across the drop, Monitor classification for dropped
+  tablets. Gameplay upside: throwable scene tablets.
 - **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
