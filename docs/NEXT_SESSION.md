@@ -20,6 +20,11 @@ at the repo root (auto-loaded every Claude session).
   Template addendum: docs/DESCRIPTION.md listing SKELETON + listing
   rules now baked in. TODO: mod-template has NO git repo yet — init +
   push to a FryD420 repo so the GitHub backup plan covers it.
+- **Bug/behavior queue (user, night wrap)**: signals must STOP when a
+  tablet is DROPPED as a world item entity — investigate before
+  fixing (transmitters are player-inventory-scan driven, so a ground
+  item should already be silent; find what actually keeps the signal
+  alive). In-inventory transmission stays BY DESIGN (1.10.2).
 - **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
