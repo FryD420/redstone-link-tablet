@@ -28,6 +28,12 @@ at the repo root (auto-loaded every Claude session).
   range anchored at the item, despawn/pickup cleanup, momentary/timer
   semantics across the drop, Monitor classification for dropped
   tablets. Gameplay upside: throwable scene tablets.
+- **Polish queue (user, 2026-08-12)**: EVERY button/glyph in EVERY
+  GUI gets a hover tooltip saying what it is — audit all screens
+  (launcher, store, arcade hub, edit screens, gauges, monitor,
+  clock, calculator, paint, twitch, overlay windows, pickers);
+  TabletScreen's renderTooltip chain is the house pattern, one lang
+  key each. Client-only, pairs with 1.12.0.
 - **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
