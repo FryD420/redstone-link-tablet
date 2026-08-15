@@ -259,6 +259,14 @@ public class MiniTabletWindow implements FloatingWindow {
         int cx = x + W - CLOSE_SIZE - 7;
         int cy = y + 5;
         int closeColor = mouseX >= 0 && overCloseButton(mouseX, mouseY) ? t.glyphHover : t.textFaint;
+        // mouseX < 0 marks the mouseless HUD pass — see NoteWindow's
+        // identical guard above. This X unpins rather than closes (see
+        // onClose), so it gets its own lang key rather than NoteWindow's
+        // "Close" (final-review Fix 7); rect mirrors overCloseButton's own
+        // expression, same as NoteWindow's registration of its twin.
+        if (mouseX >= 0) {
+            ScreenTips.add(cx - 2, cy - 2, CLOSE_SIZE + 4, CLOSE_SIZE + 4, "gui.linktablet.tip.window.unpin");
+        }
         for (int i = 0; i < CLOSE_SIZE - 2; i++) {
             graphics.fill(cx + 1 + i, cy + 1 + i, cx + 3 + i, cy + 3 + i, closeColor);
             graphics.fill(cx + CLOSE_SIZE - 3 - i, cy + 1 + i, cx + CLOSE_SIZE - 1 - i, cy + 3 + i, closeColor);
