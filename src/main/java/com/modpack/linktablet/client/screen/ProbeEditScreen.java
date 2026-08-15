@@ -46,10 +46,11 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     private static final int BTN_W = 76;
 
     private PickerOverlay picker;
+    // Field: referenced by containerTick for its `active` state. Every
+    // other button is purely local — see final-review-2 Fix A (vanilla
+    // clearTooltipForNextRenderPass replaced the per-frame tooltip-
+    // mutation helper that used to need them as fields).
     private Button addButton;
-    // Fields (Fix 4) so updateModalButtonTooltips can reach every widget.
-    private Button searchButton;
-    private Button cancelButton;
 
     public ProbeEditScreen(SignalEditMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -77,7 +78,7 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
         // All-items search (for frequency items you don't carry) — the
         // signal editor's button, same spot beside the ghost slots
-        searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
+        Button searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
                 Component.literal("..."), b ->
                 picker.open(width, height, this::stageFromPicker, false), this::theme);
         searchButton.setTooltip(ScreenTips.tooltip("gui.linktablet.picker.search"));
@@ -88,24 +89,10 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         addButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.probe.add"));
         addRenderableWidget(addButton);
 
-        cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
+        Button cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
                 Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme);
         cancelButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.cancel"));
         addRenderableWidget(cancelButton);
-    }
-
-    /**
-     * Vanilla renders {@link ChromeButton} tooltips in a deferred pass
-     * AFTER {@code render} returns, so the picker overlay drawn on top of
-     * a button here can't stop its tooltip from painting above it. Same
-     * fix and reasoning as {@code SignalEditScreen#updateModalButtonTooltips}
-     * (Fix 4).
-     */
-    private void updateModalButtonTooltips() {
-        boolean modal = picker.isOpen();
-        searchButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.picker.search"));
-        addButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.probe.add"));
-        cancelButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.cancel"));
     }
 
     // ---- Staging (ghost slots) — the signal editor's mechanics --------
@@ -207,13 +194,19 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Must run before super.render() — see updateModalButtonTooltips.
-        updateModalButtonTooltips();
         super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+        // Vanilla's own suppression mechanism (final-review-2 Fix A) —
+        // see SignalEditScreen#render for the full reasoning. Must run
+        // after super.render(): that's where the hovered widget's tooltip
+        // gets queued for Screen's deferred pass.
+        if (picker.isOpen() || NoteWindows.anyContains(mouseX, mouseY)) {
+            clearTooltipForNextRenderPass();
+        }
         // Ghost slots are BACKGROUND controls: suppressed while the picker
         // modal (which dims the whole window) sits on top of them, same
         // guard the pre-chrome tooltip ladder used (see git show 47a12b0).
+        // The vanilla slot/inventory tooltip pass gets the same guard, for
+        // symmetry with SignalEditScreen#render.
         if (!picker.isOpen()) {
             for (int slot = 0; slot < 2; slot++) {
                 if (staged(slot).isEmpty()) {
@@ -222,6 +215,7 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                             "gui.linktablet.tip.freq.item");
                 }
             }
+            renderTooltip(graphics, mouseX, mouseY);
         }
         if (picker.isOpen()) {
             picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme());

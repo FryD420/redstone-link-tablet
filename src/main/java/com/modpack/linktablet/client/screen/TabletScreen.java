@@ -536,10 +536,10 @@ public class TabletScreen extends Screen {
             int fx = (int) (mouseX - dragOffsetX);
             int fy = (int) (mouseY - dragOffsetY);
             if (listView()) {
-                renderSignalRow(graphics, signals.get(dragIndex), fx, fy, rowWidth(), false, false, false);
+                renderSignalRow(graphics, signals.get(dragIndex), fx, fy, rowWidth(), false, false, false, true);
                 graphics.fill(fx, fy, fx + rowWidth(), fy + ROW_HEIGHT, 0x28FFFFFF);
             } else {
-                renderSignalTile(graphics, signals.get(dragIndex), fx, fy, false, false, false);
+                renderSignalTile(graphics, signals.get(dragIndex), fx, fy, false, false, false, true);
                 graphics.fill(fx, fy, fx + TILE_SIZE, fy + TILE_SIZE, 0x28FFFFFF);
             }
         }
@@ -661,7 +661,7 @@ public class TabletScreen extends Screen {
                     }
                     renderSignalTile(graphics, signals.get(i), x, y, hovered,
                             i == heldMomentary || timerFlashActive(i),
-                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY), false);
                 }
             } else {
                 renderAddTile(graphics, x, y, hovered && !reorderMode);
@@ -679,7 +679,7 @@ public class TabletScreen extends Screen {
     }
 
     private void renderSignalTile(GuiGraphics graphics, Signal signal, int x, int y, boolean hovered,
-                               boolean held, boolean noteHovered) {
+                               boolean held, boolean noteHovered, boolean floating) {
         ScreenTheme theme = theme();
         // Base look (borders, plaque, color chip) shared with the
         // launcher via the painter; momentary signals glow while held
@@ -773,7 +773,18 @@ public class TabletScreen extends Screen {
         // smaller draw rect (Fix 6), and only while that rect sits inside
         // the scissored viewport — a scrolled-off glyph is unclickable
         // and must not out-tip whatever IS on screen there (Fix 5).
-        if (showNoteGlyph && noteGy - 2 >= gridTop() - 2 && noteGy + 11 <= gridBottom()) {
+        // !floating (final-review-2 Fix C): the reorder-drag floating copy
+        // is drawn at the CURSOR position with the mouse-to-corner offset
+        // preserved from grab time, so if this rect ever registered for
+        // it, a note-bearing signal grabbed near its own note glyph would
+        // tip "Note" for the whole drag — a single flag threaded through
+        // this method, not a per-site hover recomputation, so a future
+        // tip added here can't reintroduce the bug by forgetting it.
+        // !reorderMode (Fix D): the note glyph can't be clicked while
+        // reordering at all (mouseClicked's reorder branch never tests
+        // overNoteGlyph), so it shouldn't tip there either.
+        if (!floating && !reorderMode && showNoteGlyph
+                && noteGy - 2 >= gridTop() - 2 && noteGy + 11 <= gridBottom()) {
             addBackgroundTip(x + 1, noteGy - 2, 12, 13, "gui.linktablet.note");
         }
     }
@@ -830,7 +841,7 @@ public class TabletScreen extends Screen {
                     }
                     renderSignalRow(graphics, signals.get(i), x, y, w, hovered,
                             i == heldMomentary || timerFlashActive(i),
-                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY), false);
                 }
             } else {
                 renderAddRow(graphics, x, y, w, hovered && !reorderMode);
@@ -848,7 +859,7 @@ public class TabletScreen extends Screen {
     }
 
     private void renderSignalRow(GuiGraphics graphics, Signal signal, int x, int y, int w,
-                              boolean hovered, boolean held, boolean noteHovered) {
+                              boolean hovered, boolean held, boolean noteHovered, boolean floating) {
         ScreenTheme theme = theme();
         // Shared painter (also drives the pinned mini-tablet's rows)
         String name = SignalRowPainter.paint(graphics, font, theme, signal, x, y, w, hovered, held);
@@ -873,7 +884,10 @@ public class TabletScreen extends Screen {
             drawNoteGlyph(graphics, gx, gy, frame, theme.surfaceLo);
             int padTop = gy - 2;
             int padBottom = y + (ROW_HEIGHT + 9) / 2 + 2;
-            if (padTop >= gridTop() - 2 && padBottom <= gridBottom()) {
+            // !floating / !reorderMode: see renderSignalTile's note-tip
+            // registration (final-review-2 Fix C / Fix D) — same reasoning,
+            // same flags, applied to the list-row site.
+            if (!floating && !reorderMode && padTop >= gridTop() - 2 && padBottom <= gridBottom()) {
                 addBackgroundTip(gx - 2, padTop, 12, padBottom - padTop, "gui.linktablet.note");
             }
         }

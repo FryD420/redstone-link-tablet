@@ -145,11 +145,13 @@ public class LinkPickerOverlay {
             if (hovered) {
                 graphics.fill(left, ry, right, ry + ROW_H, theme.rowBgHover);
             }
-            // Viewport-gated (Fix 5): mirrors hovered's own clamp two
-            // lines up, applied to the row's position instead of the
-            // mouse's — a row scrolled only partially into view is
-            // scissor-clipped and unclickable at its off-screen edge.
-            if (eligible && ry >= listTop() && ry < listBottom()) {
+            // Viewport-gated (Fix 5, corrected final-review-2 Fix B): full
+            // containment of the REGISTERED rect (left, ry, right-left,
+            // ROW_H), matching the other three scroll-gated sites — a
+            // half-open bound at ry alone let a row whose top sat just
+            // above listBottom() register down into the panel's bottom
+            // padding, where nothing is drawn or clickable.
+            if (eligible && ry >= listTop() && ry + ROW_H <= listBottom()) {
                 ScreenTips.add(left, ry, right - left, ROW_H, "gui.linktablet.tip.link.cycle");
             }
             Signal.Link.Mode mode = eligible ? modeFor(candidate.linkId()) : null;
