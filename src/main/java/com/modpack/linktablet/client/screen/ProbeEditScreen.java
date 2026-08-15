@@ -14,7 +14,6 @@ import com.modpack.linktablet.theme.ScreenTheme;
 import com.simibubi.create.foundation.gui.menu.GhostItemSubmitPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
@@ -78,15 +77,18 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         Button searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
                 Component.literal("..."), b ->
                 picker.open(width, height, this::stageFromPicker, false), this::theme);
-        searchButton.setTooltip(Tooltip.create(Component.translatable("gui.linktablet.picker.search")));
+        searchButton.setTooltip(ScreenTips.tooltip("gui.linktablet.picker.search"));
         addRenderableWidget(searchButton);
 
         addButton = new ChromeButton(left + BTN_X, top + 146, BTN_W, 20,
                 Component.translatable("gui.linktablet.probe_edit.add"), b -> add(), this::theme);
+        addButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.probe.add"));
         addRenderableWidget(addButton);
 
-        addRenderableWidget(new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
-                Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme));
+        Button cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
+                Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme);
+        cancelButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.cancel"));
+        addRenderableWidget(cancelButton);
     }
 
     // ---- Staging (ghost slots) — the signal editor's mechanics --------
@@ -193,6 +195,7 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         if (picker.isOpen()) {
             picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme());
         }
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     // ---- Input (picker overlay first, then the container) --------------
