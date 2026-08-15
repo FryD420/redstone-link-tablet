@@ -298,7 +298,13 @@ public class MonitorScreen extends Screen {
                 graphics.fill(removeX + d, y + 3 + d, removeX + d + 1, y + 4 + d, crossColor);
                 graphics.fill(removeX + 5 - d, y + 3 + d, removeX + 6 - d, y + 4 + d, crossColor);
             }
-            ScreenTips.add(removeX, y + 3, 9, 9, "gui.linktablet.tip.probe.remove");
+            // Viewport-gated (Fix 5): the render loop calls renderChannel
+            // for partially-visible channels too, but the cross is only
+            // ever clickable within [listTop(), listBottom()) — the same
+            // bound mouseClicked's row walk uses.
+            if (y + 3 >= listTop() && y + 3 + 9 <= listBottom()) {
+                ScreenTips.add(removeX, y + 3, 9, 9, "gui.linktablet.tip.probe.remove");
+            }
         }
 
         int textX = icon2X + 16 + 6;
