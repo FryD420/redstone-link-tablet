@@ -469,14 +469,12 @@ public class TabletScreen extends Screen {
 
     /** Full name of a hovered entry whose label got ellipsized this frame. */
     private String hoveredEllipsizedName;
-    private boolean hoveredNoteGlyph;
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         hoveredEllipsizedName = null;
-        hoveredNoteGlyph = false;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
         if (reorderMode) {
@@ -563,28 +561,9 @@ public class TabletScreen extends Screen {
         // Note windows render via NoteWindows' screen event, above us.
 
         // Tooltips last, on top of everything
-        if (NoteWindows.anyContains(mouseX, mouseY)) {
-            return; // no tooltips under the windows themselves
-        }
-        if (hoveredNoteGlyph) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.note"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, homeBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.home"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, gridBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.reorder"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, themeBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.theme.title"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, pinBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(OverlayPin.isPinned(view)
-                    ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin"), mouseX, mouseY);
-        } else if (isBlockView() && !themePopupOpen && overModeBtn(mouseX, mouseY, lockBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(lockedScreen()
-                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock"), mouseX, mouseY);
-        } else if (hoveredEllipsizedName != null && !themePopupOpen) {
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
+        if (hoveredEllipsizedName != null && !themePopupOpen
+                && !NoteWindows.anyContains(mouseX, mouseY)) {
             graphics.renderTooltip(font, Component.literal(hoveredEllipsizedName), mouseX, mouseY);
         }
     }
@@ -603,26 +582,37 @@ public class TabletScreen extends Screen {
         // Glyph pixel art lives in HeaderGlyphs (shared with the launcher)
         HeaderGlyphs.grid(graphics, gridBtnX(), y,
                 glyphColor(!list, overModeBtn(mouseX, mouseY, gridBtnX())));
+        ScreenTips.glyph(gridBtnX(), modeBtnY(), "gui.linktablet.view.grid");
         HeaderGlyphs.list(graphics, listBtnX(), y,
                 glyphColor(list, overModeBtn(mouseX, mouseY, listBtnX())));
+        ScreenTips.glyph(listBtnX(), modeBtnY(), "gui.linktablet.view.list");
         HeaderGlyphs.home(graphics, homeBtnX(), y,
                 glyphColor(false, overModeBtn(mouseX, mouseY, homeBtnX())));
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         HeaderGlyphs.reorder(graphics, reorderBtnX(), y,
                 glyphColor(reorderMode, overModeBtn(mouseX, mouseY, reorderBtnX())));
+        ScreenTips.glyph(reorderBtnX(), modeBtnY(), "gui.linktablet.view.reorder");
         HeaderGlyphs.themePalette(graphics, themeBtnX(), y,
                 glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, themeBtnX())));
+        ScreenTips.glyph(themeBtnX(), modeBtnY(), "gui.linktablet.theme.title");
         // Pin lights while THIS tablet is the pinned overlay
         HeaderGlyphs.pin(graphics, pinBtnX(), y,
                 glyphColor(OverlayPin.isPinned(view), overModeBtn(mouseX, mouseY, pinBtnX())));
+        ScreenTips.glyph(pinBtnX(), modeBtnY(), OverlayPin.isPinned(view)
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         // Link (placed tablets only): joined while merging is allowed,
         // broken apart (and lit) while this tablet is SOLO
         if (isBlockView()) {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
+            ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
+                    ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
+            ScreenTips.glyph(lockBtnX(), modeBtnY(), locked
+                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock");
         }
     }
 
@@ -741,9 +731,7 @@ public class TabletScreen extends Screen {
             int frame = noteHovered ? theme.glyphHover
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
             drawNoteGlyph(graphics, x + 3, gy, frame, theme.surfaceLo);
-            if (noteHovered) {
-                hoveredNoteGlyph = true;
-            }
+            ScreenTips.add(x + 3, gy, 7, 9, "gui.linktablet.note");
         }
 
         // Chain glyph (1.10.0 signal links), below the note SLOT — a
@@ -774,6 +762,7 @@ public class TabletScreen extends Screen {
         int bg = hovered ? theme.surfaceHi : theme.rowBg;
         Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, bg);
         drawThemedCentered(graphics, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, theme.textMuted);
+        ScreenTips.add(x, y, TILE_SIZE, TILE_SIZE, "gui.linktablet.tip.signal.new");
     }
 
     // ---- List mode -----------------------------------------------------
@@ -840,10 +829,9 @@ public class TabletScreen extends Screen {
             int gx = x + w - 4 - controlReserve - 12;
             int frame = noteHovered ? theme.glyphHover
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
-            drawNoteGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, frame, theme.surfaceLo);
-            if (noteHovered) {
-                hoveredNoteGlyph = true;
-            }
+            int gy = y + (ROW_HEIGHT - 9) / 2;
+            drawNoteGlyph(graphics, gx, gy, frame, theme.surfaceLo);
+            ScreenTips.add(gx, gy, 7, 9, "gui.linktablet.note");
         }
 
         // Chain glyph (1.10.0 signal links), left of the note slot
