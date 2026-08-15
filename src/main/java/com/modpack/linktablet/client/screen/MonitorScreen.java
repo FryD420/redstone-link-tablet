@@ -201,10 +201,13 @@ public class MonitorScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overBtn(mouseX, mouseY, homeBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         boolean pinned = OverlayPin.isPinned(view, Program.MONITOR);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(pinBtnX(), modeBtnY(), pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         renderProbeRow(graphics, theme);
@@ -229,6 +232,7 @@ public class MonitorScreen extends Screen {
             graphics.disableScissor();
         }
 
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     /** Whether another probe can be added (the cap gate; dupes are

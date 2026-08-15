@@ -170,11 +170,14 @@ public class ClockScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overHomeBtn(mouseX, mouseY) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         boolean pinned = com.modpack.linktablet.client.OverlayPin.isPinned(
                 view, com.modpack.linktablet.Program.CLOCK);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(pinBtnX(), modeBtnY(), pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, tabsY() - 4, PANEL_W + 8, theme.bodyOuter);
 
         // Tab strip: four equal chips, active one lit with an accent bar
@@ -205,6 +208,8 @@ public class ClockScreen extends Screen {
         if (zonePicker.isOpen()) {
             zonePicker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
         }
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     /** Big scaled text, centered on cx. */

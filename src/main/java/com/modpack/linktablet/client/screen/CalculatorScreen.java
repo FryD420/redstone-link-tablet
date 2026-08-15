@@ -117,10 +117,13 @@ public class CalculatorScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overBtn(mouseX, mouseY, homeBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         boolean pinned = OverlayPin.isPinned(view, Program.CALCULATOR);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(pinBtnX(), modeBtnY(), pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, displayY() - 4, PANEL_W + 8, theme.bodyOuter);
 
         // Display: right-aligned tape in an ink well, pending op hinted
@@ -159,6 +162,8 @@ public class CalculatorScreen extends Screen {
                         rect[1] + (rect[3] - 8) / 2, color, theme.textShadow);
             }
         }
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     // ------------------------------------------------------------------

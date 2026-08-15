@@ -145,6 +145,7 @@ public class ArcadeHubScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overHomeBtn(mouseX, mouseY) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         scroll = Mth.clamp(scroll, 0, maxScroll());
@@ -177,6 +178,8 @@ public class ArcadeHubScreen extends Screen {
             }
         }
         graphics.disableScissor();
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     // ------------------------------------------------------------------
