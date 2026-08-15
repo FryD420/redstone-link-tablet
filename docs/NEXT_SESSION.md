@@ -3,7 +3,52 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-11 — 1.12.0 LIVE)
+## ▶ START HERE next session (state as of 2026-08-15 — 1.12.1 built, uploads pending)
+
+- **v1.12.1 hover tooltips — CODE + BUILD DONE, dev-client visual pass and
+  uploads still OUTSTANDING**: built via subagent-driven SDD (7 tasks,
+  ledger in `.superpowers/sdd/`). A shared `client/screen/ScreenTips`
+  collector lets each screen register the rect it already computed for
+  drawing a control; one call at the end of `render` paints the
+  last-registered rect under the cursor (click handling untouched, on
+  every screen). Coverage: Signals, Launcher, App Store, Arcade hub,
+  Signal edit, Probe edit, Gauges, Monitor, Paint, Twitch, Clock,
+  Calculator, the three picker overlays, and the two floating windows.
+  Previously-wordless glyphs now name themselves (chain-link, padlock,
+  solo, eyedropper, emote toggle — chain-link had NO tooltip at all
+  before this, on either Signals or Launcher). Paint's tool tips name
+  their keyboard shortcuts inline ("Brush (B)", "Fill (F)", "Line (L)",
+  "Rectangle (R)", "Pick colour (I)"). Deliberately untipped: store
+  rows/arcade rows/theme rows/named gauge tiles (already show their own
+  name — a tooltip echoing visible text is noise), the Paint canvas
+  cells (a tooltip trailing the cursor mid-draw would make the app
+  unusable), the Calculator keypad, `PickerOverlay`'s item grid (vanilla
+  item tooltip already covers it, better), and window body rows.
+  Client-only — no wire/registrar/component/NBT change of any kind —
+  **1.12.1 PAIRS WITH 1.12.0**, no coordinated server update needed.
+  `mod_version` bumped, `./gradlew build` green, jar at
+  `build/libs/linktablet-1.12.1.jar`.
+  **STILL OUTSTANDING (owed by the project owner, not done this
+  session)**: the in-client visual verification pass — `./gradlew
+  runClient`, hovering every control by eye per the spec's test matrix
+  (tooltip follows cursor / never clips an edge; state-dependent glyphs
+  flip text — pin/unpin, lock/unlock, link/unlink, emotes on/off, timer
+  start/cancel, stopwatch start/pause; popup/modal/picker priority over
+  the glyph beneath; floating windows over a live screen; block-only
+  glyphs absent on held tablets; locked screens still tip everything;
+  signal-tile ellipsis-only tooltip regression; full click-regression
+  across all screens including the 19 untouched game screens) — plus
+  the actual platform uploads and Discord announcement once that pass
+  is clean.
+  **Residual Minor queued for the final review**: on `MonitorScreen`, a
+  probe row scrolled so its header sits just above the list viewport
+  can still register its remove-cross tooltip, because `renderChannel`
+  runs for partially-visible channels while the click path gates on the
+  viewport bounds. Cosmetic (no click-through), worth a one-line
+  viewport-bounds check on the tooltip registration whenever this file
+  is next touched.
+
+## Previous START HERE (state as of 2026-08-11 — 1.12.0 LIVE)
 
 - **v1.12.0 LIVE EVERYWHERE** (uploads user-confirmed same day —
   "everythings live"): screen lock + seam fix + title header shipped

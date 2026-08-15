@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Hover tooltips on every button and glyph across all program screens —
+  the wordless ones (chain-link, padlock, solo, eyedropper, emote
+  toggle) finally say what they are. Paint's tool tips also name their
+  keyboard shortcuts (B/F/L/R/I), which were previously undiscoverable.
+  Client-only, pairs with 1.12.0.
+
 ## 1.12.0 — 2026-08-11
 
 ### Added
