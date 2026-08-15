@@ -128,6 +128,8 @@ public class PickerOverlay {
         Chrome.panel(graphics, x - 2, y - 2, w + 4, h + 4, theme);
 
         searchBox.render(graphics, mouseX, mouseY, partialTick);
+        ScreenTips.add(searchBox.getX(), searchBox.getY(), searchBox.getWidth(),
+                searchBox.getHeight(), "gui.linktablet.tip.search");
 
         graphics.enableScissor(gridLeft(), gridTop(), gridLeft() + GRID_COLS * SLOT, gridBottom());
         Item hoveredItem = null;
@@ -151,6 +153,7 @@ public class PickerOverlay {
             Chrome.bannerButton(graphics, x + 8, clearButtonY(), w - 16, 18,
                     hovered ? Chrome.ButtonState.HOVER : Chrome.ButtonState.NORMAL,
                     hovered ? theme.rowBgHover : theme.rowBg);
+            ScreenTips.add(x + 8, clearButtonY(), w - 16, 18, "gui.linktablet.tip.picker.clear");
             Component label = Component.translatable("gui.linktablet.picker.clear_icon");
             graphics.drawString(font, label, x + w / 2 - font.width(label) / 2,
                     clearButtonY() + 5, theme.textPrimary, theme.textShadow);

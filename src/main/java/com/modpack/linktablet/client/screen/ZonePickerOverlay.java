@@ -115,6 +115,8 @@ public class ZonePickerOverlay {
         Chrome.panel(graphics, x - 2, y - 2, w + 4, h + 4, theme);
 
         searchBox.render(graphics, mouseX, mouseY, partialTick);
+        ScreenTips.add(searchBox.getX(), searchBox.getY(), searchBox.getWidth(),
+                searchBox.getHeight(), "gui.linktablet.tip.search");
 
         int left = listLeft();
         int right = x + w - 8;

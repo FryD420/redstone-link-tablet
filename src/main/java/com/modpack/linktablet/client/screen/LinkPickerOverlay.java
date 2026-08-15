@@ -145,6 +145,9 @@ public class LinkPickerOverlay {
             if (hovered) {
                 graphics.fill(left, ry, right, ry + ROW_H, theme.rowBgHover);
             }
+            if (eligible) {
+                ScreenTips.add(left, ry, right - left, ROW_H, "gui.linktablet.tip.link.cycle");
+            }
             Signal.Link.Mode mode = eligible ? modeFor(candidate.linkId()) : null;
             Component tag = eligible ? modeLabel(mode)
                     : Component.translatable("gui.linktablet.links.unsaved");

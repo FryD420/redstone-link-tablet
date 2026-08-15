@@ -249,6 +249,11 @@ public class MiniTabletWindow implements FloatingWindow {
                 W - TITLE_H - 24);
         graphics.drawString(font, title, x + 10, y + 7, t.textPrimary, t.textShadow);
         Chrome.railH(graphics, x + 4, y + TITLE_H - 3, W - 8, t.bodyOuter);
+        // mouseX < 0 marks the mouseless HUD pass (NoteWindows.onRenderHud) —
+        // see NoteWindow's identical guard for why registering there would leak.
+        if (mouseX >= 0) {
+            ScreenTips.add(x, y, W - TITLE_H, TITLE_H, "gui.linktablet.tip.window.drag");
+        }
 
         // Unpin X
         int cx = x + W - CLOSE_SIZE - 7;
