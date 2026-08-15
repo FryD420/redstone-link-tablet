@@ -1,9 +1,14 @@
 package com.modpack.linktablet.client.screen;
 
+import com.modpack.linktablet.LinkTabletMod;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +25,25 @@ import java.util.List;
  *
  * <p>Click handling is deliberately NOT involved: this class never sees
  * mouseClicked, so adding a tooltip can never change what a control does.
+ *
+ * <p><b>Frame boundary:</b> {@code draw}/{@code drawWindows} clear
+ * {@link #TIPS} after painting, but nothing forces a registering screen's
+ * {@code render} to actually reach that call every frame (an early return
+ * between a screen's {@code add} calls and its {@code draw} call would
+ * otherwise leave that frame's entries stranded — a stale tooltip, or a
+ * rect from one screen bleeding into whatever screen renders next). To
+ * make that structurally impossible, {@link #onRenderPre} clears
+ * {@link #TIPS} on every {@link ScreenEvent.Render.Pre}, which NeoForge
+ * fires once per screen render, immediately BEFORE {@code Screen#render}
+ * runs (verified against {@code neoforge-21.1.233-universal.jar} and
+ * already relied on for its {@code Render.Post} sibling by
+ * {@link NoteWindows}). So every frame starts with an empty list before
+ * any screen's {@code add}/{@code glyph} calls run, regardless of whether
+ * the previous frame's {@code draw} call happened — a screen that forgets
+ * to call {@code draw} loses only its OWN tooltips that frame, it can
+ * never leak stale rects into a later one.
  */
+@EventBusSubscriber(modid = LinkTabletMod.MOD_ID, value = Dist.CLIENT)
 final class ScreenTips {
 
     /** The header-row glyph square — MODE_BTN_SIZE on every screen. */
@@ -33,6 +56,17 @@ final class ScreenTips {
     }
 
     private static final List<Tip> TIPS = new ArrayList<>();
+
+    /**
+     * Frame boundary (see class javadoc): fires once per screen render,
+     * before that screen's {@code render} body runs, so this always
+     * clears any entries a previous frame failed to consume via
+     * {@link #draw}/{@link #drawWindows}.
+     */
+    @SubscribeEvent
+    static void onRenderPre(ScreenEvent.Render.Pre event) {
+        TIPS.clear();
+    }
 
     static void add(int x, int y, int w, int h, String key) {
         add(x, y, w, h, Component.translatable(key));

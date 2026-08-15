@@ -594,12 +594,16 @@ public class TabletScreen extends Screen {
         ScreenTips.glyph(reorderBtnX(), modeBtnY(), "gui.linktablet.view.reorder");
         HeaderGlyphs.themePalette(graphics, themeBtnX(), y,
                 glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, themeBtnX())));
-        ScreenTips.glyph(themeBtnX(), modeBtnY(), "gui.linktablet.theme.title");
+        if (!themePopupOpen) {
+            ScreenTips.glyph(themeBtnX(), modeBtnY(), "gui.linktablet.theme.title");
+        }
         // Pin lights while THIS tablet is the pinned overlay
         HeaderGlyphs.pin(graphics, pinBtnX(), y,
                 glyphColor(OverlayPin.isPinned(view), overModeBtn(mouseX, mouseY, pinBtnX())));
-        ScreenTips.glyph(pinBtnX(), modeBtnY(), OverlayPin.isPinned(view)
-                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
+        if (!themePopupOpen) {
+            ScreenTips.glyph(pinBtnX(), modeBtnY(), OverlayPin.isPinned(view)
+                    ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
+        }
         // Link (placed tablets only): joined while merging is allowed,
         // broken apart (and lit) while this tablet is SOLO
         if (isBlockView()) {
@@ -611,8 +615,10 @@ public class TabletScreen extends Screen {
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
-            ScreenTips.glyph(lockBtnX(), modeBtnY(), locked
-                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock");
+            if (!themePopupOpen) {
+                ScreenTips.glyph(lockBtnX(), modeBtnY(), locked
+                        ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock");
+            }
         }
     }
 
