@@ -170,13 +170,13 @@ public class ClockScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overHomeBtn(mouseX, mouseY) ? theme.glyphHover : theme.textFaint);
-        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
+        addBackgroundTip(homeBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, "gui.linktablet.home");
         boolean pinned = com.modpack.linktablet.client.OverlayPin.isPinned(
                 view, com.modpack.linktablet.Program.CLOCK);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
-        ScreenTips.glyph(pinBtnX(), modeBtnY(), pinned
+        addBackgroundTip(pinBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, pinned
                 ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, tabsY() - 4, PANEL_W + 8, theme.bodyOuter);
 

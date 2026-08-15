@@ -257,6 +257,7 @@ public class MonitorScreen extends Screen {
         int plusColor = addable ? theme.accent : theme.textFaint;
         graphics.fill(addX + 4, addY + 8, addX + 14, addY + 10, plusColor);
         graphics.fill(addX + 8, addY + 4, addX + 10, addY + 14, plusColor);
+        ScreenTips.add(addX, addY, 18, 18, "gui.linktablet.tip.probe.add");
 
         Component hint = Component.translatable("gui.linktablet.monitor.probe.hint");
         int hintX = addX + 18 + 6;
@@ -297,6 +298,7 @@ public class MonitorScreen extends Screen {
                 graphics.fill(removeX + d, y + 3 + d, removeX + d + 1, y + 4 + d, crossColor);
                 graphics.fill(removeX + 5 - d, y + 3 + d, removeX + 6 - d, y + 4 + d, crossColor);
             }
+            ScreenTips.add(removeX, y + 3, 9, 9, "gui.linktablet.tip.probe.remove");
         }
 
         int textX = icon2X + 16 + 6;

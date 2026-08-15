@@ -137,6 +137,8 @@
   "gui.linktablet.tip.range": "Range",
   "gui.linktablet.tip.pulse": "Pulse length",
   "gui.linktablet.tip.probe.add": "Add probe",
+  "gui.linktablet.tip.probe.remove": "Remove probe",
+  "gui.linktablet.tip.gauge.new": "New gauge",
   "gui.linktablet.tip.paint.brush": "Brush (B)",
   "gui.linktablet.tip.paint.fill": "Fill (F)",
   "gui.linktablet.tip.paint.line": "Line (L)",
