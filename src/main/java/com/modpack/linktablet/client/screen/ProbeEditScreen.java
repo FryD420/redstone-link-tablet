@@ -192,6 +192,13 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         renderTooltip(graphics, mouseX, mouseY);
+        for (int slot = 0; slot < 2; slot++) {
+            if (staged(slot).isEmpty()) {
+                Rect2i area = frequencySlotArea(slot);
+                ScreenTips.add(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                        "gui.linktablet.tip.freq.item");
+            }
+        }
         if (picker.isOpen()) {
             picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme());
         }

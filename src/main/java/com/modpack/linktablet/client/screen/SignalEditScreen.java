@@ -623,9 +623,11 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         // Name box and staged ghost slots — fixed rects, always visible
         ScreenTips.add(left + 12, top + 31, 142, 8, "gui.linktablet.tip.name");
         for (int slot = 0; slot < 2; slot++) {
-            Rect2i area = frequencySlotArea(slot);
-            ScreenTips.add(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
-                    "gui.linktablet.tip.freq.item");
+            if (staged(slot).isEmpty()) {
+                Rect2i area = frequencySlotArea(slot);
+                ScreenTips.add(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                        "gui.linktablet.tip.freq.item");
+            }
         }
 
         // Icon slot content (default = show first frequency's item dimmed)
