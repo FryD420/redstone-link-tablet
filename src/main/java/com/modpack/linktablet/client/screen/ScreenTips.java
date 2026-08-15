@@ -44,7 +44,7 @@ import java.util.List;
  * never leak stale rects into a later one.
  */
 @EventBusSubscriber(modid = LinkTabletMod.MOD_ID, value = Dist.CLIENT)
-final class ScreenTips {
+public final class ScreenTips {
 
     /** The header-row glyph square — MODE_BTN_SIZE on every screen. */
     private static final int GLYPH = 12;
@@ -64,7 +64,7 @@ final class ScreenTips {
      * {@link #draw}/{@link #drawWindows}.
      */
     @SubscribeEvent
-    static void onRenderPre(ScreenEvent.Render.Pre event) {
+    public static void onRenderPre(ScreenEvent.Render.Pre event) {
         TIPS.clear();
     }
 
