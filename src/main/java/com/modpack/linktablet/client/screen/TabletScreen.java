@@ -467,14 +467,10 @@ public class TabletScreen extends Screen {
     // Rendering
     // ------------------------------------------------------------------
 
-    /** Full name of a hovered entry whose label got ellipsized this frame. */
-    private String hoveredEllipsizedName;
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        hoveredEllipsizedName = null;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
         if (reorderMode) {
@@ -562,10 +558,23 @@ public class TabletScreen extends Screen {
 
         // Tooltips last, on top of everything
         ScreenTips.draw(graphics, font, mouseX, mouseY);
-        if (hoveredEllipsizedName != null && !themePopupOpen
-                && !NoteWindows.anyContains(mouseX, mouseY)) {
-            graphics.renderTooltip(font, Component.literal(hoveredEllipsizedName), mouseX, mouseY);
-        }
+    }
+
+    /**
+     * Registers a tooltip for a CONTENT-AREA control (grid/list tiles, the
+     * add-signal tile, note glyphs, the ellipsized-name tip) — suppressed
+     * while the theme popup is open, since the popup panel overlaps the
+     * tile grid and is drawn AFTER these controls register (mirrors
+     * {@code SignalEditScreen#addBackgroundTip}). Final-review Fix 2.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
+    }
+
+    private void addBackgroundTip(int x, int y, int w, int h, Component text) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, text);
     }
 
     /** Theme dropdown, z-lifted above the batched content like the edit
@@ -610,8 +619,10 @@ public class TabletScreen extends Screen {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
-            ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
-                    ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            if (!themePopupOpen) {
+                ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
+                        ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            }
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
@@ -732,12 +743,12 @@ public class TabletScreen extends Screen {
 
         // Note glyph, tile top-left (below the badge when both show):
         // always visible when a note exists, on hover as the affordance
-        if (signal.hasNote() || hovered || noteHovered) {
-            int gy = y + (signal.frequencies().size() > 1 ? 13 : 3);
+        boolean showNoteGlyph = signal.hasNote() || hovered || noteHovered;
+        int noteGy = y + (signal.frequencies().size() > 1 ? 13 : 3);
+        if (showNoteGlyph) {
             int frame = noteHovered ? theme.glyphHover
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
-            drawNoteGlyph(graphics, x + 3, gy, frame, theme.surfaceLo);
-            ScreenTips.add(x + 3, gy, 7, 9, "gui.linktablet.note");
+            drawNoteGlyph(graphics, x + 3, noteGy, frame, theme.surfaceLo);
         }
 
         // Chain glyph (1.10.0 signal links), below the note SLOT — a
@@ -747,10 +758,23 @@ public class TabletScreen extends Screen {
             drawChainGlyph(graphics, x + 3, cy, theme.textMuted, theme.surfaceLo);
         }
 
-        // Name (ellipsized to tile width; full name via hover tooltip)
+        // Name (ellipsized to tile width; full name via hover tooltip) —
+        // registered as a normal tip (final-review Fix 1) so last-wins
+        // ordering resolves the overlap with the note glyph below: the
+        // note is registered AFTER this, so it wins the tile's tooltip
+        // when both rects contain the cursor.
         String name = SignalTilePainter.label(graphics, font, theme, signal.name(), x, y, TILE_SIZE, TILE_GAP);
         if (hovered && !name.equals(signal.name())) {
-            hoveredEllipsizedName = signal.name();
+            addBackgroundTip(x, y, TILE_SIZE, TILE_SIZE, Component.literal(signal.name()));
+        }
+
+        // Registered last so it outranks the name tip above on overlap
+        // (Fix 1); gated to the padded rect overNoteGlyph tests, not the
+        // smaller draw rect (Fix 6), and only while that rect sits inside
+        // the scissored viewport — a scrolled-off glyph is unclickable
+        // and must not out-tip whatever IS on screen there (Fix 5).
+        if (showNoteGlyph && noteGy - 2 >= gridTop() - 2 && noteGy + 11 <= gridBottom()) {
+            addBackgroundTip(x + 1, noteGy - 2, 12, 13, "gui.linktablet.note");
         }
     }
 
@@ -768,7 +792,11 @@ public class TabletScreen extends Screen {
         int bg = hovered ? theme.surfaceHi : theme.rowBg;
         Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, bg);
         drawThemedCentered(graphics, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, theme.textMuted);
-        ScreenTips.add(x, y, TILE_SIZE, TILE_SIZE, "gui.linktablet.tip.signal.new");
+        // Viewport-gated (Fix 5): a tile scrolled only partially into view
+        // is scissor-clipped and unclickable at its off-screen edge.
+        if (y >= gridTop() - 2 && y + TILE_SIZE <= gridBottom()) {
+            addBackgroundTip(x, y, TILE_SIZE, TILE_SIZE, "gui.linktablet.tip.signal.new");
+        }
     }
 
     // ---- List mode -----------------------------------------------------
@@ -824,12 +852,18 @@ public class TabletScreen extends Screen {
         ScreenTheme theme = theme();
         // Shared painter (also drives the pinned mini-tablet's rows)
         String name = SignalRowPainter.paint(graphics, font, theme, signal, x, y, w, hovered, held);
+        // Registered as a normal tip (Fix 1): already precedes the note
+        // glyph's registration below, so last-wins gives the note
+        // priority on overlap without any reordering needed here.
         if (hovered && !name.equals(signal.name())) {
-            hoveredEllipsizedName = signal.name();
+            addBackgroundTip(x, y, w, ROW_HEIGHT, Component.literal(signal.name()));
         }
 
         // Note glyph, right before the control (mirrors noteGlyphListX) —
-        // a GUI-only affordance, so it's overlaid here, not in the painter
+        // a GUI-only affordance, so it's overlaid here, not in the painter.
+        // Registered with the padded rect overNoteGlyph tests, not the
+        // smaller draw rect (Fix 6), and only while that rect sits inside
+        // the scissored viewport (Fix 5).
         if (signal.hasNote() || hovered || noteHovered) {
             int controlReserve = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
             int gx = x + w - 4 - controlReserve - 12;
@@ -837,7 +871,11 @@ public class TabletScreen extends Screen {
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
             int gy = y + (ROW_HEIGHT - 9) / 2;
             drawNoteGlyph(graphics, gx, gy, frame, theme.surfaceLo);
-            ScreenTips.add(gx, gy, 7, 9, "gui.linktablet.note");
+            int padTop = gy - 2;
+            int padBottom = y + (ROW_HEIGHT + 9) / 2 + 2;
+            if (padTop >= gridTop() - 2 && padBottom <= gridBottom()) {
+                addBackgroundTip(gx - 2, padTop, 12, padBottom - padTop, "gui.linktablet.note");
+            }
         }
 
         // Chain glyph (1.10.0 signal links), left of the note slot

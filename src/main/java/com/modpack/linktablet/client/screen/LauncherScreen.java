@@ -317,10 +317,13 @@ public class LauncherScreen extends Screen {
             int h = listView() ? TabletScreen.ROW_HEIGHT : TILE;
             if (y + h < gridTop() - 2 || y > gridBottom()) continue;
             boolean hovered = !themePopupOpen && tileIndexAt(mouseX, mouseY) == i;
+            // Viewport-gated (Fix 5): a tile scrolled only partially into
+            // view is scissor-clipped and unclickable at its off-screen edge.
+            boolean tileVisible = y >= gridTop() - 2 && y + h <= gridBottom();
             if (listView()) {
                 renderProgramRow(graphics, theme, program, x, y, hovered);
-                if (store) {
-                    ScreenTips.add(x, y, rowWidth(), TabletScreen.ROW_HEIGHT, "gui.linktablet.tip.store");
+                if (store && tileVisible) {
+                    addBackgroundTip(x, y, rowWidth(), TabletScreen.ROW_HEIGHT, "gui.linktablet.tip.store");
                 }
             } else {
                 SignalTilePainter.base(graphics, theme, x, y, TILE, program.chipColor(), false, hovered);
@@ -329,8 +332,8 @@ public class LauncherScreen extends Screen {
                     graphics.renderItem(icon, x + (TILE - 16) / 2, y + (TILE - 16) / 2);
                 }
                 SignalTilePainter.label(graphics, font, theme, label(program).getString(), x, y, TILE, GAP);
-                if (store) {
-                    ScreenTips.add(x, y, TILE, TILE, "gui.linktablet.tip.store");
+                if (store && tileVisible) {
+                    addBackgroundTip(x, y, TILE, TILE, "gui.linktablet.tip.store");
                 }
             }
         }
@@ -343,6 +346,18 @@ public class LauncherScreen extends Screen {
 
         // Tooltips last, on top of everything
         ScreenTips.draw(graphics, font, mouseX, mouseY);
+    }
+
+    /**
+     * Registers a tooltip for a CONTENT-AREA control (the store tile) —
+     * suppressed while the theme popup is open, since the popup panel
+     * overlaps the tile grid and is drawn AFTER these controls register
+     * (mirrors {@code SignalEditScreen#addBackgroundTip} /
+     * {@code TabletScreen}'s twin). Final-review Fix 2.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
     }
 
     /** Home entry as a list row (1.10.0 user feedback): chip + icon +
@@ -382,8 +397,10 @@ public class LauncherScreen extends Screen {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
-            ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
-                    ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            if (!themePopupOpen) {
+                ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
+                        ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            }
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
