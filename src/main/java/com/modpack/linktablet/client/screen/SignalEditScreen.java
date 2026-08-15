@@ -763,7 +763,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             graphics.pose().popPose();
         }
 
-        if (!picker.isOpen() && !linkPicker.isOpen() && !colorPopupOpen) {
+        if (!picker.isOpen() && !linkPicker.isOpen() && !colorPopupOpen && !NoteWindows.anyContains(mouseX, mouseY)) {
             // Hovered inventory/ghost slot tooltip (vanilla)
             renderTooltip(graphics, mouseX, mouseY);
         }

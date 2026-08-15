@@ -207,7 +207,7 @@ public class ProbeEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         // guard the pre-chrome tooltip ladder used (see git show 47a12b0).
         // The vanilla slot/inventory tooltip pass gets the same guard, for
         // symmetry with SignalEditScreen#render.
-        if (!picker.isOpen()) {
+        if (!picker.isOpen() && !NoteWindows.anyContains(mouseX, mouseY)) {
             for (int slot = 0; slot < 2; slot++) {
                 if (staged(slot).isEmpty()) {
                     Rect2i area = frequencySlotArea(slot);
