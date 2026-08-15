@@ -554,6 +554,20 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         return leftPos + RIGHT_COL + value * (TRACK_W - 4) / Signal.MAX_STRENGTH;
     }
 
+    /**
+     * Registers a tooltip for a BACKGROUND control (chips, name box, ghost
+     * slots, colour button, type row, strength/range/pulse track) —
+     * suppressed while any full-screen modal sits on top of it, mirroring
+     * the guard the pre-chrome tooltip ladder used (see {@code git show
+     * 47a12b0}). The colour popup's own swatches are NOT background
+     * controls and register directly, inside the {@code colorPopupOpen}
+     * branch that draws them.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (picker.isOpen() || linkPicker.isOpen() || colorPopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
+    }
+
     // ---- Rendering -------------------------------------------------------
 
     /** Panel + title plaque + slot cells + staging frames, under the slot items. */
@@ -610,7 +624,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             int x = chipX(i);
             int y = chipY(i);
             boolean hovered = mouseX >= x && mouseX < x + CHIP_W && mouseY >= y && mouseY < y + CHIP_H;
-            ScreenTips.add(chipX(i), chipY(i), CHIP_W, CHIP_H, "gui.linktablet.tip.freq.remove");
+            addBackgroundTip(chipX(i), chipY(i), CHIP_W, CHIP_H, "gui.linktablet.tip.freq.remove");
 
             Chrome.plaque(graphics, x, y, CHIP_W, CHIP_H, hovered ? 0xFF5A3038 : theme.rowBg);
             graphics.renderItem(freq.icon1(), x + 2, y + 1);
@@ -621,11 +635,11 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         }
 
         // Name box and staged ghost slots — fixed rects, always visible
-        ScreenTips.add(left + 12, top + 31, 142, 8, "gui.linktablet.tip.name");
+        addBackgroundTip(left + 12, top + 31, 142, 8, "gui.linktablet.tip.name");
         for (int slot = 0; slot < 2; slot++) {
             if (staged(slot).isEmpty()) {
                 Rect2i area = frequencySlotArea(slot);
-                ScreenTips.add(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                addBackgroundTip(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
                         "gui.linktablet.tip.freq.item");
             }
         }
@@ -650,7 +664,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         graphics.fill(ax, ay, ax + 6, ay + 2, theme.textMuted);
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
-        ScreenTips.add(rightX, top + COLOR_BTN_Y, 34, 20, "gui.linktablet.tip.colour");
+        addBackgroundTip(rightX, top + COLOR_BTN_Y, 34, 20, "gui.linktablet.tip.colour");
 
         // Signal type row (click cycles): inset checkbox + current type
         int momY = top + MOMENTARY_Y;
@@ -661,7 +675,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                 : "gui.linktablet.edit_signal.type.toggle";
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
-        ScreenTips.add(rightX, top + MOMENTARY_Y - 2, 90, CHECKBOX_SIZE + 4, slider
+        addBackgroundTip(rightX, top + MOMENTARY_Y - 2, 90, CHECKBOX_SIZE + 4, slider
                 ? "gui.linktablet.edit_signal.type.slider.tooltip"
                 : momentary
                 ? "gui.linktablet.edit_signal.momentary.tooltip"
@@ -712,7 +726,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         String trackKey = slider ? "gui.linktablet.tip.range"
                 : timed ? "gui.linktablet.tip.pulse"
                 : "gui.linktablet.tip.strength";
-        ScreenTips.add(rightX - 2, top + TRACK_Y - 6, TRACK_W + 6, 18, trackKey);
+        addBackgroundTip(rightX - 2, top + TRACK_Y - 6, TRACK_W + 6, 18, trackKey);
 
         // Color popup, z-lifted above the batched text/items so nothing
         // bleeds through it
