@@ -113,6 +113,14 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     private Button saveButton;
     private Button addFreqButton;
+    // Fields (Fix 4) so updateModalButtonTooltips can reach every widget
+    // whose tooltip needs clearing while a modal overlay is open —
+    // previously local to init().
+    private Button searchButton;
+    private Button iconButton;
+    private Button linksButton;
+    private Button cancelButton;
+    private Button removeButton;
 
     public SignalEditScreen(SignalEditMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -184,14 +192,14 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         addRenderableWidget(addFreqButton);
 
         // All-items search (for frequency items you don't carry)
-        Button searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
+        searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
                 Component.literal("..."), b ->
                 picker.open(width, height, this::stageFromPicker, false), this::theme);
         searchButton.setTooltip(ScreenTips.tooltip("gui.linktablet.picker.search"));
         addRenderableWidget(searchButton);
 
         // Icon slot button (picker with a "use default" option)
-        Button iconButton = new ChromeButton(left + RIGHT_COL, top + 26, 24, 24,
+        iconButton = new ChromeButton(left + RIGHT_COL, top + 26, 24, 24,
                 Component.literal(""), b ->
                 picker.open(width, height, stack ->
                                 iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
@@ -201,7 +209,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
         // Signal links (1.10.0): the free rect right of the icon slot
         linkPicker = new LinkPickerOverlay(font);
-        Button linksButton = new ChromeButton(left + RIGHT_COL + 28, top + 26, 56, 20,
+        linksButton = new ChromeButton(left + RIGHT_COL + 28, top + 26, 56, 20,
                 Component.translatable("gui.linktablet.links.button"), b ->
                 linkPicker.open(width, height,
                         LinkPickerOverlay.candidates(view().signals(), index), links),
@@ -215,13 +223,14 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         saveButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.save"));
         addRenderableWidget(saveButton);
 
-        Button cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
+        cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
                 Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme);
         cancelButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.cancel"));
         addRenderableWidget(cancelButton);
 
+        removeButton = null;
         if (index != -1) {
-            Button removeButton = new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
+            removeButton = new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
                     Component.translatable("gui.linktablet.edit_signal.remove"), b -> {
                 UISounds.delete();
                 PacketDistributor.sendToServer(
@@ -230,6 +239,31 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             }, this::theme);
             removeButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.delete"));
             addRenderableWidget(removeButton);
+        }
+    }
+
+    /**
+     * Vanilla renders {@link ChromeButton} tooltips in a deferred pass
+     * AFTER {@code render} returns (they ride {@code Screen}'s own tooltip
+     * plumbing, separate from {@link ScreenTips}), so drawing the picker /
+     * link-picker overlay on top of a button here can't stop its
+     * (still-hovered) tooltip from painting above the modal —
+     * {@code addBackgroundTip} can't reach this path at all. Cleared while
+     * either modal is open and reinstated once it closes, off the same
+     * {@code isOpen()} flags {@code mouseClicked} already gates on: this
+     * can only ever suppress a tooltip that WOULD have painted, it never
+     * changes what a button does. Final-review Fix 4.
+     */
+    private void updateModalButtonTooltips() {
+        boolean modal = picker.isOpen() || linkPicker.isOpen();
+        addFreqButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.freq.add"));
+        searchButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.picker.search"));
+        iconButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.icon"));
+        linksButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.links.button.tooltip"));
+        saveButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.save"));
+        cancelButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.cancel"));
+        if (removeButton != null) {
+            removeButton.setTooltip(modal ? null : ScreenTips.tooltip("gui.linktablet.tip.delete"));
         }
     }
 
@@ -611,6 +645,10 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Must run before super.render(): that's where AbstractWidget
+        // "refreshes" (queues) each hovered widget's tooltip for the
+        // deferred pass (Fix 4) — updating after would be one frame late.
+        updateModalButtonTooltips();
         super.render(graphics, mouseX, mouseY, partialTick);
         ScreenTheme theme = theme();
         boolean shadow = theme.textShadow;
