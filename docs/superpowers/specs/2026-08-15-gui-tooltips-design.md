@@ -59,11 +59,17 @@ ScreenTips.draw(graphics, font, mouseX, mouseY)          // end of render
 
 **Floating windows**: `MiniTabletWindow` and `NoteWindow` draw themselves
 through `NoteWindows`' `ScreenEvent.Render.Post` pass, above whatever
-screen is open. They register into the same collector and `draw` at the
-end of that pass. Because the window pass runs after the screen's, window
-tips land on top — which means `TabletScreen`'s existing
-`NoteWindows.anyContains(...) → return` guard can be **deleted**, since
-last-wins already produces exactly that behaviour.
+screen is open. They register into the same collector and paint at the
+end of that pass.
+
+Last-wins does NOT cover this case on its own: the screen's render and
+the windows' render are two separate paint calls in the same frame, so
+both could draw and leave a screen tooltip stranded under a window.
+`TabletScreen`'s existing `NoteWindows.anyContains(...) → return` guard
+therefore **moves into** `ScreenTips.draw` rather than being deleted —
+every screen inherits the yield-to-windows rule for free, and the window
+pass calls a second entry point (`drawWindows`) that skips the guard
+because that pass IS the windows.
 
 ## 2. Format
 
