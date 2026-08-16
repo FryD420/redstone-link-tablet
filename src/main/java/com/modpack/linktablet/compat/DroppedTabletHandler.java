@@ -32,10 +32,11 @@ import java.util.UUID;
  * entities, and tablets sitting in item frames, keep broadcasting
  * their toggled-ON signals from where they are.
  * <p>
- * A 4-tick sweep per level walks ONLY the type-indexed ITEM and
- * ItemFrame entity lists (never the full entity list) and diffs a
- * wanted map against live {@link VirtualTransmitter}s — the
- * {@link TabletTransmitterHandler#onPlayerTick} shape. Every cleanup
+ * A 4-tick sweep per level uses {@code getEntities(EntityTypeTest, ...)}
+ * to linearly scan visible entities with type-and-predicate filters
+ * for tablet-bearing items/frames, then diffs a wanted map against live
+ * {@link VirtualTransmitter}s — O(visible entities) per sweep, every 4
+ * ticks, per level; idiomatic and acceptable at this scale. Every cleanup
  * case (pickup, despawn, lava, hopper, frame emptied or broken, chunk
  * unload, portal transfer) is handled by ABSENCE from the sweep, not
  * by enumerated events. Momentary and timer signals never fire from
@@ -66,7 +67,7 @@ public class DroppedTabletHandler {
 
         Map<UUID, Tracked> tracked = ACTIVE.computeIfAbsent(level, l -> new HashMap<>());
 
-        // 1. Sweep the two type-indexed lists for tablet-bearing entities.
+        // 1. Linear sweep of visible entities with type filter for tablet-bearing ones.
         //    ItemFrame.class covers GlowItemFrame (it extends ItemFrame).
         Map<UUID, Entity> present = new HashMap<>();
         for (ItemEntity item : level.getEntities(EntityType.ITEM,
