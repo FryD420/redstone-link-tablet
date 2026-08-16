@@ -90,10 +90,11 @@ trigger, the tablet can too:
 
 The **Monitor** app lists every channel your tablet touches — plus any you
 **probe** (up to 8) — with live power and **every member transmitting or
-listening**: Redstone Links, placed tablets, even *"a tablet in someone's
-inventory"*. When a receiver is mysteriously pinned at 15, the Monitor points
-at the spare tablet in your pocket. Out-of-range members wear a badge; wall
-tablets make it a **status board**, and the overlay pin puts it on your HUD.
+listening**: Redstone Links, placed tablets, dropped or framed tablets, even
+*"a tablet in someone's inventory"*. When a receiver is mysteriously pinned
+at 15, the Monitor points at the spare tablet in your pocket. Out-of-range
+members wear a badge; wall tablets make it a **status board**, and the
+overlay pin puts it on your HUD.
 
 ![The Frequency Monitor GUI open in a working assembly hall — two channels with classified member rows (a placed tablet and a Redstone Link), while the overlay pin mirrors the same channels on the HUD](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/monitor.png)
 
@@ -265,7 +266,8 @@ Then:
 
 There's a **Ponder scene** too — hold W over the tablet item. A tablet
 anywhere in your inventory transmits like Create's handheld Linked Controller;
-placed tablets transmit from the block.
+placed tablets transmit from the block — and a dropped tablet, or one sitting
+in an item frame, keeps transmitting right from where it lies.
 
 ---
 

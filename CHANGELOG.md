@@ -13,7 +13,13 @@
   where it is — throw a scene tablet into the machine room and the
   scene keeps running. The Frequency Monitor names these members
   ("Dropped tablet (player)" / "Framed tablet"), completing the
-  who-is-transmitting story.
+  who-is-transmitting story. This changes the old "phantom copy"
+  diagnosis: dropping a spare tablet used to silence it — now the
+  Monitor just names it as a dropped member instead, so the fix for a
+  phantom-pinned receiver is to pick the copy up or destroy it, not
+  drop it. Edge case: because the handoff runs on a periodic sweep,
+  edge-sensitive contraptions may see a brief blip at the exact moment
+  of a throw or pickup.
 
 ### Changed
 - Network protocol version unchanged (still 24) — 1.13.0 pairs with

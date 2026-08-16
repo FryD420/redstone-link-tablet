@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Per-frame hover-tooltip collector (1.12.1). Screens register the rect
+ * Per-frame hover-tooltip collector (1.13.0). Screens register the rect
  * they ALREADY computed for drawing a control; one {@link #draw} call at
  * the end of render paints the last-registered rect under the cursor and
  * clears the list.

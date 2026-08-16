@@ -30,16 +30,16 @@ at the repo root (auto-loaded every Claude session).
   unusable), the Calculator keypad, `PickerOverlay`'s item grid (vanilla
   item tooltip already covers it, better), and window body rows.
   Client-only — no wire/registrar/component/NBT change of any kind.
-  - **Dropped-tablet transmission** (3 tasks). `compat/
-  DroppedTabletHandler` is the third transmitter anchor (player scan /
-  placed BE / entity sweep): a tablet lying on the ground, or sitting
-  in an item frame, keeps broadcasting its toggled-ON signals from
-  where it is — throw a scene tablet into the machine room and the
-  scene keeps running. The Frequency Monitor names these members
-  ("Dropped tablet (player)" / "Framed tablet"). Server-side only, no
-  wire/registrar/component/NBT change. This is the feature-queue item
-  from the 2026-08-11 night wrap below — now shipped in code, out of
-  the queue.
+  - **Dropped-tablet transmission** (3 tasks).
+  `compat/DroppedTabletHandler` is the third transmitter anchor
+  (player scan / placed BE / entity sweep): a tablet lying on the
+  ground, or sitting in an item frame, keeps broadcasting its
+  toggled-ON signals from where it is — throw a scene tablet into the
+  machine room and the scene keeps running. The Frequency Monitor
+  names these members ("Dropped tablet (player)" / "Framed tablet").
+  Server-side only, no wire/registrar/component/NBT change. This is
+  the feature-queue item from the 2026-08-11 night wrap below — now
+  shipped in code, out of the queue.
 
   Both halves: **1.13.0 PAIRS WITH 1.12.x**, no coordinated server
   update needed (registrar untouched at "24"). `mod_version` bumped,

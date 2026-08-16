@@ -245,7 +245,8 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   signals from the player every tick — in creative, placing keeps the
   item, and the phantom copy pins receivers at max (three
   "bug" reports in one day were this; it's stacked-transmitter
-  behavior working as designed).
+  behavior working as designed). Since 1.13.0, dropping the spare
+  copy does NOT silence it — see the dropped-tablet bullet below.
 
 - Frequency Monitor (1.11.0): `MonitorChannels.channelsOf` is the ONE
   channel table (probes in stored order, then signal freqs, then
@@ -344,16 +345,29 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
 - Dropped-tablet transmission (1.13.0): `compat/DroppedTabletHandler`
   is the THIRD transmitter anchor, joining the player-inventory scan
   and the placed-block BE — dropped item entities and framed tablets
-  broadcast their toggled-ON signals from where they lie. Absence
-  from the sweep is the ONLY cleanup mechanism (pickup, despawn,
-  frame-emptied, chunk unload, all covered by simply not appearing
-  next sweep) — never add entity-removal events. `MonitorScanner`
+  broadcast their toggled-ON signals from where they lie. This
+  supersedes the old 1.10.2 phantom-copy remedy: a dropped spare copy
+  no longer goes silent for its despawn window (or ever, in a frame),
+  so the Monitor now NAMES it explicitly ("Dropped tablet (player)" /
+  "Framed tablet") — the fix for a phantom-pinned receiver is to pick
+  the copy up or destroy it, not drop it. Absence from the sweep is
+  the ONLY POLLED cleanup mechanism (pickup, despawn, frame-emptied,
+  chunk unload, all covered by simply not appearing next sweep) —
+  never add entity-removal events for that purpose; `onLevelUnload`
+  is a separate, deliberate event-driven safety net (unload can race
+  the next sweep) and is not a violation of that rule. `MonitorScanner`
   classifies dropped BEFORE placed (dropped transmitters ARE
   `VirtualTransmitter`s, so the placed-BE branch would otherwise
   swallow them); momentary/timer pulses finish from the THROWER by
   design (the hold system is player-keyed, untouched). The sweep is a
   linear visible-entity scan via `getEntities(EntityTypeTest, ...)`,
-  not type-indexed — the class comment says so; keep it that way.
+  not type-indexed — the class comment says so; keep it that way. The
+  4-tick sweep period means a throw has a 1-4 tick gap before the
+  dropped copy re-appears (the player anchor drops it instantly, the
+  sweep re-adds it later) and a pickup can double-transmit for up to
+  4 ticks — harmless for power (Create max-wins) but a Monitor
+  snapshot can briefly show two rows for one tablet; this is inherent
+  to the sweep cadence, not a bug.
 
 ## Release process
 
