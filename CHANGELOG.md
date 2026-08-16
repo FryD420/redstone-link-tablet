@@ -7,7 +7,18 @@
   the wordless ones (chain-link, padlock, solo, eyedropper, emote
   toggle) finally say what they are. Paint's tool tips also name their
   keyboard shortcuts (B/F/L/R/I), which were previously undiscoverable.
-  Client-only, pairs with 1.12.0.
+  Client-only, pairs with 1.12.x.
+- Dropped tablets keep transmitting: a tablet lying on the ground (or
+  sitting in an item frame) now broadcasts its toggled-ON signals from
+  where it is — throw a scene tablet into the machine room and the
+  scene keeps running. The Frequency Monitor names these members
+  ("Dropped tablet (player)" / "Framed tablet"), completing the
+  who-is-transmitting story.
+
+### Changed
+- Network protocol version unchanged (still 24) — 1.13.0 pairs with
+  1.12.x on both sides (tooltips are client-only, dropped-tablet
+  transmission is server-side only).
 
 ## 1.12.0 — 2026-08-11
 

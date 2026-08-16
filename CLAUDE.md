@@ -341,6 +341,20 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   their screens (viewers; config bounces) — the mural test encodes
   this. Registrar "23"→"24".
 
+- Dropped-tablet transmission (1.13.0): `compat/DroppedTabletHandler`
+  is the THIRD transmitter anchor, joining the player-inventory scan
+  and the placed-block BE — dropped item entities and framed tablets
+  broadcast their toggled-ON signals from where they lie. Absence
+  from the sweep is the ONLY cleanup mechanism (pickup, despawn,
+  frame-emptied, chunk unload, all covered by simply not appearing
+  next sweep) — never add entity-removal events. `MonitorScanner`
+  classifies dropped BEFORE placed (dropped transmitters ARE
+  `VirtualTransmitter`s, so the placed-BE branch would otherwise
+  swallow them); momentary/timer pulses finish from the THROWER by
+  design (the hold system is player-keyed, untouched). The sweep is a
+  linear visible-entity scan via `getEntities(EntityTypeTest, ...)`,
+  not type-indexed — the class comment says so; keep it that way.
+
 ## Release process
 
 1. Move CHANGELOG "Unreleased" → new version + date; bump `mod_version` in
