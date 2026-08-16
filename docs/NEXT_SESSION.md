@@ -86,8 +86,9 @@ at the repo root (auto-loaded every Claude session).
   skill on the new idea. (Superpowers plugin + global prefs + per-
   folder auto-memory travel free — only these files needed scaffolding.)
   Template addendum: docs/DESCRIPTION.md listing SKELETON + listing
-  rules now baked in. TODO: mod-template has NO git repo yet — init +
-  push to a FryD420 repo so the GitHub backup plan covers it.
+  rules now baked in. DONE 2026-08-16: template pushed to the PRIVATE
+  repo https://github.com/FryD420/mod-template (branch main) — the
+  GitHub backup plan now covers it.
 - **Feature queue (user, night wrap — corrected same night) — SHIPPED
   in 1.13.0 (see current START HERE)**: a
   DROPPED tablet (world item entity) should KEEP transmitting its
