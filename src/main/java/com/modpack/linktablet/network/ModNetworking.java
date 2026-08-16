@@ -584,6 +584,8 @@ public class ModNetworking {
     public static final byte MEMBER_PLACED_TABLET = 1;
     public static final byte MEMBER_PLAYER_TABLET = 2;
     public static final byte MEMBER_OTHER = 3;
+    public static final byte MEMBER_DROPPED_TABLET = 4;
+    public static final byte MEMBER_FRAMED_TABLET = 5;
 
     public record MonitorMember(byte type, Component label, BlockPos pos, int strength,
                                 boolean listening, boolean inRange) {
