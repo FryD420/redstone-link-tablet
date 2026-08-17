@@ -170,11 +170,14 @@ public class ClockScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overHomeBtn(mouseX, mouseY) ? theme.glyphHover : theme.textFaint);
+        addBackgroundTip(homeBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, "gui.linktablet.home");
         boolean pinned = com.modpack.linktablet.client.OverlayPin.isPinned(
                 view, com.modpack.linktablet.Program.CLOCK);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        addBackgroundTip(pinBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, tabsY() - 4, PANEL_W + 8, theme.bodyOuter);
 
         // Tab strip: four equal chips, active one lit with an accent bar
@@ -193,6 +196,8 @@ public class ClockScreen extends Screen {
                     + tabs[i].name().toLowerCase(Locale.ROOT));
             graphics.drawString(font, label, tx + (tabW() - font.width(label)) / 2,
                     tabsY() + 4, active ? theme.textPrimary : theme.textMuted, theme.textShadow);
+            addBackgroundTip(tx + 1, tabsY(), tabW() - 2, TABS_H,
+                    "gui.linktablet.tip.clock.tab." + tabs[i].name().toLowerCase(Locale.ROOT));
         }
 
         switch (tab) {
@@ -205,6 +210,8 @@ public class ClockScreen extends Screen {
         if (zonePicker.isOpen()) {
             zonePicker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
         }
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     /** Big scaled text, centered on cx. */
@@ -233,6 +240,18 @@ public class ClockScreen extends Screen {
 
     private static boolean over(double mouseX, double mouseY, int x, int y, int w, int h) {
         return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+    }
+
+    /**
+     * Registers a tooltip for a BACKGROUND control (tabs and every
+     * per-tab control) — suppressed while the zone-picker overlay is
+     * open, mirroring {@code SignalEditScreen#addBackgroundTip}: the
+     * overlay is a full-screen modal drawn after these controls, so an
+     * unsuppressed tooltip would paint on top of it.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (zonePicker.isOpen()) return;
+        ScreenTips.add(x, y, w, h, key);
     }
 
     // ---- Clock tab ----------------------------------------------------
@@ -281,6 +300,7 @@ public class ClockScreen extends Screen {
             Component add = Component.translatable("gui.linktablet.clock.add_zone");
             graphics.drawString(font, add, left + (right - left - font.width(add)) / 2,
                     ry + 3, theme.textMuted, theme.textShadow);
+            addBackgroundTip(left, ry, right - left, ROW_H, "gui.linktablet.tip.clock.zone.add");
         }
         if (!zones.isEmpty()) {
             Component hint = Component.translatable("gui.linktablet.clock.zone_hint");
@@ -319,6 +339,7 @@ public class ClockScreen extends Screen {
             boolean overX = over(mouseX, mouseY, right - 12, ry + 2, 10, 10);
             graphics.drawString(font, "x", right - 10, ry + 3,
                     overX ? theme.glyphHover : theme.textFaint, false);
+            addBackgroundTip(right - 12, ry + 2, 10, 10, "gui.linktablet.tip.clock.alarm.remove");
         }
 
         // Composer: hour/minute steppers + Add, pinned to the tab bottom
@@ -329,12 +350,17 @@ public class ClockScreen extends Screen {
         int bw = 20, bh = 14;
         int stepY = by + 16;
         button(graphics, left, stepY, bw, bh, Component.literal("h-"), mouseX, mouseY, true);
+        addBackgroundTip(left, stepY, bw, bh, "gui.linktablet.tip.clock.hour");
         button(graphics, left + bw + 2, stepY, bw, bh, Component.literal("h+"), mouseX, mouseY, true);
+        addBackgroundTip(left + bw + 2, stepY, bw, bh, "gui.linktablet.tip.clock.hour");
         button(graphics, left + 2 * (bw + 2), stepY, bw, bh, Component.literal("m-"), mouseX, mouseY, true);
+        addBackgroundTip(left + 2 * (bw + 2), stepY, bw, bh, "gui.linktablet.tip.clock.minute");
         button(graphics, left + 3 * (bw + 2), stepY, bw, bh, Component.literal("m+"), mouseX, mouseY, true);
+        addBackgroundTip(left + 3 * (bw + 2), stepY, bw, bh, "gui.linktablet.tip.clock.minute");
         button(graphics, right - 56, stepY, 56, bh,
                 Component.translatable("gui.linktablet.clock.add_alarm"), mouseX, mouseY,
                 alarms.size() < ClockService.MAX_ALARMS);
+        addBackgroundTip(right - 56, stepY, 56, bh, "gui.linktablet.tip.clock.alarm.add");
     }
 
     // ---- Timer tab ----------------------------------------------------
@@ -352,16 +378,22 @@ public class ClockScreen extends Screen {
         if (running) {
             button(graphics, cx - 40, by + 24, 80, bh,
                     Component.translatable("gui.linktablet.clock.cancel"), mouseX, mouseY, true);
+            addBackgroundTip(cx - 40, by + 24, 80, bh, "gui.linktablet.tip.clock.timer.cancel");
         } else {
             int bw = 34;
             int total = 4 * bw + 3 * 4;
             int bx = cx - total / 2;
             button(graphics, bx, by, bw, bh, Component.literal("-1m"), mouseX, mouseY, true);
+            addBackgroundTip(bx, by, bw, bh, "gui.linktablet.tip.clock.timer.adjust");
             button(graphics, bx + bw + 4, by, bw, bh, Component.literal("-10s"), mouseX, mouseY, true);
+            addBackgroundTip(bx + bw + 4, by, bw, bh, "gui.linktablet.tip.clock.timer.adjust");
             button(graphics, bx + 2 * (bw + 4), by, bw, bh, Component.literal("+10s"), mouseX, mouseY, true);
+            addBackgroundTip(bx + 2 * (bw + 4), by, bw, bh, "gui.linktablet.tip.clock.timer.adjust");
             button(graphics, bx + 3 * (bw + 4), by, bw, bh, Component.literal("+1m"), mouseX, mouseY, true);
+            addBackgroundTip(bx + 3 * (bw + 4), by, bw, bh, "gui.linktablet.tip.clock.timer.adjust");
             button(graphics, cx - 40, by + 24, 80, bh,
                     Component.translatable("gui.linktablet.clock.start"), mouseX, mouseY, true);
+            addBackgroundTip(cx - 40, by + 24, 80, bh, "gui.linktablet.tip.clock.timer.start");
         }
     }
 
@@ -378,9 +410,14 @@ public class ClockScreen extends Screen {
         button(graphics, cx - 74, by, 70, bh,
                 Component.translatable(running ? "gui.linktablet.clock.pause"
                         : "gui.linktablet.clock.start"), mouseX, mouseY, true);
+        addBackgroundTip(cx - 74, by, 70, bh, running
+                ? "gui.linktablet.tip.clock.sw.pause" : "gui.linktablet.tip.clock.sw.start");
+        boolean canReset = ClockService.stopwatchElapsedMillis() > 0;
         button(graphics, cx + 4, by, 70, bh,
-                Component.translatable("gui.linktablet.clock.reset"), mouseX, mouseY,
-                ClockService.stopwatchElapsedMillis() > 0);
+                Component.translatable("gui.linktablet.clock.reset"), mouseX, mouseY, canReset);
+        if (canReset) {
+            addBackgroundTip(cx + 4, by, 70, bh, "gui.linktablet.tip.clock.sw.reset");
+        }
     }
 
     // ------------------------------------------------------------------

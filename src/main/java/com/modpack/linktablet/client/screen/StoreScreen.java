@@ -193,9 +193,12 @@ public class StoreScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overHomeBtn(mouseX, mouseY) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         searchBox.render(graphics, mouseX, mouseY, partialTick);
+        ScreenTips.add(searchBox.getX(), searchBox.getY(), searchBox.getWidth(),
+                searchBox.getHeight(), "gui.linktablet.tip.search");
 
         scroll = net.minecraft.util.Mth.clamp(scroll, 0, maxScroll());
         List<TabletProgram> home = view.homeApps();
@@ -247,6 +250,8 @@ public class StoreScreen extends Screen {
                     btnY(i) + (BTN_H - 8) / 2, color, theme.textShadow);
         }
         graphics.disableScissor();
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     // ------------------------------------------------------------------

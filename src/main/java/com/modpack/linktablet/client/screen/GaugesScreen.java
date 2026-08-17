@@ -286,10 +286,13 @@ public class GaugesScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overBtn(mouseX, mouseY, homeBtnX()) ? theme.glyphHover : theme.textFaint);
+        addBackgroundTip(homeBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, "gui.linktablet.home");
         boolean pinned = OverlayPin.isPinned(view, Program.GAUGES);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        addBackgroundTip(pinBtnX(), modeBtnY(), MODE_BTN_SIZE, MODE_BTN_SIZE, pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         List<Gauge> gauges = gauges();
@@ -304,6 +307,7 @@ public class GaugesScreen extends Screen {
                         hovered ? theme.surfaceHi : theme.rowBg);
                 graphics.drawString(font, "+", x + CELL_W / 2 - 2, y + CELL_H / 2 - 4,
                         theme.textMuted, theme.textShadow);
+                addBackgroundTip(x + 3, y + 3, CELL_W - 6, CELL_H - 6, "gui.linktablet.tip.gauge.new");
             }
         }
         if (gauges.isEmpty()) {
@@ -318,6 +322,8 @@ public class GaugesScreen extends Screen {
         if (picker.isOpen()) {
             picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
         }
+
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     private void renderGaugeTile(GuiGraphics graphics, ScreenTheme theme, Gauge gauge,
@@ -346,6 +352,7 @@ public class GaugesScreen extends Screen {
         Chrome.panel(graphics, edX() - 2, edY() - 2, ED_W + 4, ED_H + 4, theme);
 
         nameBox.render(graphics, mouseX, mouseY, 0);
+        addEditorTip(edX() + 12, edY() + 15, ED_W - 24, 8, "gui.linktablet.tip.name");
 
         // Frequency ghost slots (18x18), Redstone-Link colored underlines
         Chrome.slot(graphics, edSlot1X(), edSlotY(), theme.surfaceLo);
@@ -360,6 +367,8 @@ public class GaugesScreen extends Screen {
                 TabletScreen.FREQ1_COLOR);
         graphics.fill(edSlot2X(), edSlotY() + 20, edSlot2X() + 18, edSlotY() + 22,
                 TabletScreen.FREQ2_COLOR);
+        addEditorTip(edSlot1X(), edSlotY(), 18, 18, "gui.linktablet.tip.freq.item");
+        addEditorTip(edSlot2X(), edSlotY(), 18, 18, "gui.linktablet.tip.freq.item");
 
         // Color swatches, 8 × 2
         for (int i = 0; i < COLORS.length; i++) {
@@ -369,6 +378,7 @@ public class GaugesScreen extends Screen {
                 graphics.fill(sx - 1, sy - 1, sx + 13, sy + 13, 0xFFFFFFFF);
             }
             graphics.fill(sx, sy, sx + 12, sy + 12, COLORS[i]);
+            addEditorTip(sx, sy, 12, 12, "gui.linktablet.tip.colour");
         }
 
         // Save / Delete
@@ -379,6 +389,7 @@ public class GaugesScreen extends Screen {
         Component save = Component.translatable("gui.linktablet.gauge.save");
         graphics.drawString(font, save, edX() + 8 + (74 - font.width(save)) / 2,
                 edButtonY() + 5, theme.textPrimary, theme.textShadow);
+        addEditorTip(edX() + 8, edButtonY(), 74, 18, "gui.linktablet.tip.save");
 
         boolean canDelete = editIndex >= 0;
         boolean overDelete = canDelete && over(mouseX, mouseY, edX() + ED_W - 82, edButtonY(), 74, 18);
@@ -389,12 +400,41 @@ public class GaugesScreen extends Screen {
         Component delete = Component.translatable("gui.linktablet.gauge.delete");
         graphics.drawString(font, delete, edX() + ED_W - 82 + (74 - font.width(delete)) / 2,
                 edButtonY() + 5, canDelete ? theme.textPrimary : theme.textFaint, theme.textShadow);
+        if (canDelete) {
+            addEditorTip(edX() + ED_W - 82, edButtonY(), 74, 18, "gui.linktablet.tip.delete");
+        }
 
         graphics.pose().popPose();
     }
 
     private static boolean over(double mouseX, double mouseY, int x, int y, int w, int h) {
         return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+    }
+
+    /**
+     * Registers a tooltip for a BACKGROUND control (header glyphs, the
+     * empty "new gauge" tile) — suppressed while EITHER the editor modal
+     * or the picker overlay is open, since both draw after these
+     * controls and would otherwise be painted over by an unsuppressed
+     * tooltip. Mirrors {@code SignalEditScreen#addBackgroundTip} /
+     * {@code ClockScreen#addBackgroundTip}.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (editorOpen || picker.isOpen()) return;
+        ScreenTips.add(x, y, w, h, key);
+    }
+
+    /**
+     * Registers a tooltip for one of the EDITOR MODAL's own controls
+     * (name box, frequency slots, colour swatches, save, delete). These
+     * only draw while {@link #renderEditor} runs, i.e. {@code editorOpen}
+     * is already true, but the editor itself can be covered by the
+     * picker overlay (clicking a frequency slot opens the picker on top
+     * of the editor), so that still needs suppressing here.
+     */
+    private void addEditorTip(int x, int y, int w, int h, String key) {
+        if (picker.isOpen()) return;
+        ScreenTips.add(x, y, w, h, key);
     }
 
     // ------------------------------------------------------------------

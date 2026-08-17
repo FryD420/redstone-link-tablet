@@ -368,6 +368,16 @@ public final class MonitorScanner {
             if (owner != null) {
                 type = ModNetworking.MEMBER_PLAYER_TABLET;
                 label = Component.translatable("gui.linktablet.monitor.member.player", owner);
+            } else if (DroppedTabletHandler.classify(member) instanceof DroppedTabletHandler.Origin origin) {
+                if (origin.framed()) {
+                    type = ModNetworking.MEMBER_FRAMED_TABLET;
+                    label = Component.translatable("gui.linktablet.monitor.member.framed");
+                } else {
+                    type = ModNetworking.MEMBER_DROPPED_TABLET;
+                    label = origin.throwerName() != null
+                            ? Component.translatable("gui.linktablet.monitor.member.dropped", origin.throwerName())
+                            : Component.translatable("gui.linktablet.monitor.member.dropped.anon");
+                }
             } else if (member instanceof VirtualTransmitter || member instanceof VirtualReceiver
                     || level.getBlockEntity(member.getLocation()) instanceof TabletBlockEntity) {
                 type = ModNetworking.MEMBER_PLACED_TABLET;

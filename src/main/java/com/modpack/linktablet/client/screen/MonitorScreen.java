@@ -201,10 +201,13 @@ public class MonitorScreen extends Screen {
                 theme.textPrimary, theme.textShadow);
         HeaderGlyphs.home(graphics, homeBtnX(), modeBtnY(),
                 overBtn(mouseX, mouseY, homeBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         boolean pinned = OverlayPin.isPinned(view, Program.MONITOR);
         HeaderGlyphs.pin(graphics, pinBtnX(), modeBtnY(),
                 pinned ? theme.accent
                         : overBtn(mouseX, mouseY, pinBtnX()) ? theme.glyphHover : theme.textFaint);
+        ScreenTips.glyph(pinBtnX(), modeBtnY(), pinned
+                ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
         Chrome.railH(graphics, left - 4, top + HEADER - 8, PANEL_W + 8, theme.bodyOuter);
 
         renderProbeRow(graphics, theme);
@@ -229,6 +232,7 @@ public class MonitorScreen extends Screen {
             graphics.disableScissor();
         }
 
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     /** Whether another probe can be added (the cap gate; dupes are
@@ -253,6 +257,7 @@ public class MonitorScreen extends Screen {
         int plusColor = addable ? theme.accent : theme.textFaint;
         graphics.fill(addX + 4, addY + 8, addX + 14, addY + 10, plusColor);
         graphics.fill(addX + 8, addY + 4, addX + 10, addY + 14, plusColor);
+        ScreenTips.add(addX, addY, 18, 18, "gui.linktablet.tip.probe.add");
 
         Component hint = Component.translatable("gui.linktablet.monitor.probe.hint");
         int hintX = addX + 18 + 6;
@@ -292,6 +297,13 @@ public class MonitorScreen extends Screen {
             for (int d = 0; d < 6; d++) {
                 graphics.fill(removeX + d, y + 3 + d, removeX + d + 1, y + 4 + d, crossColor);
                 graphics.fill(removeX + 5 - d, y + 3 + d, removeX + 6 - d, y + 4 + d, crossColor);
+            }
+            // Viewport-gated (Fix 5): the render loop calls renderChannel
+            // for partially-visible channels too, but the cross is only
+            // ever clickable within [listTop(), listBottom()) — the same
+            // bound mouseClicked's row walk uses.
+            if (y + 3 >= listTop() && y + 3 + 9 <= listBottom()) {
+                ScreenTips.add(removeX, y + 3, 9, 9, "gui.linktablet.tip.probe.remove");
             }
         }
 

@@ -317,8 +317,14 @@ public class LauncherScreen extends Screen {
             int h = listView() ? TabletScreen.ROW_HEIGHT : TILE;
             if (y + h < gridTop() - 2 || y > gridBottom()) continue;
             boolean hovered = !themePopupOpen && tileIndexAt(mouseX, mouseY) == i;
+            // Viewport-gated (Fix 5): a tile scrolled only partially into
+            // view is scissor-clipped and unclickable at its off-screen edge.
+            boolean tileVisible = y >= gridTop() - 2 && y + h <= gridBottom();
             if (listView()) {
                 renderProgramRow(graphics, theme, program, x, y, hovered);
+                if (store && tileVisible) {
+                    addBackgroundTip(x, y, rowWidth(), TabletScreen.ROW_HEIGHT, "gui.linktablet.tip.store");
+                }
             } else {
                 SignalTilePainter.base(graphics, theme, x, y, TILE, program.chipColor(), false, hovered);
                 ItemStack icon = icon(program);
@@ -326,6 +332,9 @@ public class LauncherScreen extends Screen {
                     graphics.renderItem(icon, x + (TILE - 16) / 2, y + (TILE - 16) / 2);
                 }
                 SignalTilePainter.label(graphics, font, theme, label(program).getString(), x, y, TILE, GAP);
+                if (store && tileVisible) {
+                    addBackgroundTip(x, y, TILE, TILE, "gui.linktablet.tip.store");
+                }
             }
         }
         graphics.disableScissor();
@@ -336,21 +345,19 @@ public class LauncherScreen extends Screen {
         }
 
         // Tooltips last, on top of everything
-        if (overModeBtn(mouseX, mouseY, gridBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, themeBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.theme.title"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, pinBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(
-                    OverlayPin.isPinned(view, Program.LAUNCHER)
-                            ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin"),
-                    mouseX, mouseY);
-        } else if (isBlockView() && !themePopupOpen && overModeBtn(mouseX, mouseY, lockBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(lockedScreen()
-                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock"), mouseX, mouseY);
-        }
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
+    }
+
+    /**
+     * Registers a tooltip for a CONTENT-AREA control (the store tile) —
+     * suppressed while the theme popup is open, since the popup panel
+     * overlaps the tile grid and is drawn AFTER these controls register
+     * (mirrors {@code SignalEditScreen#addBackgroundTip} /
+     * {@code TabletScreen}'s twin). Final-review Fix 2.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
     }
 
     /** Home entry as a list row (1.10.0 user feedback): chip + icon +
@@ -374,23 +381,40 @@ public class LauncherScreen extends Screen {
         boolean list = ClientPrefs.listView();
         HeaderGlyphs.themePalette(graphics, themeBtnX(), y,
                 glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, themeBtnX())));
+        if (!themePopupOpen) {
+            ScreenTips.glyph(themeBtnX(), modeBtnY(), "gui.linktablet.theme.title");
+        }
         // The launcher's pin pins the LAUNCHER — a home-roster dock
         // overlay (user decision; each app screen pins itself)
         HeaderGlyphs.pin(graphics, pinBtnX(), y,
                 glyphColor(OverlayPin.isPinned(view, Program.LAUNCHER),
                         overModeBtn(mouseX, mouseY, pinBtnX())));
+        if (!themePopupOpen) {
+            ScreenTips.glyph(pinBtnX(), modeBtnY(), OverlayPin.isPinned(view, Program.LAUNCHER)
+                    ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
+        }
         if (isBlockView()) {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
+            if (!themePopupOpen) {
+                ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
+                        ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            }
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
+            if (!themePopupOpen) {
+                ScreenTips.glyph(lockBtnX(), modeBtnY(), locked
+                        ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock");
+            }
         }
         HeaderGlyphs.grid(graphics, gridBtnX(), y,
                 glyphColor(!list, overModeBtn(mouseX, mouseY, gridBtnX())));
+        ScreenTips.glyph(gridBtnX(), modeBtnY(), "gui.linktablet.view.grid");
         HeaderGlyphs.list(graphics, listBtnX(), y,
                 glyphColor(list, overModeBtn(mouseX, mouseY, listBtnX())));
+        ScreenTips.glyph(listBtnX(), modeBtnY(), "gui.linktablet.view.list");
     }
 
     private void sendHome(List<TabletProgram> home) {

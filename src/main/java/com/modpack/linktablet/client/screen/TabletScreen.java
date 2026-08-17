@@ -467,16 +467,10 @@ public class TabletScreen extends Screen {
     // Rendering
     // ------------------------------------------------------------------
 
-    /** Full name of a hovered entry whose label got ellipsized this frame. */
-    private String hoveredEllipsizedName;
-    private boolean hoveredNoteGlyph;
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        hoveredEllipsizedName = null;
-        hoveredNoteGlyph = false;
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
         if (reorderMode) {
@@ -542,10 +536,10 @@ public class TabletScreen extends Screen {
             int fx = (int) (mouseX - dragOffsetX);
             int fy = (int) (mouseY - dragOffsetY);
             if (listView()) {
-                renderSignalRow(graphics, signals.get(dragIndex), fx, fy, rowWidth(), false, false, false);
+                renderSignalRow(graphics, signals.get(dragIndex), fx, fy, rowWidth(), false, false, false, true);
                 graphics.fill(fx, fy, fx + rowWidth(), fy + ROW_HEIGHT, 0x28FFFFFF);
             } else {
-                renderSignalTile(graphics, signals.get(dragIndex), fx, fy, false, false, false);
+                renderSignalTile(graphics, signals.get(dragIndex), fx, fy, false, false, false, true);
                 graphics.fill(fx, fy, fx + TILE_SIZE, fy + TILE_SIZE, 0x28FFFFFF);
             }
         }
@@ -563,30 +557,24 @@ public class TabletScreen extends Screen {
         // Note windows render via NoteWindows' screen event, above us.
 
         // Tooltips last, on top of everything
-        if (NoteWindows.anyContains(mouseX, mouseY)) {
-            return; // no tooltips under the windows themselves
-        }
-        if (hoveredNoteGlyph) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.note"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, homeBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.home"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, gridBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.grid"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, listBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.list"), mouseX, mouseY);
-        } else if (overModeBtn(mouseX, mouseY, reorderBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.view.reorder"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, themeBtnX())) {
-            graphics.renderTooltip(font, Component.translatable("gui.linktablet.theme.title"), mouseX, mouseY);
-        } else if (!themePopupOpen && overModeBtn(mouseX, mouseY, pinBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(OverlayPin.isPinned(view)
-                    ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin"), mouseX, mouseY);
-        } else if (isBlockView() && !themePopupOpen && overModeBtn(mouseX, mouseY, lockBtnX())) {
-            graphics.renderTooltip(font, Component.translatable(lockedScreen()
-                    ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock"), mouseX, mouseY);
-        } else if (hoveredEllipsizedName != null && !themePopupOpen) {
-            graphics.renderTooltip(font, Component.literal(hoveredEllipsizedName), mouseX, mouseY);
-        }
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
+    }
+
+    /**
+     * Registers a tooltip for a CONTENT-AREA control (grid/list tiles, the
+     * add-signal tile, note glyphs, the ellipsized-name tip) — suppressed
+     * while the theme popup is open, since the popup panel overlaps the
+     * tile grid and is drawn AFTER these controls register (mirrors
+     * {@code SignalEditScreen#addBackgroundTip}). Final-review Fix 2.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
+    }
+
+    private void addBackgroundTip(int x, int y, int w, int h, Component text) {
+        if (themePopupOpen) return;
+        ScreenTips.add(x, y, w, h, text);
     }
 
     /** Theme dropdown, z-lifted above the batched content like the edit
@@ -603,26 +591,45 @@ public class TabletScreen extends Screen {
         // Glyph pixel art lives in HeaderGlyphs (shared with the launcher)
         HeaderGlyphs.grid(graphics, gridBtnX(), y,
                 glyphColor(!list, overModeBtn(mouseX, mouseY, gridBtnX())));
+        ScreenTips.glyph(gridBtnX(), modeBtnY(), "gui.linktablet.view.grid");
         HeaderGlyphs.list(graphics, listBtnX(), y,
                 glyphColor(list, overModeBtn(mouseX, mouseY, listBtnX())));
+        ScreenTips.glyph(listBtnX(), modeBtnY(), "gui.linktablet.view.list");
         HeaderGlyphs.home(graphics, homeBtnX(), y,
                 glyphColor(false, overModeBtn(mouseX, mouseY, homeBtnX())));
+        ScreenTips.glyph(homeBtnX(), modeBtnY(), "gui.linktablet.home");
         HeaderGlyphs.reorder(graphics, reorderBtnX(), y,
                 glyphColor(reorderMode, overModeBtn(mouseX, mouseY, reorderBtnX())));
+        ScreenTips.glyph(reorderBtnX(), modeBtnY(), "gui.linktablet.view.reorder");
         HeaderGlyphs.themePalette(graphics, themeBtnX(), y,
                 glyphColor(themePopupOpen, overModeBtn(mouseX, mouseY, themeBtnX())));
+        if (!themePopupOpen) {
+            ScreenTips.glyph(themeBtnX(), modeBtnY(), "gui.linktablet.theme.title");
+        }
         // Pin lights while THIS tablet is the pinned overlay
         HeaderGlyphs.pin(graphics, pinBtnX(), y,
                 glyphColor(OverlayPin.isPinned(view), overModeBtn(mouseX, mouseY, pinBtnX())));
+        if (!themePopupOpen) {
+            ScreenTips.glyph(pinBtnX(), modeBtnY(), OverlayPin.isPinned(view)
+                    ? "gui.linktablet.overlay.unpin" : "gui.linktablet.overlay.pin");
+        }
         // Link (placed tablets only): joined while merging is allowed,
         // broken apart (and lit) while this tablet is SOLO
         if (isBlockView()) {
             boolean solo = soloScreen();
             HeaderGlyphs.link(graphics, linkBtnX(), y,
                     glyphColor(solo, overModeBtn(mouseX, mouseY, linkBtnX())), solo);
+            if (!themePopupOpen) {
+                ScreenTips.glyph(linkBtnX(), modeBtnY(), solo
+                        ? "gui.linktablet.tip.link" : "gui.linktablet.tip.unlink");
+            }
             boolean locked = lockedScreen();
             HeaderGlyphs.lock(graphics, lockBtnX(), y,
                     glyphColor(locked, overModeBtn(mouseX, mouseY, lockBtnX())), locked);
+            if (!themePopupOpen) {
+                ScreenTips.glyph(lockBtnX(), modeBtnY(), locked
+                        ? "gui.linktablet.lock.unlock" : "gui.linktablet.lock.lock");
+            }
         }
     }
 
@@ -654,7 +661,7 @@ public class TabletScreen extends Screen {
                     }
                     renderSignalTile(graphics, signals.get(i), x, y, hovered,
                             i == heldMomentary || timerFlashActive(i),
-                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY), false);
                 }
             } else {
                 renderAddTile(graphics, x, y, hovered && !reorderMode);
@@ -672,7 +679,7 @@ public class TabletScreen extends Screen {
     }
 
     private void renderSignalTile(GuiGraphics graphics, Signal signal, int x, int y, boolean hovered,
-                               boolean held, boolean noteHovered) {
+                               boolean held, boolean noteHovered, boolean floating) {
         ScreenTheme theme = theme();
         // Base look (borders, plaque, color chip) shared with the
         // launcher via the painter; momentary signals glow while held
@@ -736,14 +743,12 @@ public class TabletScreen extends Screen {
 
         // Note glyph, tile top-left (below the badge when both show):
         // always visible when a note exists, on hover as the affordance
-        if (signal.hasNote() || hovered || noteHovered) {
-            int gy = y + (signal.frequencies().size() > 1 ? 13 : 3);
+        boolean showNoteGlyph = signal.hasNote() || hovered || noteHovered;
+        int noteGy = y + (signal.frequencies().size() > 1 ? 13 : 3);
+        if (showNoteGlyph) {
             int frame = noteHovered ? theme.glyphHover
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
-            drawNoteGlyph(graphics, x + 3, gy, frame, theme.surfaceLo);
-            if (noteHovered) {
-                hoveredNoteGlyph = true;
-            }
+            drawNoteGlyph(graphics, x + 3, noteGy, frame, theme.surfaceLo);
         }
 
         // Chain glyph (1.10.0 signal links), below the note SLOT — a
@@ -753,10 +758,34 @@ public class TabletScreen extends Screen {
             drawChainGlyph(graphics, x + 3, cy, theme.textMuted, theme.surfaceLo);
         }
 
-        // Name (ellipsized to tile width; full name via hover tooltip)
+        // Name (ellipsized to tile width; full name via hover tooltip) —
+        // registered as a normal tip (final-review Fix 1) so last-wins
+        // ordering resolves the overlap with the note glyph below: the
+        // note is registered AFTER this, so it wins the tile's tooltip
+        // when both rects contain the cursor.
         String name = SignalTilePainter.label(graphics, font, theme, signal.name(), x, y, TILE_SIZE, TILE_GAP);
         if (hovered && !name.equals(signal.name())) {
-            hoveredEllipsizedName = signal.name();
+            addBackgroundTip(x, y, TILE_SIZE, TILE_SIZE, Component.literal(signal.name()));
+        }
+
+        // Registered last so it outranks the name tip above on overlap
+        // (Fix 1); gated to the padded rect overNoteGlyph tests, not the
+        // smaller draw rect (Fix 6), and only while that rect sits inside
+        // the scissored viewport — a scrolled-off glyph is unclickable
+        // and must not out-tip whatever IS on screen there (Fix 5).
+        // !floating (final-review-2 Fix C): the reorder-drag floating copy
+        // is drawn at the CURSOR position with the mouse-to-corner offset
+        // preserved from grab time, so if this rect ever registered for
+        // it, a note-bearing signal grabbed near its own note glyph would
+        // tip "Note" for the whole drag — a single flag threaded through
+        // this method, not a per-site hover recomputation, so a future
+        // tip added here can't reintroduce the bug by forgetting it.
+        // !reorderMode (Fix D): the note glyph can't be clicked while
+        // reordering at all (mouseClicked's reorder branch never tests
+        // overNoteGlyph), so it shouldn't tip there either.
+        if (!floating && !reorderMode && showNoteGlyph
+                && noteGy - 2 >= gridTop() - 2 && noteGy + 11 <= gridBottom()) {
+            addBackgroundTip(x + 1, noteGy - 2, 12, 13, "gui.linktablet.note");
         }
     }
 
@@ -774,6 +803,11 @@ public class TabletScreen extends Screen {
         int bg = hovered ? theme.surfaceHi : theme.rowBg;
         Chrome.tile(graphics, x, y, TILE_SIZE, TILE_SIZE, bg);
         drawThemedCentered(graphics, "+", x + TILE_SIZE / 2, y + TILE_SIZE / 2 - 4, theme.textMuted);
+        // Viewport-gated (Fix 5): a tile scrolled only partially into view
+        // is scissor-clipped and unclickable at its off-screen edge.
+        if (y >= gridTop() - 2 && y + TILE_SIZE <= gridBottom()) {
+            addBackgroundTip(x, y, TILE_SIZE, TILE_SIZE, "gui.linktablet.tip.signal.new");
+        }
     }
 
     // ---- List mode -----------------------------------------------------
@@ -807,7 +841,7 @@ public class TabletScreen extends Screen {
                     }
                     renderSignalRow(graphics, signals.get(i), x, y, w, hovered,
                             i == heldMomentary || timerFlashActive(i),
-                            !reorderMode && overNoteGlyph(i, mouseX, mouseY));
+                            !reorderMode && overNoteGlyph(i, mouseX, mouseY), false);
                 }
             } else {
                 renderAddRow(graphics, x, y, w, hovered && !reorderMode);
@@ -825,24 +859,36 @@ public class TabletScreen extends Screen {
     }
 
     private void renderSignalRow(GuiGraphics graphics, Signal signal, int x, int y, int w,
-                              boolean hovered, boolean held, boolean noteHovered) {
+                              boolean hovered, boolean held, boolean noteHovered, boolean floating) {
         ScreenTheme theme = theme();
         // Shared painter (also drives the pinned mini-tablet's rows)
         String name = SignalRowPainter.paint(graphics, font, theme, signal, x, y, w, hovered, held);
+        // Registered as a normal tip (Fix 1): already precedes the note
+        // glyph's registration below, so last-wins gives the note
+        // priority on overlap without any reordering needed here.
         if (hovered && !name.equals(signal.name())) {
-            hoveredEllipsizedName = signal.name();
+            addBackgroundTip(x, y, w, ROW_HEIGHT, Component.literal(signal.name()));
         }
 
         // Note glyph, right before the control (mirrors noteGlyphListX) —
-        // a GUI-only affordance, so it's overlaid here, not in the painter
+        // a GUI-only affordance, so it's overlaid here, not in the painter.
+        // Registered with the padded rect overNoteGlyph tests, not the
+        // smaller draw rect (Fix 6), and only while that rect sits inside
+        // the scissored viewport (Fix 5).
         if (signal.hasNote() || hovered || noteHovered) {
             int controlReserve = signal.slider() ? LIST_SLIDER_W + font.width("15") + 4 : SWITCH_W;
             int gx = x + w - 4 - controlReserve - 12;
             int frame = noteHovered ? theme.glyphHover
                     : signal.hasNote() ? theme.textMuted : theme.textFaint;
-            drawNoteGlyph(graphics, gx, y + (ROW_HEIGHT - 9) / 2, frame, theme.surfaceLo);
-            if (noteHovered) {
-                hoveredNoteGlyph = true;
+            int gy = y + (ROW_HEIGHT - 9) / 2;
+            drawNoteGlyph(graphics, gx, gy, frame, theme.surfaceLo);
+            int padTop = gy - 2;
+            int padBottom = y + (ROW_HEIGHT + 9) / 2 + 2;
+            // !floating / !reorderMode: see renderSignalTile's note-tip
+            // registration (final-review-2 Fix C / Fix D) — same reasoning,
+            // same flags, applied to the list-row site.
+            if (!floating && !reorderMode && padTop >= gridTop() - 2 && padBottom <= gridBottom()) {
+                addBackgroundTip(gx - 2, padTop, 12, padBottom - padTop, "gui.linktablet.note");
             }
         }
 

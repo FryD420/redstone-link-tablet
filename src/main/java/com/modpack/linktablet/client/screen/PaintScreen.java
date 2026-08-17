@@ -81,6 +81,16 @@ public class PaintScreen extends ArcadeScreen {
      * ordinary cells — see the design spec. */
     enum Tool { BRUSH, FILL, LINE, RECT, EYEDROPPER }
 
+    /** Tooltip keys, in {@link Tool} order — shortcuts confirmed against
+     * {@link #keyPressed}'s B/F/L/R/I bindings. */
+    private static final String[] TOOL_TIP_KEYS = {
+            "gui.linktablet.tip.paint.brush",
+            "gui.linktablet.tip.paint.fill",
+            "gui.linktablet.tip.paint.line",
+            "gui.linktablet.tip.paint.rect",
+            "gui.linktablet.tip.paint.pick",
+    };
+
     private Tool tool = Tool.BRUSH;
     /** Undo history, newest first, depth-capped at MAX_UNDO — one entry
      * per finished gesture (brush stroke, fill, committed shape).
@@ -546,7 +556,11 @@ public class PaintScreen extends ArcadeScreen {
             if (i == selected) {
                 graphics.fill(x, py - 2, x + SWATCH, py - 1, 0xFFE8EAF0);
             }
+            ScreenTips.add(x, py, SWATCH, SWATCH, "gui.linktablet.tip.colour");
         }
+        // Canvas cells intentionally get no tooltip: trailing the cursor
+        // while drawing would make the app unusable (spec exemption).
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     /** The header tool bar: five tool glyphs + undo, right-aligned in
@@ -563,9 +577,12 @@ public class PaintScreen extends ArcadeScreen {
                 graphics.fill(gx - 1, gy + GLYPH, gx + GLYPH + 1, gy + GLYPH + 1, theme.accent);
             }
             renderToolGlyph(graphics, tools[i], gx, gy, theme.textPrimary, theme.textMuted);
+            ScreenTips.glyph(gx, gy, TOOL_TIP_KEYS[i]);
         }
-        renderUndoGlyph(graphics, headerGlyphX(GLYPH_SLOTS - 1), gy,
+        int undoX = headerGlyphX(GLYPH_SLOTS - 1);
+        renderUndoGlyph(graphics, undoX, gy,
                 !history.isEmpty(), theme.textPrimary, theme.textFaint);
+        ScreenTips.glyph(undoX, gy, "gui.linktablet.tip.paint.undo");
     }
 
     /** Two-thirds brightness — shading tone for the held-color art. */

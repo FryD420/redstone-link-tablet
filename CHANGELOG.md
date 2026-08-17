@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.13.0 — 2026-08-17
+
+### Added
+- Hover tooltips on every button and glyph across all program screens —
+  the wordless ones (chain-link, padlock, solo, eyedropper, emote
+  toggle) finally say what they are. Paint's tool tips also name their
+  keyboard shortcuts (B/F/L/R/I), which were previously undiscoverable.
+  Client-only, pairs with 1.12.x.
+- Dropped tablets keep transmitting: a tablet lying on the ground (or
+  sitting in an item frame) now broadcasts its toggled-ON signals from
+  where it is — throw a scene tablet into the machine room and the
+  scene keeps running. The Frequency Monitor names these members
+  ("Dropped tablet (player)" / "Framed tablet"), completing the
+  who-is-transmitting story. This changes the old "phantom copy"
+  diagnosis: dropping a spare tablet used to silence it — now the
+  Monitor just names it as a dropped member instead, so the fix for a
+  phantom-pinned receiver is to pick the copy up or destroy it, not
+  drop it. Edge case: a deliberate player toss (Q-drop or inventory
+  drag-out) now registers instantly via an add-only fast path, closing
+  the blink at the exact moment of a throw; because the handoff still
+  runs on a periodic sweep for every other case, edge-sensitive
+  contraptions may still see a brief blip at pickup, or on death
+  drops, dispensers, and other non-toss spawns.
+
+### Changed
+- Network protocol version unchanged (still 24) — 1.13.0 pairs with
+  1.12.x on both sides (tooltips are client-only, dropped-tablet
+  transmission is server-side only).
+
 ## 1.12.0 — 2026-08-11
 
 ### Added

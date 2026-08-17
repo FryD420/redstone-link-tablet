@@ -161,10 +161,21 @@ public class NoteWindow implements FloatingWindow {
         graphics.pose().translate(0, 0, 350);
 
         paintFrame(graphics, font, t, x, y, title);
+        // mouseX < 0 marks the mouseless HUD pass (NoteWindows.onRenderHud) —
+        // ScreenTips is only ever painted/cleared from a screen's render, so
+        // registering here too would leak unbounded entries while a window
+        // stays pinned with no screen open (see MiniTabletWindow's identical
+        // mouseX >= 0 guard on its close-button hover color).
+        if (mouseX >= 0) {
+            ScreenTips.add(x, y, W - TITLE_H, TITLE_H, "gui.linktablet.tip.window.drag");
+        }
 
         int cx = x + W - CLOSE_SIZE - 7;
         int cy = y + 5;
         int closeColor = overCloseButton(mouseX, mouseY) ? t.glyphHover : t.textFaint;
+        if (mouseX >= 0) {
+            ScreenTips.add(cx - 2, cy - 2, CLOSE_SIZE + 4, CLOSE_SIZE + 4, "gui.linktablet.tip.window.close");
+        }
         // X glyph: two 2px diagonals
         for (int i = 0; i < CLOSE_SIZE - 2; i++) {
             graphics.fill(cx + 1 + i, cy + 1 + i, cx + 3 + i, cy + 3 + i, closeColor);

@@ -14,7 +14,6 @@ import com.simibubi.create.foundation.gui.menu.GhostItemSubmitPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -112,6 +111,10 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     private int draggingKnob = -1;
     private boolean colorPopupOpen = false;
 
+    // Fields: referenced by containerTick for their `active` state, so
+    // they must outlive init(). Every other button is purely local — see
+    // final-review-2 Fix A (vanilla clearTooltipForNextRenderPass replaced
+    // the per-frame tooltip-mutation helper that used to need them all).
     private Button saveButton;
     private Button addFreqButton;
 
@@ -181,21 +184,24 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         addFreqButton = new ChromeButton(left + 60, top + 58, 40, 20,
                 Component.translatable("gui.linktablet.edit_signal.add_frequency"),
                 b -> commitStagedFrequency(), this::theme);
+        addFreqButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.freq.add"));
         addRenderableWidget(addFreqButton);
 
         // All-items search (for frequency items you don't carry)
         Button searchButton = new ChromeButton(left + 104, top + 58, 24, 20,
                 Component.literal("..."), b ->
                 picker.open(width, height, this::stageFromPicker, false), this::theme);
-        searchButton.setTooltip(Tooltip.create(Component.translatable("gui.linktablet.picker.search")));
+        searchButton.setTooltip(ScreenTips.tooltip("gui.linktablet.picker.search"));
         addRenderableWidget(searchButton);
 
         // Icon slot button (picker with a "use default" option)
-        addRenderableWidget(new ChromeButton(left + RIGHT_COL, top + 26, 24, 24,
+        Button iconButton = new ChromeButton(left + RIGHT_COL, top + 26, 24, 24,
                 Component.literal(""), b ->
                 picker.open(width, height, stack ->
                                 iconItem = stack.isEmpty() ? Optional.empty() : Optional.of(stack.getItem()),
-                        true), this::theme));
+                        true), this::theme);
+        iconButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.icon"));
+        addRenderableWidget(iconButton);
 
         // Signal links (1.10.0): the free rect right of the icon slot
         linkPicker = new LinkPickerOverlay(font);
@@ -204,26 +210,30 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                 linkPicker.open(width, height,
                         LinkPickerOverlay.candidates(view().signals(), index), links),
                 this::theme);
-        linksButton.setTooltip(Tooltip.create(
-                Component.translatable("gui.linktablet.links.button.tooltip")));
+        linksButton.setTooltip(ScreenTips.tooltip("gui.linktablet.links.button.tooltip"));
         addRenderableWidget(linksButton);
 
         // Save / Cancel / Remove, right of the inventory block
         saveButton = new ChromeButton(left + BTN_X, top + 146, BTN_W, 20,
                 Component.translatable("gui.linktablet.edit_signal.save"), b -> save(), this::theme);
+        saveButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.save"));
         addRenderableWidget(saveButton);
 
-        addRenderableWidget(new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
-                Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme));
+        Button cancelButton = new ChromeButton(left + BTN_X, top + 170, BTN_W, 20,
+                Component.translatable("gui.linktablet.edit_signal.cancel"), b -> onClose(), this::theme);
+        cancelButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.cancel"));
+        addRenderableWidget(cancelButton);
 
         if (index != -1) {
-            addRenderableWidget(new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
+            Button removeButton = new ChromeButton(left + BTN_X, top + 194, BTN_W, 20,
                     Component.translatable("gui.linktablet.edit_signal.remove"), b -> {
                 UISounds.delete();
                 PacketDistributor.sendToServer(
                         new ModNetworking.RemoveSignalPayload(menu.contentHolder.target(), index));
                 onClose();
-            }, this::theme));
+            }, this::theme);
+            removeButton.setTooltip(ScreenTips.tooltip("gui.linktablet.tip.delete"));
+            addRenderableWidget(removeButton);
         }
     }
 
@@ -548,6 +558,20 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         return leftPos + RIGHT_COL + value * (TRACK_W - 4) / Signal.MAX_STRENGTH;
     }
 
+    /**
+     * Registers a tooltip for a BACKGROUND control (chips, name box, ghost
+     * slots, colour button, type row, strength/range/pulse track) —
+     * suppressed while any full-screen modal sits on top of it, mirroring
+     * the guard the pre-chrome tooltip ladder used (see {@code git show
+     * 47a12b0}). The colour popup's own swatches are NOT background
+     * controls and register directly, inside the {@code colorPopupOpen}
+     * branch that draws them.
+     */
+    private void addBackgroundTip(int x, int y, int w, int h, String key) {
+        if (picker.isOpen() || linkPicker.isOpen() || colorPopupOpen) return;
+        ScreenTips.add(x, y, w, h, key);
+    }
+
     // ---- Rendering -------------------------------------------------------
 
     /** Panel + title plaque + slot cells + staging frames, under the slot items. */
@@ -592,6 +616,19 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+        // AbstractWidget queues a hovered widget's tooltip DURING
+        // super.render() for Screen's own deferred pass (renderWithTooltip,
+        // which runs after this method returns and repaints once per
+        // frame) — so clearing here, after the queue, reliably suppresses
+        // THIS frame's widget tooltip whenever a modal sits on top of the
+        // background buttons. Vanilla's own mechanism instead of a manual
+        // per-button clear/reinstate (final-review-2 Fix A): it covers
+        // every widget uniformly (including nameBox) and the colour popup,
+        // which the previous helper's fixed button list missed.
+        if (picker.isOpen() || linkPicker.isOpen() || colorPopupOpen
+                || NoteWindows.anyContains(mouseX, mouseY)) {
+            clearTooltipForNextRenderPass();
+        }
         ScreenTheme theme = theme();
         boolean shadow = theme.textShadow;
         int left = leftPos;
@@ -599,13 +636,12 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         int rightX = left + RIGHT_COL;
 
         // Committed frequency chips
-        boolean hoveredChip = false;
         for (int i = 0; i < frequencies.size(); i++) {
             Frequency freq = frequencies.get(i);
             int x = chipX(i);
             int y = chipY(i);
             boolean hovered = mouseX >= x && mouseX < x + CHIP_W && mouseY >= y && mouseY < y + CHIP_H;
-            hoveredChip |= hovered;
+            addBackgroundTip(chipX(i), chipY(i), CHIP_W, CHIP_H, "gui.linktablet.tip.freq.remove");
 
             Chrome.plaque(graphics, x, y, CHIP_W, CHIP_H, hovered ? 0xFF5A3038 : theme.rowBg);
             graphics.renderItem(freq.icon1(), x + 2, y + 1);
@@ -613,6 +649,16 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             // Red/blue pair markers along the chip's bottom edge
             graphics.fill(x + 2, y + CHIP_H - 2, x + CHIP_W / 2, y + CHIP_H, TabletScreen.FREQ1_COLOR);
             graphics.fill(x + CHIP_W / 2, y + CHIP_H - 2, x + CHIP_W - 2, y + CHIP_H, TabletScreen.FREQ2_COLOR);
+        }
+
+        // Name box and staged ghost slots — fixed rects, always visible
+        addBackgroundTip(left + 12, top + 31, 142, 8, "gui.linktablet.tip.name");
+        for (int slot = 0; slot < 2; slot++) {
+            if (staged(slot).isEmpty()) {
+                Rect2i area = frequencySlotArea(slot);
+                addBackgroundTip(area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                        "gui.linktablet.tip.freq.item");
+            }
         }
 
         // Icon slot content (default = show first frequency's item dimmed)
@@ -635,6 +681,7 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
         graphics.fill(ax, ay, ax + 6, ay + 2, theme.textMuted);
         graphics.fill(ax + 1, ay + 2, ax + 5, ay + 4, theme.textMuted);
         graphics.fill(ax + 2, ay + 4, ax + 4, ay + 6, theme.textMuted);
+        addBackgroundTip(rightX, top + COLOR_BTN_Y, 34, 20, "gui.linktablet.tip.colour");
 
         // Signal type row (click cycles): inset checkbox + current type
         int momY = top + MOMENTARY_Y;
@@ -645,6 +692,13 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                 : "gui.linktablet.edit_signal.type.toggle";
         graphics.drawString(font, Component.translatable("gui.linktablet.edit_signal.type", Component.translatable(typeKey)),
                 rightX + CHECKBOX_SIZE + 4, momY + 2, theme.textMuted, shadow);
+        addBackgroundTip(rightX, top + MOMENTARY_Y - 2, 90, CHECKBOX_SIZE + 4, slider
+                ? "gui.linktablet.edit_signal.type.slider.tooltip"
+                : momentary
+                ? "gui.linktablet.edit_signal.momentary.tooltip"
+                : timed
+                ? "gui.linktablet.edit_signal.type.timed.tooltip"
+                : "gui.linktablet.edit_signal.type.toggle.tooltip");
 
         // Strength slider (toggle/hold) or the min/max range row (slider
         // signals: two knobs on the full 0..15 scale, fill between them).
@@ -686,6 +740,10 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
             graphics.drawString(font, String.valueOf(strength), rightX + TRACK_W + 8, trackY - 2,
                     theme.textPrimary, shadow);
         }
+        String trackKey = slider ? "gui.linktablet.tip.range"
+                : timed ? "gui.linktablet.tip.pulse"
+                : "gui.linktablet.tip.strength";
+        addBackgroundTip(rightX - 2, top + TRACK_Y - 6, TRACK_W + 6, 18, trackKey);
 
         // Color popup, z-lifted above the batched text/items so nothing
         // bleeds through it
@@ -700,31 +758,19 @@ public class SignalEditScreen extends AbstractContainerScreen<SignalEditMenu> {
                     graphics.fill(x - 1, y - 1, x + POPUP_SWATCH + 1, y + POPUP_SWATCH + 1, 0xFFFFFFFF);
                 }
                 graphics.fill(x, y, x + POPUP_SWATCH, y + POPUP_SWATCH, COLORS[i]);
+                ScreenTips.add(x, y, POPUP_SWATCH, POPUP_SWATCH, "gui.linktablet.tip.colour");
             }
             graphics.pose().popPose();
         }
 
-        if (!picker.isOpen() && !linkPicker.isOpen() && !colorPopupOpen) {
-            if (hoveredChip) {
-                graphics.renderTooltip(font,
-                        Component.translatable("gui.linktablet.edit_signal.chip_remove"), mouseX, mouseY);
-            } else if (mouseX >= rightX && mouseX < rightX + 90
-                    && mouseY >= momY - 2 && mouseY < momY + CHECKBOX_SIZE + 2) {
-                graphics.renderTooltip(font, Component.translatable(slider
-                        ? "gui.linktablet.edit_signal.type.slider.tooltip"
-                        : momentary
-                        ? "gui.linktablet.edit_signal.momentary.tooltip"
-                        : timed
-                        ? "gui.linktablet.edit_signal.type.timed.tooltip"
-                        : "gui.linktablet.edit_signal.type.toggle.tooltip"), mouseX, mouseY);
-            } else {
-                // Hovered inventory/ghost slot tooltip (vanilla)
-                renderTooltip(graphics, mouseX, mouseY);
-            }
+        if (!picker.isOpen() && !linkPicker.isOpen() && !colorPopupOpen && !NoteWindows.anyContains(mouseX, mouseY)) {
+            // Hovered inventory/ghost slot tooltip (vanilla)
+            renderTooltip(graphics, mouseX, mouseY);
         }
 
         picker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
         linkPicker.render(graphics, mouseX, mouseY, partialTick, width, height, theme);
+        ScreenTips.draw(graphics, font, mouseX, mouseY);
     }
 
     @Override

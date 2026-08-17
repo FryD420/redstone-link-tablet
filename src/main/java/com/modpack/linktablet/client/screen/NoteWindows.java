@@ -196,6 +196,8 @@ public final class NoteWindows {
             window.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(),
                     event.getPartialTick());
         }
+        ScreenTips.drawWindows(event.getGuiGraphics(), Minecraft.getInstance().font,
+                event.getMouseX(), event.getMouseY());
     }
 
     // ---- Input over any screen ---------------------------------------

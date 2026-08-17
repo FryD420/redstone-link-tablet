@@ -3,9 +3,120 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-11 — 1.12.0 released)
+## ▶ START HERE next session (state as of 2026-08-17 — 1.13.0 RELEASED, uploads pending)
 
-- **v1.12.0 TAGGED same day it was built** (screen lock, credit Fluid
+- **v1.13.0 DEV PASS PASSED + TAGGED 2026-08-17** — the user walked
+  both checklists in the dev client: tooltips all good; dropped-tablet
+  rows all good; the throw blink they confirmed live drove one
+  addition, the add-only `ItemTossEvent` fast path (instant
+  re-register on deliberate throws; re-test confirmed "throw blink is
+  gone"). Tagged v1.13.0, merged to main, pushed. REMAINING: user
+  uploads to both platforms (game 1.21.1, NeoForge, Java 21, Create
+  required) + updates the family server/pack (server side optional —
+  1.13.0 pairs with 1.12.x, but the dropped-tablet feature only works
+  once the SERVER has it) + Discord announcement (user posts).
+  Listing text: DESCRIPTION.md gained dropped/framed lines — paste the
+  refreshed listing at upload time.
+- **v1.13.0 — hover tooltips AND dropped-tablet transmission, CODE +
+  BUILD DONE, dev-client pass and uploads still OUTSTANDING for BOTH**:
+  the tooltip cycle's 1.12.1 was never released or uploaded, so the
+  owner folded it together with the dropped-tablet feature — "ship and
+  test it all together" — as a single 1.13.0. Two independent
+  subagent-driven SDD builds, both review-clean, ledgers in
+  `.superpowers/sdd/`:
+  - **Hover tooltips** (7 tasks). A shared `client/screen/ScreenTips`
+  collector lets each screen register the rect it already computed for
+  drawing a control; one call at the end of `render` paints the
+  last-registered rect under the cursor (click handling untouched, on
+  every screen). Coverage: Signals, Launcher, App Store, Arcade hub,
+  Signal edit, Probe edit, Gauges, Monitor, Paint, Twitch, Clock,
+  Calculator, the three picker overlays, and the two floating windows.
+  Previously-wordless glyphs now name themselves (chain-link, padlock,
+  solo, eyedropper, emote toggle — chain-link had NO tooltip at all
+  before this, on either Signals or Launcher). Paint's tool tips name
+  their keyboard shortcuts inline ("Brush (B)", "Fill (F)", "Line (L)",
+  "Rectangle (R)", "Pick colour (I)"). Deliberately untipped: store
+  rows/arcade rows/theme rows/named gauge tiles (already show their own
+  name — a tooltip echoing visible text is noise), the Paint canvas
+  cells (a tooltip trailing the cursor mid-draw would make the app
+  unusable), the Calculator keypad, `PickerOverlay`'s item grid (vanilla
+  item tooltip already covers it, better), and window body rows.
+  Client-only — no wire/registrar/component/NBT change of any kind.
+  - **Dropped-tablet transmission** (3 tasks).
+  `compat/DroppedTabletHandler` is the third transmitter anchor
+  (player scan / placed BE / entity sweep): a tablet lying on the
+  ground, or sitting in an item frame, keeps broadcasting its
+  toggled-ON signals from where it is — throw a scene tablet into the
+  machine room and the scene keeps running. The Frequency Monitor
+  names these members ("Dropped tablet (player)" / "Framed tablet").
+  Server-side only, no wire/registrar/component/NBT change. This is
+  the feature-queue item from the 2026-08-11 night wrap below — now
+  shipped in code, out of the queue.
+
+  Both halves: **1.13.0 PAIRS WITH 1.12.x**, no coordinated server
+  update needed (registrar untouched at "24"). `mod_version` bumped,
+  `./gradlew build` green, jar at `build/libs/linktablet-1.13.0.jar`.
+  The `runServer` dedicated-server boot gate (mandatory since the
+  dropped-tablet handler is server-side — the 1.10.2 dist-cleaner
+  lesson) was run this session: clean boot to "Done", no dist-cleaner
+  or classloading errors.
+  **STILL OUTSTANDING (owed by the project owner, not done this
+  session)**: the in-client dev pass covering BOTH halves together
+  (owner decision — test them together) via `./gradlew runClient`:
+  tooltips' visual verification, hovering every control by eye per the
+  spec's test matrix (tooltip follows cursor / never clips an edge;
+  state-dependent glyphs flip text — pin/unpin, lock/unlock,
+  link/unlink, emotes on/off, timer start/cancel, stopwatch
+  start/pause; popup/modal/picker priority over the glyph beneath;
+  floating windows over a live screen; block-only glyphs absent on
+  held tablets; locked screens still tip everything; signal-tile
+  ellipsis-only tooltip regression; full click-regression across all
+  screens including the 19 untouched game screens) PLUS dropped/framed
+  tablet transmission (throw a scene tablet, item-frame case, Monitor
+  classification naming) — then the actual platform uploads and
+  Discord announcement once that pass is clean.
+  **Residual Minor queued for the final review**: on `MonitorScreen`, a
+  probe row scrolled so its header sits just above the list viewport
+  can still register its remove-cross tooltip, because `renderChannel`
+  runs for partially-visible channels while the click path gates on the
+  viewport bounds. Cosmetic (no click-through), worth a one-line
+  viewport-bounds check on the tooltip registration whenever this file
+  is next touched.
+
+## Previous START HERE (state as of 2026-08-11 — 1.12.0 LIVE)
+
+- **v1.12.0 LIVE EVERYWHERE** (uploads user-confirmed same day —
+  "everythings live"): screen lock + seam fix + title header shipped
+  the same day they were built (spec re-scope → SDD build → user dev
+  pass → release, one session). Remaining: tester rows below;
+  reactive hotfix posture.
+- **Next-session seed (user ask)**: replicate this workflow in a NEW
+  mod folder — DONE same session: template BUILT and build-verified at
+  DEV/mod-template (examplemod-0.1.0.jar) — copy + rename per its
+  START-HERE.md; Create/JEI/EMI blocks commented out, uncomment both
+  sides for a Create addon. First session in a copy: brainstorming
+  skill on the new idea. (Superpowers plugin + global prefs + per-
+  folder auto-memory travel free — only these files needed scaffolding.)
+  Template addendum: docs/DESCRIPTION.md listing SKELETON + listing
+  rules now baked in. DONE 2026-08-16: template pushed to the PRIVATE
+  repo https://github.com/FryD420/mod-template (branch main) — the
+  GitHub backup plan now covers it.
+- **Feature queue (user, night wrap — corrected same night) — SHIPPED
+  in 1.13.0 (see current START HERE)**: a
+  DROPPED tablet (world item entity) should KEEP transmitting its
+  toggled-ON signals from where it lies — today it goes silent
+  (transmitters are player-inventory-scan driven; ground items fall
+  off the network). Needs a brainstorm/spec: ItemEntity tracking,
+  range anchored at the item, despawn/pickup cleanup, momentary/timer
+  semantics across the drop, Monitor classification for dropped
+  tablets. Gameplay upside: throwable scene tablets.
+- **Polish queue (user, 2026-08-12)**: EVERY button/glyph in EVERY
+  GUI gets a hover tooltip saying what it is — audit all screens
+  (launcher, store, arcade hub, edit screens, gauges, monitor,
+  clock, calculator, paint, twitch, overlay windows, pickers);
+  TabletScreen's renderTooltip chain is the house pattern, one lang
+  key each. Client-only, pairs with 1.12.0.
+- **v1.12.0 content** (screen lock, credit Fluid
   Valve): use-only lock, LOCKING IS FREE / wrench unlocks (asymmetric
   rule re-decided in the dev pass — a main-hand wrench can't reach an
   unlocked GUI, so the spec's symmetric rule was undiscoverable);
