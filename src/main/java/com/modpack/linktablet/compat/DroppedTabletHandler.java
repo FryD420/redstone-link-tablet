@@ -141,9 +141,10 @@ public class DroppedTabletHandler {
         if (!(stack.getItem() instanceof TabletItem)) return;
 
         Map<UUID, Tracked> tracked = ACTIVE.computeIfAbsent(level, l -> new HashMap<>());
-        // Prefer the event's player directly: getOwner() resolves the
-        // thrower UUID against loaded entities and may not be set on the
-        // ItemEntity yet at the moment the toss event fires.
+        // Prefer the event's player directly: GUI drag-out tosses never
+        // call setThrower (Player.drop's traceItem arg is false there), so
+        // getOwner() would stay null for them permanently — the event is
+        // the only reliable thrower source.
         syncTransmitters(level, tracked, itemEntity, stack, event.getPlayer().getName().getString());
     }
 
