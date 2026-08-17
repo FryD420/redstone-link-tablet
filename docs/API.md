@@ -25,7 +25,7 @@ repositories {
     maven { url = "https://api.modrinth.com/maven" }
 }
 dependencies {
-    implementation "maven.modrinth:redstone-link-tablet:1.10.0"
+    implementation "maven.modrinth:redstone-link-tablet:1.13.0"
 }
 ```
 
