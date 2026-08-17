@@ -3,8 +3,20 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-15 — 1.13.0 built, dev pass + uploads pending for both halves)
+## ▶ START HERE next session (state as of 2026-08-17 — 1.13.0 RELEASED, uploads pending)
 
+- **v1.13.0 DEV PASS PASSED + TAGGED 2026-08-17** — the user walked
+  both checklists in the dev client: tooltips all good; dropped-tablet
+  rows all good; the throw blink they confirmed live drove one
+  addition, the add-only `ItemTossEvent` fast path (instant
+  re-register on deliberate throws; re-test confirmed "throw blink is
+  gone"). Tagged v1.13.0, merged to main, pushed. REMAINING: user
+  uploads to both platforms (game 1.21.1, NeoForge, Java 21, Create
+  required) + updates the family server/pack (server side optional —
+  1.13.0 pairs with 1.12.x, but the dropped-tablet feature only works
+  once the SERVER has it) + Discord announcement (user posts).
+  Listing text: DESCRIPTION.md gained dropped/framed lines — paste the
+  refreshed listing at upload time.
 - **v1.13.0 — hover tooltips AND dropped-tablet transmission, CODE +
   BUILD DONE, dev-client pass and uploads still OUTSTANDING for BOTH**:
   the tooltip cycle's 1.12.1 was never released or uploaded, so the

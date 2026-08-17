@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 1.13.0 — 2026-08-17
 
 ### Added
 - Hover tooltips on every button and glyph across all program screens —
