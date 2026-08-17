@@ -3,20 +3,37 @@
 Project facts, build setup, gotchas, and the release process live in `CLAUDE.md`
 at the repo root (auto-loaded every Claude session).
 
-## ▶ START HERE next session (state as of 2026-08-17 — 1.13.0 LIVE EVERYWHERE)
+## ▶ START HERE next session (state as of 2026-08-17 end of day — 1.13.0 fully rolled out, queue EMPTY)
 
-- **v1.13.0 DEV PASS PASSED + TAGGED 2026-08-17** — the user walked
-  both checklists in the dev client: tooltips all good; dropped-tablet
-  rows all good; the throw blink they confirmed live drove one
-  addition, the add-only `ItemTossEvent` fast path (instant
-  re-register on deliberate throws; re-test confirmed "throw blink is
-  gone"). Tagged v1.13.0, merged to main, pushed. UPLOADS DONE —
-  user-confirmed same day ("uploads are done everythings live"):
-  both platforms live, refreshed listing pasted. Remaining: family
-  server/pack update when convenient (pairs with 1.12.x; the
-  dropped-tablet feature needs the SERVER side), Discord announcement
-  (user posts), and the carried tester rows below. Reactive hotfix
-  posture; no coding item queued.
+- **v1.13.0 CYCLE FULLY CLOSED 2026-08-17, all in one day**: dev pass
+  ("throw blink is gone, everything else looks good"), tag + merge +
+  push, platform uploads, FAMILY SERVER updated, Discord announcement
+  posted — all user-confirmed same day. The session cleared the ENTIRE
+  queue: tooltips shipped, dropped-tablet transmission shipped (+ the
+  ItemTossEvent fast path added mid-dev-pass from the user's live
+  blink report), and mod-template pushed to the private
+  https://github.com/FryD420/mod-template backup. NO coding item
+  queued — reactive hotfix posture; only the carried tester rows
+  remain (two-account mural, dedicated-server lock,
+  follow-while-locked, 1.11.1's two server-only paint rows).
+- **Addon-API interest (2026-08-17)**: the user asked how third
+  parties make App Store apps — docs/API.md is current (dep-pin
+  example bumped to 1.13.0, commit b5decc3; floor stays [1.10.0,),
+  API_VERSION still 1) and a Discord-ready explainer was delivered.
+  If someone starts an addon: they'd be the FIRST external jar against
+  the API (the in-repo Dice example proves the boundary but has never
+  shipped separately) — offer to sanity-check their registration code,
+  and expect possible API_VERSION-bump requests.
+- **Twitch listing experiment, tried and REVERTED same day**
+  (3bfc714 → b1582ff): a cozy twitch-singular badge + shields.io
+  LIVE/OFFLINE status pill (`img.shields.io/twitch/status/fryd42`) in
+  the header row — user changed their mind; don't re-suggest. The
+  mechanics are proven if ever wanted again (live player embeds are
+  impossible on both platforms — they strip iframes; the pill is the
+  ceiling). Also settled: paid Java mods violate the Mojang EULA
+  (commission work is the legit route; Bedrock Marketplace = partner-
+  gated rewrite, judged not worth it) — user was just curious, no
+  action.
 - **v1.13.0 — hover tooltips AND dropped-tablet transmission, CODE +
   BUILD DONE, dev-client pass and uploads still OUTSTANDING for BOTH**:
   the tooltip cycle's 1.12.1 was never released or uploaded, so the
