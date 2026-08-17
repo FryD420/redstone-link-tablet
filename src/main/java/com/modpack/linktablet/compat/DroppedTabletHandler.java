@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.jetbrains.annotations.Nullable;
@@ -43,6 +44,15 @@ import java.util.UUID;
  * the ground — there is no interaction path — and in-flight pulses
  * finish from the thrower (the hold system is player-keyed, untouched
  * by design).
+ * <p>
+ * A player TOSS (Q-drop or inventory drag-out) additionally registers
+ * instantly via an add-only {@link ItemTossEvent} fast path, closing
+ * the 1-4 tick power blink the sweep cadence would otherwise leave at
+ * a receiver between the player-inventory anchor releasing the stack
+ * and the next sweep boundary picking it back up. This is deliberately
+ * NOT extended to other spawn paths — death drops, dispensers, block
+ * drops, item frames popping their item — which keep the ≤4-tick gap;
+ * cleanup for all of them, tosses included, stays sweep-only.
  */
 @EventBusSubscriber(modid = LinkTabletMod.MOD_ID)
 public class DroppedTabletHandler {
@@ -96,58 +106,117 @@ public class DroppedTabletHandler {
             Entity entity = entry.getValue();
             ItemStack stack = entity instanceof ItemFrame frame
                     ? frame.getItem() : ((ItemEntity) entity).getItem();
-
-            Map<Frequency, Integer> wanted = new HashMap<>();
-            List<Signal> signals = stack.getOrDefault(
-                    ModDataComponents.TABLET_SIGNALS.get(), List.of());
-            for (Signal signal : signals) {
-                // Same filter as the player-inventory scan: momentary
-                // and timer signals broadcast via holds, never from here
-                if (!signal.active() || signal.momentary() || signal.timed()) continue;
-                for (Frequency freq : signal.frequencies()) {
-                    if (!freq.isEmpty()) {
-                        wanted.merge(freq, signal.strength(), Math::max);
-                    }
-                }
-            }
-
-            Tracked existing = tracked.get(entry.getKey());
-            if (existing == null) {
-                if (wanted.isEmpty()) continue; // nothing to say, don't track
-                existing = new Tracked(entity instanceof ItemFrame,
-                        throwerName(entity), new HashMap<>());
-                tracked.put(entry.getKey(), existing);
-            }
-
-            Map<Frequency, VirtualTransmitter> live = existing.transmitters();
-            Iterator<Map.Entry<Frequency, VirtualTransmitter>> it =
-                    live.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<Frequency, VirtualTransmitter> t = it.next();
-                if (!wanted.containsKey(t.getKey())) {
-                    t.getValue().removeFromNetwork();
-                    it.remove();
-                }
-            }
-            for (Map.Entry<Frequency, Integer> want : wanted.entrySet()) {
-                VirtualTransmitter transmitter = live.get(want.getKey());
-                if (transmitter == null) {
-                    transmitter = new VirtualTransmitter(want.getKey(), level,
-                            entity.blockPosition(), want.getValue());
-                    Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(level, transmitter);
-                    live.put(want.getKey(), transmitter);
-                } else {
-                    // update() no-ops on the network unless position or
-                    // strength actually changed — drifting items are cheap
-                    transmitter.update(level, entity.blockPosition(), want.getValue());
-                }
-            }
-            if (live.isEmpty()) {
-                tracked.remove(entry.getKey());
-            }
+            syncTransmitters(level, tracked, entity, stack, null);
         }
 
         if (tracked.isEmpty()) ACTIVE.remove(level);
+    }
+
+    /**
+     * Toss fast path (add-only): a player Q-drop or inventory drag-out
+     * registers the thrown tablet's transmitters immediately instead of
+     * waiting up to {@link #SWEEP_INTERVAL} ticks for the sweep to pick
+     * it up, closing the power blink between the player-inventory anchor
+     * releasing the stack and the sweep noticing the dropped one. Runs the
+     * exact same per-entity registration the sweep uses (never forked —
+     * see {@link #syncTransmitters}), so a sweep landing on this entity
+     * before or after this handler runs is a no-op either way: {@code
+     * update()} on an already-live transmitter only touches the network
+     * when position or strength actually changed, and a wanted frequency
+     * that's already registered is simply fetched from {@code live}, not
+     * re-added.
+     * <p>
+     * Add-only by design: cleanup remains sweep-only (see class javadoc).
+     * If some other listener cancels the toss afterward and the item
+     * entity never truly enters the world, this handler has already
+     * registered it — but the next sweep won't find it in {@code
+     * present} and removes it within {@link #SWEEP_INTERVAL} ticks, same
+     * as any other despawn. No {@code receiveCanceled}, no removal event.
+     */
+    @SubscribeEvent
+    public static void onItemToss(ItemTossEvent event) {
+        if (!(event.getPlayer().level() instanceof ServerLevel level)) return;
+        ItemEntity itemEntity = event.getEntity();
+        ItemStack stack = itemEntity.getItem();
+        if (!(stack.getItem() instanceof TabletItem)) return;
+
+        Map<UUID, Tracked> tracked = ACTIVE.computeIfAbsent(level, l -> new HashMap<>());
+        // Prefer the event's player directly: getOwner() resolves the
+        // thrower UUID against loaded entities and may not be set on the
+        // ItemEntity yet at the moment the toss event fires.
+        syncTransmitters(level, tracked, itemEntity, stack, event.getPlayer().getName().getString());
+    }
+
+    /**
+     * Builds the wanted-frequency map for one tablet-bearing entity and
+     * diffs it against that entity's live transmitters, registering new
+     * ones and dropping ones no longer wanted. Shared by the sweep (step
+     * 3 above) and the toss fast path — the ONLY place either adds or
+     * updates a transmitter for a present entity; never fork this logic.
+     * Idempotent: calling it twice in a row for the same entity and stack
+     * state is a no-op the second time (see {@link #onItemToss}).
+     *
+     * @param throwerNameOverride thrower name to use when first tracking
+     *                            this entity, or null to fall back to
+     *                            {@link #throwerName}; ignored once the
+     *                            entity is already tracked.
+     */
+    private static void syncTransmitters(ServerLevel level, Map<UUID, Tracked> tracked,
+                                         Entity entity, ItemStack stack,
+                                         @Nullable String throwerNameOverride) {
+        UUID uuid = entity.getUUID();
+
+        Map<Frequency, Integer> wanted = new HashMap<>();
+        List<Signal> signals = stack.getOrDefault(
+                ModDataComponents.TABLET_SIGNALS.get(), List.of());
+        for (Signal signal : signals) {
+            // Same filter as the player-inventory scan: momentary
+            // and timer signals broadcast via holds, never from here
+            if (!signal.active() || signal.momentary() || signal.timed()) continue;
+            for (Frequency freq : signal.frequencies()) {
+                if (!freq.isEmpty()) {
+                    wanted.merge(freq, signal.strength(), Math::max);
+                }
+            }
+        }
+
+        Tracked existing = tracked.get(uuid);
+        if (existing == null) {
+            if (wanted.isEmpty()) return; // nothing to say, don't track
+            existing = new Tracked(entity instanceof ItemFrame,
+                    throwerNameOverride != null ? throwerNameOverride : throwerName(entity),
+                    new HashMap<>());
+            tracked.put(uuid, existing);
+        }
+
+        Map<Frequency, VirtualTransmitter> live = existing.transmitters();
+        Iterator<Map.Entry<Frequency, VirtualTransmitter>> it =
+                live.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Frequency, VirtualTransmitter> t = it.next();
+            if (!wanted.containsKey(t.getKey())) {
+                t.getValue().removeFromNetwork();
+                it.remove();
+            }
+        }
+        for (Map.Entry<Frequency, Integer> want : wanted.entrySet()) {
+            VirtualTransmitter transmitter = live.get(want.getKey());
+            if (transmitter == null) {
+                transmitter = new VirtualTransmitter(want.getKey(), level,
+                        entity.blockPosition(), want.getValue());
+                Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(level, transmitter);
+                live.put(want.getKey(), transmitter);
+            } else {
+                // update() no-ops on the network unless position or
+                // strength actually changed — drifting items are cheap,
+                // and a sweep re-visiting an entity this handler already
+                // registered is equally cheap.
+                transmitter.update(level, entity.blockPosition(), want.getValue());
+            }
+        }
+        if (live.isEmpty()) {
+            tracked.remove(uuid);
+        }
     }
 
     /** Thrower attribution for the Monitor row; null when unknown.

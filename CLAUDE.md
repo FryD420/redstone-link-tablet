@@ -362,12 +362,18 @@ apps→signals rename (2026-07-27) covered code, wire ids (registrar
   design (the hold system is player-keyed, untouched). The sweep is a
   linear visible-entity scan via `getEntities(EntityTypeTest, ...)`,
   not type-indexed — the class comment says so; keep it that way. The
-  4-tick sweep period means a throw has a 1-4 tick gap before the
-  dropped copy re-appears (the player anchor drops it instantly, the
-  sweep re-adds it later) and a pickup can double-transmit for up to
-  4 ticks — harmless for power (Create max-wins) but a Monitor
-  snapshot can briefly show two rows for one tablet; this is inherent
-  to the sweep cadence, not a bug.
+  4-tick sweep period used to mean a throw had a 1-4 tick gap before
+  the dropped copy re-appeared; a player TOSS (Q-drop or inventory
+  drag-out) now registers instantly through an add-only `ItemTossEvent`
+  fast path in the same class (`onItemToss`, extracted per-entity
+  registration shared with the sweep via `syncTransmitters` — never
+  forked), closing that gap for deliberate throws. Cleanup is
+  untouched: still sweep-only, add-only fast path never removes. Other
+  spawn paths (death drops, dispensers, block drops, frame pops) keep
+  the ≤4-tick gap. A pickup can still double-transmit for up to 4
+  ticks — harmless for power (Create max-wins) but a Monitor snapshot
+  can briefly show two rows for one tablet; this remains inherent to
+  the sweep cadence, not a bug.
 
 ## Release process
 

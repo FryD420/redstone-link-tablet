@@ -17,9 +17,12 @@
   diagnosis: dropping a spare tablet used to silence it — now the
   Monitor just names it as a dropped member instead, so the fix for a
   phantom-pinned receiver is to pick the copy up or destroy it, not
-  drop it. Edge case: because the handoff runs on a periodic sweep,
-  edge-sensitive contraptions may see a brief blip at the exact moment
-  of a throw or pickup.
+  drop it. Edge case: a deliberate player toss (Q-drop or inventory
+  drag-out) now registers instantly via an add-only fast path, closing
+  the blink at the exact moment of a throw; because the handoff still
+  runs on a periodic sweep for every other case, edge-sensitive
+  contraptions may still see a brief blip at pickup, or on death
+  drops, dispensers, and other non-toss spawns.
 
 ### Changed
 - Network protocol version unchanged (still 24) — 1.13.0 pairs with
