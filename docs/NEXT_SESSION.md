@@ -16,6 +16,14 @@ at the repo root (auto-loaded every Claude session).
   queued — reactive hotfix posture; only the carried tester rows
   remain (two-account mural, dedicated-server lock,
   follow-while-locked, 1.11.1's two server-only paint rows).
+- **Listing refresh DONE 2026-08-20**: DESCRIPTION.md gained the
+  1.11.1 paint-toolbox sentence (brush/fill/line/rect/eyedropper +
+  32-step undo) and a new "🔒 Lock it down" section after Paint
+  (padlock-in-GUI to lock, wrench to reconfigure/unlock, walls lock
+  whole and stay locked on split). Tooltips deliberately NOT
+  mentioned (user call — "standard"). Paste file delivered; user
+  pastes to both platforms. This clears the 2026-08-11 "listing nit
+  queue" below. No new images — nothing blocks on a main push.
 - **Addon-API interest (2026-08-17)**: the user asked how third
   parties make App Store apps — docs/API.md is current (dep-pin
   example bumped to 1.13.0, commit b5decc3; floor stays [1.10.0,),

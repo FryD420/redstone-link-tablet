@@ -215,7 +215,9 @@ signals.
 ## 🖌️ Paint on the walls
 
 A pixel canvas that lives on the tablet: doodle, place it, and the picture
-**shows right on the glass**. Merged walls become **murals** — paint across
+**shows right on the glass**. A proper toolbox rides along — **brush, fill,
+line, rectangle, an eyedropper, and a 32-step undo**, each with a keyboard
+shortcut. Merged walls become **murals** — paint across
 the seams while viewers watch your strokes land live, split the wall and each
 tablet keeps its slice, merge back and the mural reassembles. Break it, chest
 it, gift it — the art travels with the tablet.
@@ -225,6 +227,17 @@ it, gift it — the art travels with the tablet.
 ![The same wall with its member tablets rearranged — the sunrise mural remixed into a new picture](https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/mural-remix.png)
 
 *Every tablet keeps its slice — rearrange the wall, remix the painting.*
+
+---
+
+## 🔒 Lock it down
+
+On a shared server, tap the **padlock** in a placed tablet's GUI and it
+locks: everyone can still flip its signals, drag its sliders, and use its
+apps — but reconfiguring anything (signals, channels, the mural) and
+unlocking again take a **Create wrench** in hand. Locking a merged wall
+locks every tablet in it, and the pieces stay locked if the wall is split.
+Perfect for public kiosks — and for keeping your mural safe.
 
 ---
 
