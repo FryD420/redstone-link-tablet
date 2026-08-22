@@ -12,6 +12,8 @@
 
 <p align="center"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/supported/neoforge_64h.png?raw=true" alt="Available for NeoForge" height="56">&nbsp;&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/requires/create_64h.png?raw=true" alt="Requires Create" height="56"></a>&nbsp;&nbsp;<a href="https://discord.gg/JwkHGpE527"><img src="https://raw.githubusercontent.com/FryD420/redstone-link-tablet/main/docs/images/discord-badge.png" alt="Help develop on Discord" height="56"></a>&nbsp;&nbsp;<a href="https://streamelements.com/fryd42/tip"><img src="https://github.com/intergrav/devins-badges/blob/v3/assets/cozy/donate/generic-singular_64h.png?raw=true" alt="Donate" height="56"></a></p>
 
+<p align="center"><img src="https://img.shields.io/badge/Available%20for-1.21.1-EE6D3D?style=flat-square" alt="Available for Minecraft 1.21.1" height="28">&nbsp;<a href="https://modrinth.com/mod/redstone-link-tablet"><img src="https://img.shields.io/modrinth/dt/redstone-link-tablet?label=Modrinth&logo=modrinth&logoColor=white&color=00AF5C&style=flat-square" alt="Modrinth downloads" height="28"></a>&nbsp;<a href="https://www.curseforge.com/minecraft/mc-mods/create-redstone-link-tablet"><img src="https://img.shields.io/curseforge/dt/1610713?label=CurseForge&logo=curseforge&logoColor=white&color=F16436&style=flat-square" alt="CurseForge downloads" height="28"></a></p>
+
 ---
 
 **A smart-home control panel for your Create contraptions.**
@@ -318,6 +320,16 @@ no source/issues/changelog link in the paste content. The raw.githubusercontent
 image embeds stay (that's just hosting, invisible in the rendered page).
 The ADDON-API developer bullet was removed entirely (same decision — its only
 docs link was GitHub); the API is announced to addon authors elsewhere.
+
+### Download-counter row (2026-08-20, shields.io — no shoot needed)
+
+- ✅ Live badges under the cozy badge row: "Available for 1.21.1"
+  (static) + Modrinth and CurseForge download counters, each linking
+  to its listing (user request, styled after Create: Power Loader's
+  header). shields.io serves them live — nothing to regenerate. The
+  CurseForge badge is keyed by numeric project id **1610713**; the
+  Modrinth badge by slug. If the mod ever targets more MC versions,
+  extend the static "Available for" badge by hand.
 
 ### Discord badge (2026-08-10, Claude-generated — no shoot needed)
 
